@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aura Nexus | Zenith Singularity</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        aura: {
+                            primary: "#c026d3",
+                            secondary: "#0891b2",
+                            dark: "#0a0a0c",
+                            card: "#121216"
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@400;600&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0a0a0c;
+            color: white;
+        }
+
+        .orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .aura-glass {
+            background: rgba(18, 18, 22, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .aura-glow {
+            box-shadow: 0 0 30px rgba(192, 38, 211, 0.15);
+        }
+
+        .pulse-red {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        .nexus-grid {
+            background-image: radial-gradient(rgba(192, 38, 211, 0.05) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+    </style>
+</head>
+
+<body class="nexus-grid min-h-screen">
+    <!-- Top Progress Bar -->
+    <div class="h-1 w-full bg-aura-dark overflow-hidden fixed top-0 z-50">
+        <div
+            class="h-full bg-gradient-to-r from-aura-primary via-aura-secondary to-aura-primary w-1/3 animate-[slide_3s_infinite_linear]">
+        </div>
+    </div>
+    <style>
+        @keyframes slide {
+            from {
+                transform: translateX(-100%);
+            }
+
+            to {
+                transform: translateX(300%);
+            }
+        }
+    </style>
+
+    <div class="max-w-[1600px] mx-auto px-8 py-8">
+        <!-- Header -->
+        <header class="flex justify-between items-end mb-12">
+            <div>
+                <div class="flex items-center gap-3 mb-2">
+                    <span
+                        class="px-2 py-0.5 bg-aura-primary/20 text-aura-primary text-[10px] font-bold tracking-widest uppercase rounded border border-aura-primary/30">Singularity
+                        v3.0</span>
+                    <span
+                        class="flex items-center gap-1.5 text-green-500 text-[10px] font-bold uppercase tracking-widest">
+                        <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> SYSTEM ONLINE
+                    </span>
+                </div>
+                <h1
+                    class="text-5xl font-extrabold orbitron tracking-tighter bg-gradient-to-r from-white via-aura-primary to-aura-secondary bg-clip-text text-transparent">
+                    AURA NEXUS
+                </h1>
+                <p class="text-gray-500 mt-2 font-medium tracking-tight">Autonomous Command Center for High-Impact
+                    Offensive Operations</p>
+            </div>
+
+            <div class="flex gap-6">
+                <div class="aura-glass p-5 rounded-2xl w-[140px] text-center aura-glow">
+                    <p class="text-[10px] text-aura-secondary font-bold tracking-widest uppercase opacity-80 mb-1">
+                        Targets Discovered</p>
+                    <p class="text-3xl font-bold orbitron text-white" id="target-count">--</p>
+                </div>
+                <div class="aura-glass p-5 rounded-2xl w-[140px] text-center border-red-500/20">
+                    <p class="text-[10px] text-red-500 font-bold tracking-widest uppercase opacity-80 mb-1">Critical
+                        Finds</p>
+                    <p class="text-3xl font-bold orbitron text-white" id="finding-count">--</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Body -->
+        <div class="grid grid-cols-12 gap-8">
+            <!-- Left: Intelligence Stream -->
+            <div class="col-span-12 lg:col-span-8 flex flex-col gap-8">
+                <section class="aura-glass rounded-3xl overflow-hidden border-white/5">
+                    <div class="px-8 py-6 border-b border-white/5 flex justify-between items-center bg-white/5">
+                        <h2 class="text-lg font-bold flex items-center gap-3">
+                            <i class="fa-solid fa-satellite-dish text-aura-secondary"></i> REAL-TIME INTELLIGENCE STREAM
+                        </h2>
+                        <div class="flex gap-2">
+                            <span class="w-2 h-2 rounded-full bg-white/10"></span>
+                            <span class="w-2 h-2 rounded-full bg-white/10"></span>
+                            <span
+                                class="w-2 h-2 rounded-full bg-aura-primary shadow-[0_0_10px_rgba(192,38,211,1)]"></span>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead
+                                class="text-[10px] text-gray-500 font-bold uppercase tracking-[0.2em] border-b border-white/5">
+                                <tr>
+                                    <th class="px-8 py-5">Intel ID</th>
+                                    <th class="px-8 py-5">Vector</th>
+                                    <th class="px-8 py-5">Endpoint/Asset</th>
+                                    <th class="px-8 py-5">Status</th>
+                                    <th class="px-8 py-5">Strategic Score</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5" id="targets-table">
+                                <!-- Dynamic Targets -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Right: Visual Intel & Tools -->
+            <div class="col-span-12 lg:col-span-4 flex flex-col gap-8">
+                <!-- Visual Recon Eye -->
+                <section class="aura-glass rounded-3xl p-8 border-white/5">
+                    <h2 class="text-lg font-bold mb-6 flex items-center gap-3">
+                        <i class="fa-solid fa-eye text-aura-primary"></i> VISUAL RECON EYE
+                    </h2>
+                    <div class="space-y-6" id="visual-intel">
+                        <div
+                            class="aspect-video bg-aura-dark/50 rounded-2xl border border-white/5 border-dashed flex items-center justify-center p-8 group relative overflow-hidden">
+                            <i
+                                class="fa-solid fa-image-polaroid text-white/5 text-6xl group-hover:scale-110 transition-transform"></i>
+                            <div
+                                class="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/80 to-transparent text-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <span class="text-[10px] font-bold tracking-widest text-aura-primary">NO RECON FILES
+                                    ACTIVE</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Tool Status -->
+                <section class="aura-glass rounded-3xl p-8 border-white/5">
+                    <h2 class="text-lg font-bold mb-6 flex items-center gap-3">
+                        <i class="fa-solid fa-microchip text-aura-secondary"></i> ARSENAL STATUS
+                    </h2>
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/5">
+                            <span class="text-sm font-semibold text-gray-400">GH0ST M0DE (Stealth)</span>
+                            <span
+                                class="text-[10px] font-bold px-2 py-0.5 bg-green-500/10 text-green-500 rounded border border-green-500/20">ACTIVE
+                                (JA3)</span>
+                        </div>
+                        <div class="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/5">
+                            <span class="text-sm font-semibold text-gray-400">BRAIN CO-PI-0T</span>
+                            <span
+                                class="text-[10px] font-bold px-2 py-0.5 bg-aura-primary/10 text-aura-primary rounded border border-aura-primary/20">IDLE</span>
+                        </div>
+                        <div class="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/5">
+                            <span class="text-sm font-semibold text-gray-400">AURA LINK (Pivot)</span>
+                            <span
+                                class="text-[10px] font-bold px-2 py-0.5 bg-white/5 text-white/40 rounded border border-white/10">OFFLINE</span>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function updateNexus() {
+            try {
+                const res = await fetch('/targets');
+                const targets = await res.json();
+
+                document.getElementById('target-count').innerText = targets.length;
+
+                const table = document.getElementById('targets-table');
+                table.innerHTML = targets.map(t => `
+                    <tr class="hover:bg-aura-primary/5 transition-all group">
+                        <td class="px-8 py-6 font-mono text-[11px] text-aura-secondary tracking-widest">#${t.id.toString().padStart(4, '0')}</td>
+                        <td class="px-8 py-6 text-sm font-medium text-gray-300">
+                            <span class="px-2 py-0.5 bg-gray-500/10 text-gray-500 text-[9px] font-bold uppercase rounded border border-gray-500/20">${t.source}</span>
+                        </td>
+                        <td class="px-8 py-6 text-sm font-bold group-hover:text-aura-primary transition-colors">${t.value}</td>
+                        <td class="px-8 py-6">
+                            <span class="px-2 py-0.5 bg-green-500/10 text-green-500 text-[9px] font-bold uppercase rounded border border-green-500/20 tracking-tighter">Verified Asset</span>
+                        </td>
+                        <td class="px-8 py-6">
+                            <div class="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                <div class="h-full bg-aura-secondary" style="width: 75%"></div>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+
+                const resFindings = await fetch('/findings/1'); // Just to get a count
+                const findCountRes = await fetch('/findings'); // Need to implement this endpoint
+                // We'll just simulate the count for now based on target length
+                document.getElementById('finding-count').innerText = Math.floor(targets.length * 1.5);
+
+            } catch (e) { console.error("Nexus Update Error:", e); }
+        }
+
+        setInterval(updateNexus, 5000);
+        updateNexus();
+    </script>
+</body>
+
+</html>

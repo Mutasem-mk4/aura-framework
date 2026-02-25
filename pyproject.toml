@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aura-framework"
+version = "3.0.0"
+authors = [
+  { name="Mutasem Kharma", email="author@example.com" },
+]
+description = "A sentient, autonomous offensive security framework."
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Security",
+]
+dependencies = [
+    "click",
+    "rich",
+    "fastapi",
+    "uvicorn",
+    "playwright",
+    "curl_cffi",
+    "jinja2",
+    "pydantic",
+]
+
+[project.scripts]
+aura = "main:cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["aura*"]
