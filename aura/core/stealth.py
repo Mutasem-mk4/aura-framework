@@ -75,6 +75,40 @@ class StealthEngine:
         }
         return evasions.get(waf_type, evasions["Generic"])
 
+    # ── v6.0: Polymorphic Payload Mutation ────────────────────────────────
+    _mutation_counter: int = 0
+    MUTATION_STRATEGIES = ["url_encode", "double_url_encode", "unicode_escape", "hex_encode", "whitespace", "comment"]
+
+    def mutate_payload(self, payload: str) -> str:
+        """
+        v6.0 Adaptive WAF Evasion: Rotates through 6 mutation strategies on each call.
+        This provides Polymorphic Payloads — same attack, different shape every retry.
+        """
+        import urllib.parse
+        strategy = self.MUTATION_STRATEGIES[self._mutation_counter % len(self.MUTATION_STRATEGIES)]
+        StealthEngine._mutation_counter = (self._mutation_counter + 1) % len(self.MUTATION_STRATEGIES)
+
+        if strategy == "url_encode":
+            return urllib.parse.quote(payload, safe="")
+        elif strategy == "double_url_encode":
+            return urllib.parse.quote(urllib.parse.quote(payload, safe=""), safe="")
+        elif strategy == "unicode_escape":
+            return "".join(f"\\u{ord(c):04x}" if c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-." else c for c in payload)
+        elif strategy == "hex_encode":
+            return "".join(f"%{ord(c):02x}" if ord(c) > 32 and c not in "0123456789" else c for c in payload)
+        elif strategy == "whitespace":
+            # Inject harmless whitespace at various positions
+            import re
+            return re.sub(r'(\s+)', '\t ', payload).replace("SELECT", "SELECT/**/").replace("OR", "OR/**/").replace("AND", "AND/**/")
+        else:  # comment injection
+            return payload.replace(" ", "/**/").replace("'", "'/**/")
+
+    async def human_jitter(self, min_ms: float = 300, max_ms: float = 1200):
+        """v6.0: Human-like delay between requests to avoid anti-bot detection."""
+        delay = random.uniform(min_ms / 1000, max_ms / 1000)
+        await asyncio.sleep(delay)
+
+
     def get_stealth_params(self, force_rotate: bool = False) -> Dict:
         """Returns randomized stealth headers mimicking modern browsers (v5)."""
         impersonate = random.choice(self.IMPERSONATE_TYPES)

@@ -18,6 +18,8 @@ from aura.modules.bounty import BountyHunter
 from aura.modules.banner_grabber import BannerGrabber
 from aura.modules.recon_pipeline import ReconPipeline   # v5.0
 from aura.modules.secret_hunter import SecretHunter      # v5.0
+from aura.modules.power_stack import PowerStack          # v6.0
+from aura.modules.poc_engine import PoCEngine            # v6.0
 from aura.core import state
 from aura.core.storage import AuraStorage
 from rich.console import Console
@@ -47,6 +49,8 @@ class NeuralOrchestrator:
         self.banner_grabber = BannerGrabber()            # v3.0: OSINT Resiliency
         self.recon_pipeline = ReconPipeline()             # v5.0: Subfinder→HTTPX→Nmap
         self.secret_hunter  = SecretHunter()              # v5.0: TruffleHog-style
+        self.power_stack    = PowerStack(stealth=self.stealth)  # v6.0: Nuclei/TruffleHog/HTTPX/Nmap
+        self.poc_engine     = PoCEngine(stealth=self.stealth)   # v6.0: Deterministic PoC
         self.dast_semaphore = asyncio.Semaphore(5)        # Velocity v14.4
         self.sing_semaphore = asyncio.Semaphore(3) # Velocity v14.4
         self.plugins = []
@@ -182,6 +186,14 @@ class NeuralOrchestrator:
         # 2.1 Active Reconnaissance (Phase 23: Port Scanning & DirBusting)
         console.print("[cyan][*] Phase 2.1: Active Reconnaissance (Port Scanning & DirBusting)...[/cyan]")
         await self.broadcast("Executing Active Port Scan & Directory Brute Forcing...", type="status", icon="radar")
+
+        # v6.0: PowerStack Phase 2.0 — Nuclei CVE Scan
+        console.print("[bold cyan][*] Phase 2.0: v6.0 PowerStack — Nuclei CVE/Template Scan...[/bold cyan]")
+        nuclei_findings = await self.power_stack.nuclei_scan(target_url)
+        for nf in nuclei_findings:
+            self.db.add_finding(domain, nf['content'], nf['type'], campaign_id=campaign_id)
+            findings.append(nf)
+            vulns.append(nf)
         
         discovered_urls = [target_url]
         if target_ip:
@@ -240,6 +252,21 @@ class NeuralOrchestrator:
             self.db.add_finding(domain, sf['content'], sf['type'], campaign_id=campaign_id)
             findings.append(sf)
             vulns.append(sf)  # All secrets are CRITICAL
+
+        # v6.0: PowerStack — HTTPX liveness filter on discovered URLs
+        console.print("[bold green][*] Phase 2.3: v6.0 PowerStack — HTTPX URL Liveness Filter...[/bold green]")
+        live_urls = await self.power_stack.httpx_verify(discovered_urls)
+        # Replace with live-only list for subsequent scans
+        if live_urls:
+            discovered_urls = list(set(discovered_urls[:1] + live_urls))  # Keep base + live
+
+        # v6.0: PowerStack — Nmap -sV service fingerprinting
+        if target_ip:
+            nmap_findings = await self.power_stack.nmap_service_scan(target_ip)
+            for nf in nmap_findings:
+                self.db.add_finding(domain, nf['content'], nf['type'], campaign_id=campaign_id)
+                findings.append(nf)
+                vulns.append(nf)
 
         vision_data = await self.vision.capture_screenshot(domain, f"zenith_{domain.replace('.', '_')}")
         tech_stack = vision_data.get("techs", []) if vision_data else []
@@ -388,9 +415,14 @@ class NeuralOrchestrator:
                     except: pass
                     vulns.append({"type": "Blind RCE / SSRF", "content": content})
 
+        # v6.0: Phase 5 — PoCEngine: Deterministic verification of all findings
+        console.print("[bold red][*] Phase 5: v6.0 PoC Engine — Deterministic Exploitation Verification...[/bold red]")
+        await self.poc_engine.verify_all(target_url, vulns)
+
         # Step 5: Aura Forge Plugins (Community/Custom Intelligence)
         if self.plugins:
-            console.print(f"[bold magenta][*] Step 5: Executing {len(self.plugins)} Forge plugins...[/bold magenta]")
+            console.print(f"[bold magenta][*] Step 5+: Executing {len(self.plugins)} Forge plugins...[/bold magenta]")
+
             for plugin in self.plugins:
                 plugin_result = await plugin.run(domain, {"waf": self.stealth.active_waf, "vulns": vulns, "tech": tech_stack})
                 if plugin_result:

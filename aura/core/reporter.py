@@ -1,6 +1,9 @@
 import sqlite3
 import json
 import os
+import re
+from urllib.parse import urlparse
+from collections import defaultdict
 from jinja2 import Template
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
@@ -9,6 +12,69 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from aura.core.storage import AuraStorage
 from aura.core import state
+
+# ──────────────────────────────────────────────────────────────────────────
+# v6.0: CVSS v3.1 PRECISION LABEL (fixes "9.8 = HIGH" bug)
+# ──────────────────────────────────────────────────────────────────────────
+def cvss_to_label(score) -> str:
+    """Maps a CVSS v3.1 score to the correct severity label."""
+    try:
+        s = float(score)
+    except (TypeError, ValueError):
+        return "MEDIUM"
+    if s == 0.0:    return "INFORMATIONAL"
+    if s < 4.0:     return "LOW"
+    if s < 7.0:     return "MEDIUM"
+    if s < 9.0:     return "HIGH"
+    return "CRITICAL"
+
+# ──────────────────────────────────────────────────────────────────────────
+# v6.0: MITRE ATT&CK FRAMEWORK MAPPING
+# ──────────────────────────────────────────────────────────────────────────
+MITRE_ATTACK_MAP = {
+    "sqli":          ("T1190",  "Exploit Public-Facing Application"),
+    "sql injection": ("T1190",  "Exploit Public-Facing Application"),
+    "xss":           ("T1059.007", "JavaScript Execution"),
+    "cross-site":    ("T1059.007", "JavaScript Execution"),
+    "lfi":           ("T1083",  "File & Directory Discovery"),
+    "rfi":           ("T1190",  "Exploit Public-Facing Application"),
+    "ssrf":          ("T1090",  "Proxy / Internal Network Access"),
+    "rce":           ("T1059",  "Command & Scripting Interpreter"),
+    "command":       ("T1059",  "Command & Scripting Interpreter"),
+    "secret":        ("T1552",  "Unsecured Credentials"),
+    "api key":       ("T1552",  "Unsecured Credentials"),
+    "token":         ("T1528",  "Steal Application Access Token"),
+    "idor":          ("T1078",  "Valid Accounts – BOLA/IDOR"),
+    "auth bypass":   ("T1078",  "Valid Accounts – Auth Bypass"),
+    "information":   ("T1592",  "Gather Victim Host Information"),
+    "disclosure":    ("T1592",  "Gather Victim Host Information"),
+    "path":          ("T1083",  "File & Directory Discovery"),
+    "directory":     ("T1083",  "File & Directory Discovery"),
+    "open redirect":  ("T1566",  "Phishing via Open Redirect"),
+    "csrf":          ("T1185",  "Browser Session Hijacking"),
+}
+
+def get_mitre(finding_type: str, content: str = "") -> str:
+    """Auto-assigns a MITRE ATT&CK ID from finding type."""
+    combined = (finding_type + " " + content).lower()
+    for keyword, (tid, tname) in MITRE_ATTACK_MAP.items():
+        if keyword in combined:
+            return f"{tid} — {tname}"
+    return "T1592 — Gather Victim Information"
+
+def _normalize_root_path(url_or_content: str) -> str:
+    """Extract and normalize the root path of a URL (e.g. /.git/config → /.git)."""
+    # Try to extract a URL first
+    match = re.search(r'https?://[^\s\'"]+', url_or_content)
+    target = match.group(0) if match else url_or_content
+    try:
+        p = urlparse(target)
+        parts = [x for x in p.path.split('/') if x]
+        # Return first two path components at most (root + one level)
+        root = '/' + parts[0] if parts else '/'
+        return root
+    except Exception:
+        return '/'
 
 class AuraReporter:
     """Generates professional HTML and PDF security reports from Aura's database."""
@@ -232,59 +298,73 @@ class AuraReporter:
 
     def _deduplicate_findings(self, findings: list) -> list:
         """
-        v4.0 De-duplication Engine: Merges repeated finding types into Pattern entries.
-        If the same finding type appears > 3 times, collapse them into one Pattern card
-        listing all affected URLs. This transforms 521 'Information Disclosure' rows into
-        a single professional 'Information Disclosure Pattern - 521 paths affected' entry.
+        v6.0 Smart De-duplication: Groups findings by (type, root_path) instead
+        of just type. This prevents /.git, /.git/config, /.git/HEAD showing up
+        as 3 separate entries — they all collapse under one '/.git' Pattern card.
+        Target: 180-page reports → clean 20-page executive reports.
         """
-        from collections import defaultdict
-        import re
-
-        type_groups = defaultdict(list)
-        unique_findings = []
+        # Group by (normalized_type, root_path)
+        path_type_groups = defaultdict(list)
+        unique_findings   = []
+        PATTERN_THRESHOLD = 3
 
         for f in findings:
-            f_type = f.get("type") or f.get("finding_type") or "Unknown"
-            # Extract URL from content if present
-            url_match = re.search(r'https?://[^\s\'"]+', f.get("content", ""))
-            url = url_match.group(0) if url_match else f.get("content", "")[:80]
-            type_groups[f_type].append((url, f))
+            f_type  = (f.get("type") or f.get("finding_type") or "Unknown").split(" (Pattern")[0]
+            content = f.get("content", "")
+            root    = _normalize_root_path(content)
+            key     = (f_type, root)
+            url_match = re.search(r'https?://[^\s\'"]+', content)
+            url = url_match.group(0) if url_match else content[:100]
+            path_type_groups[key].append((url, f))
 
-        PATTERN_THRESHOLD = 3  # Collapse if same type appears > this many times
-
-        for f_type, instances in type_groups.items():
+        for (f_type, root_path), instances in path_type_groups.items():
             if len(instances) <= PATTERN_THRESHOLD:
-                # Small number — show individually
                 for _, f in instances:
+                    # v6.0: Fix CVSS label and auto-assign MITRE ATT&CK
+                    cvss = f.get("cvss_score")
+                    if cvss:
+                        f["severity"] = cvss_to_label(cvss)
+                    if not f.get("mitre"):
+                        f["mitre"] = get_mitre(f_type, f.get("content", ""))
                     unique_findings.append(f)
             else:
-                # Collapse into a Pattern entry
-                all_urls = [url for url, _ in instances]
-                base_finding = instances[0][1]  # Use first finding as template
-                
-                # Use a small font and limited list for PDF layout safety
-                PDF_LIMIT = 12
-                url_list = "<br/>".join(f"  • <font size='8' face='Courier'>{u}</font>" for u in all_urls[:PDF_LIMIT])
-                suffix = f"<br/><i>  ... and {len(all_urls) - PDF_LIMIT} more paths.</i>" if len(all_urls) > PDF_LIMIT else ""
+                all_urls    = [url for url, _ in instances]
+                base_finding = instances[0][1]
+                cvss         = base_finding.get("cvss_score")
+                sev          = cvss_to_label(cvss) if cvss else base_finding.get("severity", "MEDIUM")
+                mitre        = get_mitre(f_type, base_finding.get("content", ""))
+
+                PDF_LIMIT = 8
+                url_list = "<br/>".join(
+                    f"&nbsp;&nbsp;• <font size='7.5' face='Courier'>{u}</font>" for u in all_urls[:PDF_LIMIT]
+                )
+                suffix = (
+                    f"<br/><i>&nbsp;&nbsp;... and <b>{len(all_urls) - PDF_LIMIT}</b> more paths.</i>"
+                    if len(all_urls) > PDF_LIMIT else ""
+                )
 
                 pattern_finding = {
                     **base_finding,
-                    "type": f"{f_type} (Pattern — {len(all_urls)} paths)",
+                    "type":         f"{f_type} (Systemic — {len(all_urls)} paths @ {root_path})",
+                    "finding_type": f"{f_type} (Systemic — {len(all_urls)} paths @ {root_path})",
                     "content": (
-                        f"⚠ <b>PATTERN DETECTED:</b> '{f_type}' discovered across {len(all_urls)} endpoints.<br/><br/>"
+                        f"<b>⚠ SYSTEMIC PATTERN:</b> '{f_type}' across {len(all_urls)} paths "
+                        f"under root <font face='Courier'>{root_path}</font>.<br/><br/>"
                         f"<b>Top Affected Paths:</b><br/>{url_list}{suffix}"
                     ),
-                    "severity": base_finding.get("severity", "MEDIUM"),
-                    "cvss_score": base_finding.get("cvss_score"),
-                    "cvss_vector": base_finding.get("cvss_vector"),
-                    "remediation_fix": base_finding.get("remediation_fix",
-                        "Implement a global sanitization/filtering layer to fix this pattern across all endpoints."),
+                    "severity":         sev,
+                    "mitre":            mitre,
+                    "patch_priority":   "IMMEDIATE" if sev in ("CRITICAL", "HIGH") else "HIGH",
+                    "cvss_score":       cvss,
+                    "cvss_vector":      base_finding.get("cvss_vector"),
+                    "remediation_fix":  base_finding.get("remediation_fix",
+                        "Implement a global response-level header policy and path-based access controls for all instances."),
                     "impact_desc": (
-                        f"This finding type affects {len(all_urls)} endpoints, indicating a "
-                        f"systemic layout/config issue. Scale of compromise is magnified."
+                        f"This finding type ({f_type}) was detected across {len(all_urls)} endpoints under '{root_path}', "
+                        f"indicating a systemic misconfiguration rather than an isolated case. "
+                        f"The attack surface is significantly larger than a single vulnerability."
                     ),
                 }
-
                 unique_findings.append(pattern_finding)
 
         return unique_findings
@@ -483,18 +563,13 @@ class AuraReporter:
                 elements.append(Spacer(1, 10))
                 # v4.0: De-duplication Engine — collapse repeated findings into Patterns
                 deduped = self._deduplicate_findings(target['findings'])
-                data = [["Finding Identification & Business Impact", "Type", "Compliance", "Severity"]]
+                data = [["Finding Identification & Business Impact", "Type", "MITRE ATT&CK", "CVSS / Sev"]]
                 for f in deduped:
-                    severity = f.get('severity') or f.get('finding_severity', 'MEDIUM')
-                    if severity == 'UNKNOWN' or not severity:
-                        severity = 'MEDIUM'
-                        f_type_check = f.get('type') or f.get('finding_type', '')
-                        if 'Injection' in f_type_check or 'Secret' in f_type_check:
-                            severity = 'CRITICAL'
-
-                    
-                    # Professional Formatting for PDF (v3.0: MITRE ATT&CK + Patching Priority)
-                    mitre_str = f.get('mitre', '')
+                    # v6.0: Accurate severity using CVSS label
+                    cvss_score = f.get('cvss_score')
+                    severity   = cvss_to_label(cvss_score) if cvss_score else (f.get('severity') or f.get('finding_severity', 'MEDIUM'))
+                    if severity in ('', 'UNKNOWN', None): severity = 'MEDIUM'
+                    mitre_str  = f.get('mitre') or get_mitre(f.get('type') or f.get('finding_type', ''), f.get('content', ''))
                     patch_priority = f.get('patch_priority', '')
                     f_content = (
                         f"<b>{f.get('content', 'N/A')}</b><br/><br/>"
