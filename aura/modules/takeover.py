@@ -19,7 +19,7 @@ class TakeoverFinder:
         "Ghost.io": {"fingerprint": "The thing you were looking for is no longer here", "service": "Ghost.io"}
     }
 
-    def check_takeover(self, domain):
+    async def check_takeover(self, domain):
         """Checks a subdomain for potential takeover fingerprints."""
         if not domain.startswith("http"):
             url = f"http://{domain}"
@@ -29,7 +29,8 @@ class TakeoverFinder:
         console.print(f"[bold yellow][*] TakeoverFinder: Checking {domain} for DNS takeover...[/bold yellow]")
         
         try:
-            response = session.get(url, timeout=5)
+            # Aura Session now handles throttling and async requests
+            response = await session.get(url, timeout=5)
             content = response.text
             
             for service, data in self.TAKEOVER_SIGS.items():

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aura-framework"
-version = "3.0.0"
+version = "3.0.2"
 authors = [
   { name="Mutasem Kharma", email="author@example.com" },
 ]
@@ -29,7 +29,7 @@ dependencies = [
 ]
 
 [project.scripts]
-aura = "main:cli"
+aura = "aura.cli:cli"
 
 [tool.setuptools.packages.find]
 where = ["."]

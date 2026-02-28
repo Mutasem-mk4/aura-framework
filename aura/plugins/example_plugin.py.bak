@@ -1,0 +1,13 @@
+# aura/plugins/example_plugin.py
+from aura.plugins.base import AuraPlugin
+
+class ExamplePlugin(AuraPlugin):
+    def __init__(self):
+        super().__init__("ExampleScanner", "1.0.0")
+
+    async def run(self, target, context):
+        self.log(f"Running custom logic on {target}...")
+        # Simulate custom inspection
+        import asyncio
+        await asyncio.sleep(1)
+        return {"finding": "Example custom finding", "severity": "Low"}

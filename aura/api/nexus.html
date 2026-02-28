@@ -4,19 +4,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aura Nexus | Zenith Singularity</title>
+    <title>Aura Nexus V5 | Sentinel Command</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
                         aura: {
-                            primary: "#c026d3",
-                            secondary: "#0891b2",
-                            dark: "#0a0a0c",
-                            card: "#121216"
+                            base: "#050507",
+                            card: "#0d0d12",
+                            accent: "#a855f7", /* Electric Violet */
+                            cyan: "#06b6d4",
+                            critical: "#ef4444",
+                            success: "#10b981",
+                            warning: "#f59e0b"
+                        }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'glow': 'glow 2s ease-in-out infinite alternate',
+                    },
+                    keyframes: {
+                        glow: {
+                            'from': { boxShadow: '0 0 5px #a855f7, 0 0 10px #a855f7' },
+                            'to': { boxShadow: '0 0 20px #a855f7, 0 0 30px #a855f7' }
                         }
                     }
                 }
@@ -24,186 +37,258 @@
         }
     </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@400;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
+        :root {
+            --glass: rgba(13, 13, 18, 0.8);
+            --border: rgba(255, 255, 255, 0.05);
+        }
 
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0a0a0c;
-            color: white;
+            font-family: 'Outfit', sans-serif;
+            background-color: #050507;
+            color: #e2e8f0;
+            overflow-x: hidden;
         }
 
-        .orbitron {
-            font-family: 'Orbitron', sans-serif;
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
         }
 
-        .aura-glass {
-            background: rgba(18, 18, 22, 0.7);
+        .glass {
+            background: var(--glass);
             backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
         }
 
-        .aura-glow {
-            box-shadow: 0 0 30px rgba(192, 38, 211, 0.15);
+        .glass-bright {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .pulse-red {
-            animation: pulse 2s infinite;
+        .neon-text-violet {
+            text-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
         }
 
-        @keyframes pulse {
-            0% {
-                opacity: 1;
+        .neon-text-cyan {
+            text-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+        }
+
+        .scanline {
+            width: 100%;
+            height: 1px;
+            background: rgba(168, 85, 247, 0.1);
+            position: fixed;
+            z-index: 100;
+            pointer-events: none;
+            animation: scan 8s linear infinite;
+        }
+
+        @keyframes scan {
+            from {
+                top: 0;
+            }
+
+            to {
+                top: 100%;
+            }
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 3px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #a855f7;
+            border-radius: 10px;
+        }
+
+        .ai-node {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0);
             }
 
             50% {
-                opacity: 0.5;
+                transform: translateY(-5px);
             }
-
-            100% {
-                opacity: 1;
-            }
-        }
-
-        .nexus-grid {
-            background-image: radial-gradient(rgba(192, 38, 211, 0.05) 1px, transparent 1px);
-            background-size: 30px 30px;
         }
     </style>
 </head>
 
-<body class="nexus-grid min-h-screen">
-    <!-- Top Progress Bar -->
-    <div class="h-1 w-full bg-aura-dark overflow-hidden fixed top-0 z-50">
-        <div
-            class="h-full bg-gradient-to-r from-aura-primary via-aura-secondary to-aura-primary w-1/3 animate-[slide_3s_infinite_linear]">
-        </div>
+<body class="min-h-screen relative p-6 lg:p-10">
+    <div class="scanline"></div>
+
+    <!-- Background Elements -->
+    <div
+        class="fixed top-[-10%] right-[-10%] w-[500px] h-[500px] bg-aura-accent/10 rounded-full blur-[120px] pointer-events-none">
     </div>
-    <style>
-        @keyframes slide {
-            from {
-                transform: translateX(-100%);
-            }
+    <div
+        class="fixed bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-aura-cyan/5 rounded-full blur-[120px] pointer-events-none">
+    </div>
 
-            to {
-                transform: translateX(300%);
-            }
-        }
-    </style>
-
-    <div class="max-w-[1600px] mx-auto px-8 py-8">
+    <div class="max-w-[1700px] mx-auto space-y-8 relative z-10">
         <!-- Header -->
-        <header class="flex justify-between items-end mb-12">
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div>
-                <div class="flex items-center gap-3 mb-2">
+                <div class="flex items-center gap-4 mb-2">
                     <span
-                        class="px-2 py-0.5 bg-aura-primary/20 text-aura-primary text-[10px] font-bold tracking-widest uppercase rounded border border-aura-primary/30">Singularity
-                        v3.0</span>
+                        class="px-3 py-1 bg-aura-accent/20 text-aura-accent text-[10px] font-bold tracking-[0.3em] uppercase rounded-full border border-aura-accent/30 shadow-[0_0_15px_rgba(168,85,247,0.2)]">Vanguard
+                        V5</span>
                     <span
-                        class="flex items-center gap-1.5 text-green-500 text-[10px] font-bold uppercase tracking-widest">
-                        <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> SYSTEM ONLINE
+                        class="flex items-center gap-2 text-aura-success text-[10px] font-bold tracking-widest uppercase">
+                        <span
+                            class="w-1.5 h-1.5 rounded-full bg-aura-success animate-pulse shadow-[0_0_8px_#10b981]"></span>
+                        Live Operations
                     </span>
                 </div>
-                <h1
-                    class="text-5xl font-extrabold orbitron tracking-tighter bg-gradient-to-r from-white via-aura-primary to-aura-secondary bg-clip-text text-transparent">
-                    AURA NEXUS
-                </h1>
-                <p class="text-gray-500 mt-2 font-medium tracking-tight">Autonomous Command Center for High-Impact
-                    Offensive Operations</p>
+                <h1 class="text-6xl font-black tracking-tighter text-white drop-shadow-2xl">AURA<span
+                        class="text-aura-accent">NEXUS</span></h1>
+                <p class="text-slate-500 font-medium mt-1 tracking-tight">Sentient Offensive Intelligence Command Center
+                </p>
             </div>
 
-            <div class="flex gap-6">
-                <div class="aura-glass p-5 rounded-2xl w-[140px] text-center aura-glow">
-                    <p class="text-[10px] text-aura-secondary font-bold tracking-widest uppercase opacity-80 mb-1">
-                        Targets Discovered</p>
-                    <p class="text-3xl font-bold orbitron text-white" id="target-count">--</p>
-                </div>
-                <div class="aura-glass p-5 rounded-2xl w-[140px] text-center border-red-500/20">
-                    <p class="text-[10px] text-red-500 font-bold tracking-widest uppercase opacity-80 mb-1">Critical
-                        Finds</p>
-                    <p class="text-3xl font-bold orbitron text-white" id="finding-count">--</p>
-                </div>
+            <div class="flex items-center gap-4">
+                <button onclick="launchScan()"
+                    class="group relative px-8 py-4 bg-aura-accent hover:bg-aura-accent/90 text-white font-bold rounded-2xl transition-all shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:scale-[1.02]">
+                    <span class="relative z-10 flex items-center gap-3 uppercase tracking-widest text-xs">
+                        <i class="fa-solid fa-bolt-lightning text-sm"></i> Engage Zenith
+                    </span>
+                </button>
+                <button onclick="emergencyStop()"
+                    class="px-5 py-4 bg-transparent hover:bg-aura-critical/10 text-aura-critical rounded-2xl border border-aura-critical/30 transition-all">
+                    <i class="fa-solid fa-power-off"></i>
+                </button>
             </div>
         </header>
 
-        <!-- Main Body -->
+        <!-- Dynamic Stats Row -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="glass p-6 rounded-[2rem] flex items-center gap-5 hover:border-aura-accent/30 transition-colors">
+                <div class="w-12 h-12 rounded-2xl bg-aura-accent/10 flex items-center justify-center text-aura-accent">
+                    <i class="fa-solid fa-globe text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Total Assets</p>
+                    <p class="text-3xl font-bold text-white mono" id="stat-targets">0</p>
+                </div>
+            </div>
+            <div
+                class="glass p-6 rounded-[2rem] flex items-center gap-5 hover:border-aura-critical/30 transition-colors">
+                <div
+                    class="w-12 h-12 rounded-2xl bg-aura-critical/10 flex items-center justify-center text-aura-critical">
+                    <i class="fa-solid fa-shield-virus text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Vulnerabilities</p>
+                    <p class="text-3xl font-bold text-white mono" id="stat-findings">0</p>
+                </div>
+            </div>
+            <div class="glass p-6 rounded-[2rem] flex items-center gap-5 hover:border-aura-cyan/30 transition-colors">
+                <div class="w-12 h-12 rounded-2xl bg-aura-cyan/10 flex items-center justify-center text-aura-cyan">
+                    <i class="fa-solid fa-microchip text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">AI Cycles</p>
+                    <p class="text-3xl font-bold text-white mono" id="stat-cycles">--</p>
+                </div>
+            </div>
+            <div class="glass p-6 rounded-[2rem] flex items-center gap-5 border border-aura-accent/20">
+                <div class="w-12 h-12 rounded-2xl bg-aura-accent/10 flex items-center justify-center text-aura-accent">
+                    <i class="fa-solid fa-brain text-xl pulse-slow"></i>
+                </div>
+                <div>
+                    <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Mission Depth</p>
+                    <p class="text-3xl font-bold text-white mono">v5.0</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Workspace -->
         <div class="grid grid-cols-12 gap-8">
-            <!-- Left: Intelligence Stream -->
-            <div class="col-span-12 lg:col-span-8 flex flex-col gap-8">
-                <section class="aura-glass rounded-3xl overflow-hidden border-white/5">
-                    <div class="px-8 py-6 border-b border-white/5 flex justify-between items-center bg-white/5">
-                        <h2 class="text-lg font-bold flex items-center gap-3">
-                            <i class="fa-solid fa-satellite-dish text-aura-secondary"></i> REAL-TIME INTELLIGENCE STREAM
+            <!-- Left: Neural Feed & Intelligence -->
+            <div class="col-span-12 lg:col-span-8 space-y-8">
+                <!-- CATEGORIZED FEED (Structural Change) -->
+                <section class="glass rounded-[2.5rem] overflow-hidden">
+                    <div class="px-8 py-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+                        <h2 class="text-sm font-bold tracking-widest uppercase flex items-center gap-3">
+                            <i class="fa-solid fa-wave-square text-aura-accent"></i> Neural Feed
                         </h2>
-                        <div class="flex gap-2">
-                            <span class="w-2 h-2 rounded-full bg-white/10"></span>
-                            <span class="w-2 h-2 rounded-full bg-white/10"></span>
-                            <span
-                                class="w-2 h-2 rounded-full bg-aura-primary shadow-[0_0_10px_rgba(192,38,211,1)]"></span>
+                        <div class="flex gap-4">
+                            <span class="flex items-center gap-2 text-[10px] text-slate-400 font-bold">
+                                <span class="w-1.5 h-1.5 rounded-full bg-aura-accent"></span> RECON
+                            </span>
+                            <span class="flex items-center gap-2 text-[10px] text-slate-400 font-bold">
+                                <span class="w-1.5 h-1.5 rounded-full bg-aura-cyan"></span> INTEL
+                            </span>
                         </div>
+                    </div>
+                    <div id="neural-feed" class="h-[500px] p-8 overflow-y-auto space-y-5 custom-scrollbar bg-black/20">
+                        <div
+                            class="flex items-center justify-center h-full text-slate-500 text-xs tracking-widest uppercase italic">
+                            Awaiting neural patterns...</div>
+                    </div>
+                </section>
+
+                <section class="glass rounded-[2.5rem] overflow-hidden">
+                    <div class="px-8 py-6 border-b border-white/5 bg-white/[0.02]">
+                        <h2 class="text-sm font-bold tracking-widest uppercase flex items-center gap-3">
+                            <i class="fa-solid fa-fingerprint text-aura-cyan"></i> Target Inventory
+                        </h2>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left">
                             <thead
-                                class="text-[10px] text-gray-500 font-bold uppercase tracking-[0.2em] border-b border-white/5">
+                                class="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em] bg-white/[0.01]">
                                 <tr>
-                                    <th class="px-8 py-5">Intel ID</th>
+                                    <th class="px-8 py-5">Source</th>
                                     <th class="px-8 py-5">Vector</th>
-                                    <th class="px-8 py-5">Endpoint/Asset</th>
-                                    <th class="px-8 py-5">Status</th>
-                                    <th class="px-8 py-5">Strategic Score</th>
+                                    <th class="px-8 py-5">Threat Score</th>
+                                    <th class="px-8 py-5 text-right pr-12">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-white/5" id="targets-table">
-                                <!-- Dynamic Targets -->
+                            <tbody id="target-list" class="divide-y divide-white/5">
+                                <!-- Dynamic -->
                             </tbody>
                         </table>
                     </div>
                 </section>
             </div>
 
-            <!-- Right: Visual Intel & Tools -->
-            <div class="col-span-12 lg:col-span-4 flex flex-col gap-8">
-                <!-- Visual Recon Eye -->
-                <section class="aura-glass rounded-3xl p-8 border-white/5">
-                    <h2 class="text-lg font-bold mb-6 flex items-center gap-3">
-                        <i class="fa-solid fa-eye text-aura-primary"></i> VISUAL RECON EYE
+            <!-- Right: OSINT Grid & Visual Intel -->
+            <div class="col-span-12 lg:col-span-4 space-y-8">
+                <!-- OSINT INSIGHT CARDS (New Section) -->
+                <section class="space-y-6">
+                    <h2 class="text-sm font-bold tracking-widest uppercase px-2 flex items-center gap-3 text-aura-cyan">
+                        <i class="fa-solid fa-satellite"></i> Intelligence Grid
                     </h2>
-                    <div class="space-y-6" id="visual-intel">
+                    <div id="osint-grid" class="grid grid-cols-1 gap-4">
                         <div
-                            class="aspect-video bg-aura-dark/50 rounded-2xl border border-white/5 border-dashed flex items-center justify-center p-8 group relative overflow-hidden">
-                            <i
-                                class="fa-solid fa-image-polaroid text-white/5 text-6xl group-hover:scale-110 transition-transform"></i>
-                            <div
-                                class="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/80 to-transparent text-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                <span class="text-[10px] font-bold tracking-widest text-aura-primary">NO RECON FILES
-                                    ACTIVE</span>
-                            </div>
-                        </div>
+                            class="glass-bright p-5 rounded-3xl opacity-40 italic text-center text-[10px] uppercase tracking-widest py-10">
+                            No active intel stream</div>
                     </div>
                 </section>
 
-                <!-- Tool Status -->
-                <section class="aura-glass rounded-3xl p-8 border-white/5">
-                    <h2 class="text-lg font-bold mb-6 flex items-center gap-3">
-                        <i class="fa-solid fa-microchip text-aura-secondary"></i> ARSENAL STATUS
+                <!-- Screenshots Eye -->
+                <section class="glass rounded-[2.5rem] p-8">
+                    <h2
+                        class="text-sm font-bold tracking-widest uppercase mb-8 flex items-center gap-3 text-aura-accent">
+                        <i class="fa-solid fa-eye"></i> Visual Recon
                     </h2>
-                    <div class="space-y-4">
-                        <div class="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/5">
-                            <span class="text-sm font-semibold text-gray-400">GH0ST M0DE (Stealth)</span>
-                            <span
-                                class="text-[10px] font-bold px-2 py-0.5 bg-green-500/10 text-green-500 rounded border border-green-500/20">ACTIVE
-                                (JA3)</span>
-                        </div>
-                        <div class="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/5">
-                            <span class="text-sm font-semibold text-gray-400">BRAIN CO-PI-0T</span>
-                            <span
-                                class="text-[10px] font-bold px-2 py-0.5 bg-aura-primary/10 text-aura-primary rounded border border-aura-primary/20">IDLE</span>
-                        </div>
-                        <div class="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/5">
-                            <span class="text-sm font-semibold text-gray-400">AURA LINK (Pivot)</span>
-                            <span
-                                class="text-[10px] font-bold px-2 py-0.5 bg-white/5 text-white/40 rounded border border-white/10">OFFLINE</span>
-                        </div>
+                    <div id="visual-recon" class="space-y-6">
+                        <div
+                            class="aspect-video rounded-3xl bg-aura-base/40 border-2 border-dashed border-white/5 flex items-center justify-center text-slate-600 italic text-xs">
+                            Awaiting vision data</div>
                     </div>
                 </section>
             </div>
@@ -211,43 +296,145 @@
     </div>
 
     <script>
-        async function updateNexus() {
+        let ws;
+        const neuralFeed = document.getElementById('neural-feed');
+        const osintGrid = document.getElementById('osint-grid');
+
+        function connectWS() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws/stream`);
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleNeuralEvent(data);
+            };
+
+            ws.onclose = () => setTimeout(connectWS, 2000);
+        }
+
+        function handleNeuralEvent(data) {
+            // Remove placeholder
+            if (neuralFeed.innerText.includes('Awaiting neural patterns')) neuralFeed.innerHTML = '';
+
+            const entry = document.createElement('div');
+            entry.className = 'flex gap-5 group items-start animate-[fadeIn_0.5s_ease-out]';
+
+            const iconBg = data.type === 'alert' ? 'bg-aura-critical/20 text-aura-critical' :
+                data.type === 'intel' ? 'bg-aura-cyan/20 text-aura-cyan' : 'bg-aura-accent/20 text-aura-accent';
+            const iconGlow = data.type === 'alert' ? 'shadow-[0_0_10px_rgba(239,68,68,0.3)]' :
+                data.type === 'intel' ? 'shadow-[0_0_10px_rgba(6,182,212,0.3)]' : 'shadow-[0_0_10px_rgba(168,85,247,0.3)]';
+
+            entry.innerHTML = `
+                <div class="w-10 h-10 shrink-0 rounded-xl ${iconBg} ${iconGlow} flex items-center justify-center text-sm">
+                    <i class="fa-solid fa-${data.icon || 'info'}"></i>
+                </div>
+                <div class="flex-grow pt-1">
+                    <p class="text-[13px] font-semibold text-slate-200">${data.content}</p>
+                    <p class="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-1">${new Date().toLocaleTimeString()} &bull; ${data.type}</p>
+                </div>
+            `;
+
+            neuralFeed.prepend(entry);
+
+            // Handle OSINT Grid update
+            if (data.type === 'intel' && data.data) {
+                renderOSINT(data.data);
+            }
+        }
+
+        function renderOSINT(intel) {
+            osintGrid.innerHTML = '';
+            Object.keys(intel).forEach(source => {
+                const card = document.createElement('div');
+                card.className = 'glass-bright p-5 rounded-3xl border-l-2 border-aura-cyan flex justify-between items-center';
+                card.innerHTML = `
+                    <div>
+                        <p class="text-[8px] font-black uppercase tracking-[0.2em] text-aura-cyan mb-1">${source}</p>
+                        <p class="text-xs font-bold text-white">${source === 'shodan' ? intel[source].ports.length + ' Ports Found' : source === 'otx' ? intel[source].pulse_count + ' Pulses' : 'Malicious Indicators Found'}</p>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-slate-700 text-[10px]"></i>
+                `;
+                osintGrid.appendChild(card);
+            });
+        }
+
+        async function launchScan() {
+            const domain = prompt("CENTRAL COMMAND: Specify mission target domain");
+            if (!domain) return;
+            await fetch('/scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ domain })
+            });
+        }
+
+        async function updateData() {
             try {
-                const res = await fetch('/targets');
-                const targets = await res.json();
+                const [targets, findings] = await Promise.all([
+                    fetch('/targets').then(r => r.json()),
+                    fetch('/findings').then(r => r.json())
+                ]);
 
-                document.getElementById('target-count').innerText = targets.length;
+                document.getElementById('stat-targets').innerText = targets.length;
+                document.getElementById('stat-findings').innerText = findings.length;
 
-                const table = document.getElementById('targets-table');
-                table.innerHTML = targets.map(t => `
-                    <tr class="hover:bg-aura-primary/5 transition-all group">
-                        <td class="px-8 py-6 font-mono text-[11px] text-aura-secondary tracking-widest">#${t.id.toString().padStart(4, '0')}</td>
-                        <td class="px-8 py-6 text-sm font-medium text-gray-300">
-                            <span class="px-2 py-0.5 bg-gray-500/10 text-gray-500 text-[9px] font-bold uppercase rounded border border-gray-500/20">${t.source}</span>
+                document.getElementById('target-list').innerHTML = targets.slice(0, 8).map(t => `
+                    <tr class="hover:bg-white/[0.02] transition-colors group">
+                        <td class="px-8 py-5">
+                            <span class="px-2 py-0.5 bg-white/5 text-slate-400 text-[9px] font-bold uppercase rounded border border-white/5">${t.source}</span>
                         </td>
-                        <td class="px-8 py-6 text-sm font-bold group-hover:text-aura-primary transition-colors">${t.value}</td>
-                        <td class="px-8 py-6">
-                            <span class="px-2 py-0.5 bg-green-500/10 text-green-500 text-[9px] font-bold uppercase rounded border border-green-500/20 tracking-tighter">Verified Asset</span>
-                        </td>
-                        <td class="px-8 py-6">
-                            <div class="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                <div class="h-full bg-aura-secondary" style="width: 75%"></div>
+                        <td class="px-8 py-5 text-sm font-bold text-slate-300">${t.value}</td>
+                        <td class="px-8 py-5">
+                            <div class="flex items-center gap-3">
+                                <span class="text-[10px] font-bold mono ${t.risk_score > 500 ? 'text-aura-accent' : 'text-aura-cyan'}">${t.risk_score}</span>
+                                <div class="w-20 h-1 bg-white/5 rounded-full overflow-hidden">
+                                    <div class="h-full bg-aura-accent" style="width: ${Math.min(100, t.risk_score / 20)}%"></div>
+                                </div>
                             </div>
+                        </td>
+                        <td class="px-8 py-5 text-right pr-12">
+                            <button class="text-slate-600 hover:text-white transition-colors text-xs uppercase font-black tracking-widest">Detail</button>
                         </td>
                     </tr>
                 `).join('');
 
-                const resFindings = await fetch('/findings/1'); // Just to get a count
-                const findCountRes = await fetch('/findings'); // Need to implement this endpoint
-                // We'll just simulate the count for now based on target length
-                document.getElementById('finding-count').innerText = Math.floor(targets.length * 1.5);
-
-            } catch (e) { console.error("Nexus Update Error:", e); }
+                const screens = await fetch('/api/screenshots').then(r => r.json());
+                if (screens.length) {
+                    document.getElementById('visual-recon').innerHTML = screens.slice(0, 2).map(img => `
+                        <div class="aspect-video rounded-3xl overflow-hidden border border-white/5 shadow-2xl group cursor-pointer relative">
+                             <img src="/screenshots/${img}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700">
+                             <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6">
+                                <p class="text-[10px] font-bold tracking-widest uppercase text-aura-accent">Expand Visual</p>
+                             </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) { }
         }
 
-        setInterval(updateNexus, 5000);
-        updateNexus();
+        async function emergencyStop() {
+            if (confirm("INITIATE EMERGENCY HALT? This will terminate all active mission sequences.")) {
+                await fetch('/stop', { method: 'POST' });
+            }
+        }
+
+        connectWS();
+        setInterval(updateData, 3000);
+        updateData();
     </script>
+    <style>
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
 </body>
 
 </html>

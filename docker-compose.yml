@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  aura:
+    build: .
+    container_name: aura_sandbox
+    env_file: .env
+    # Drop all capabilities for extra security
+    cap_drop:
+      - ALL
+    # Prevent privilege escalation
+    security_opt:
+      - no-new-privileges:true
+    # Mount the local directory read-only, except for reports/screenshots
+    volumes:
+      - ./:/app:ro
+      - ./reports:/app/reports
+      - ./screenshots:/app/screenshots
+      - ./.aura_state:/app/.aura_state
+      - ./aura.db:/app/aura.db
+      - ./aura_intel.db:/app/aura_intel.db
+    # Network mode default (bridge) creates an isolated network
+    # We could restrict external access entirely, but the tool needs internet.
+    # We will let it access internet but we should rely on Aura's own code to block localhost targeting.
+    command: [ "--help" ]
+    # --- SWARM MODE (SCALING) ---
+    # To run in swarm/distributed mode, uncomment the following block:
+    # deploy:
+    #   mode: replicated
+    #   replicas: 3
