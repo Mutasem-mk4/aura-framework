@@ -230,6 +230,61 @@ class AuraReporter:
             pass
         return None
 
+    def _deduplicate_findings(self, findings: list) -> list:
+        """
+        v4.0 De-duplication Engine: Merges repeated finding types into Pattern entries.
+        If the same finding type appears > 3 times, collapse them into one Pattern card
+        listing all affected URLs. This transforms 521 'Information Disclosure' rows into
+        a single professional 'Information Disclosure Pattern - 521 paths affected' entry.
+        """
+        from collections import defaultdict
+        import re
+
+        type_groups = defaultdict(list)
+        unique_findings = []
+
+        for f in findings:
+            f_type = f.get("type") or f.get("finding_type") or "Unknown"
+            # Extract URL from content if present
+            url_match = re.search(r'https?://[^\s\'"]+', f.get("content", ""))
+            url = url_match.group(0) if url_match else f.get("content", "")[:80]
+            type_groups[f_type].append((url, f))
+
+        PATTERN_THRESHOLD = 3  # Collapse if same type appears > this many times
+
+        for f_type, instances in type_groups.items():
+            if len(instances) <= PATTERN_THRESHOLD:
+                # Small number — show individually
+                for _, f in instances:
+                    unique_findings.append(f)
+            else:
+                # Collapse into a Pattern entry
+                all_urls = [url for url, _ in instances]
+                base_finding = instances[0][1]  # Use first finding as template
+                url_list = "\n".join(f"  • {u}" for u in all_urls[:50])  # Cap at 50 URLs
+                suffix = f"\n  ... and {len(all_urls) - 50} more." if len(all_urls) > 50 else ""
+
+                pattern_finding = {
+                    **base_finding,
+                    "type": f"{f_type} (Pattern — {len(all_urls)} paths)",
+                    "content": (
+                        f"⚠ PATTERN DETECTED: '{f_type}' found across {len(all_urls)} paths.\n"
+                        f"Affected paths:\n{url_list}{suffix}"
+                    ),
+                    "severity": base_finding.get("severity", "MEDIUM"),
+                    "cvss_score": base_finding.get("cvss_score"),
+                    "cvss_vector": base_finding.get("cvss_vector"),
+                    "remediation_fix": base_finding.get("remediation_fix",
+                        "Apply systematic fix across all affected paths listed above."),
+                    "impact_desc": (
+                        f"This finding type affects {len(all_urls)} endpoints, indicating a "
+                        f"systemic issue rather than an isolated occurrence."
+                    ),
+                }
+                unique_findings.append(pattern_finding)
+
+        return unique_findings
+
     def generate_pdf_report(self, output_path=None, target_filter=None):
         """Generates a premium PDF security report with screenshots."""
         if not output_path:
@@ -422,13 +477,17 @@ class AuraReporter:
 
             if target['findings']:
                 elements.append(Spacer(1, 10))
+                # v4.0: De-duplication Engine — collapse repeated findings into Patterns
+                deduped = self._deduplicate_findings(target['findings'])
                 data = [["Finding Identification & Business Impact", "Type", "Compliance", "Severity"]]
-                for f in target['findings']:
-                    severity = f['severity']
+                for f in deduped:
+                    severity = f.get('severity') or f.get('finding_severity', 'MEDIUM')
                     if severity == 'UNKNOWN' or not severity:
                         severity = 'MEDIUM'
-                        if 'Injection' in f['finding_type'] or 'Secret' in f['finding_type']:
+                        f_type_check = f.get('type') or f.get('finding_type', '')
+                        if 'Injection' in f_type_check or 'Secret' in f_type_check:
                             severity = 'CRITICAL'
+
                     
                     # Professional Formatting for PDF (v3.0: MITRE ATT&CK + Patching Priority)
                     mitre_str = f.get('mitre', '')
