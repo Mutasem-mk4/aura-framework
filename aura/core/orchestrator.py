@@ -187,22 +187,33 @@ class NeuralOrchestrator:
                         if bf.get('severity') == 'CRITICAL':
                             vulns.append(bf)
         
-        # Run dirbusting on the primary discovered URLs
-        for url in discovered_urls:
+        # v3.0 Fix: scanner.dirbust() now handles recursion internally (depth ≤ 2, 200-only).
+        # The orchestrator just calls it once per BASE URL and processes the flat results.
+        # DO NOT loop back and call dirbust() on returned paths — that caused the explosion.
+        for url in list(discovered_urls):  # snapshot to avoid modifying while iterating
             hidden_paths = await self.scanner.dirbust(url)
             for path in hidden_paths:
                 full_path_url = path if path.startswith("http") else f"{url.rstrip('/')}/{path.lstrip('/')}"
-                if full_path_url not in discovered_urls:
-                    discovered_urls.append(full_path_url)
                 
-                f_content = f"Hidden Path Discovered: {path}"
-                f_type = "Information Disclosure"
-                severity = self.brain.calculate_impact(f_type, f_content)
+                last_seg = full_path_url.rstrip('/').split('/')[-1]
+                severity = "CRITICAL" if last_seg in [".env", ".git", "docker-compose.yml", "config"] else "MEDIUM"
+                f_content = f"Hidden Path Discovered: {full_path_url}"
+                f_type = "Sensitive File Exposure" if severity == "CRITICAL" else "Information Disclosure"
+                
                 self.db.add_finding(domain, f_content, f_type, campaign_id=campaign_id)
                 self.db.update_finding_metadata(domain, f_content, severity)
                 findings.append({"type": f_type, "content": f_content, "severity": severity})
                 if severity == "CRITICAL":
-                    vulns.append({"type": f_type, "content": f_content, "severity": "CRITICAL"})
+                    vulns.append({
+                        "type": f_type, "content": f_content, "severity": "CRITICAL",
+                        "cvss_score": 7.5, "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+                        "owasp": "A05:2021-Security Misconfiguration",
+                        "mitre": "T1083 - File and Directory Discovery",
+                        "remediation_fix": "Remove sensitive files from web root. Block access in .htaccess/nginx config.",
+                        "impact_desc": "Exposed configuration files may contain credentials, API keys, or secrets.",
+                        "patch_priority": "IMMEDIATE"
+                    })
+
             
         vision_data = await self.vision.capture_screenshot(domain, f"zenith_{domain.replace('.', '_')}")
         tech_stack = vision_data.get("techs", []) if vision_data else []
