@@ -99,6 +99,25 @@ class AuraBrain:
         
         return "\n\n".join(insights)
 
+    def reason_json(self, prompt: str, system_instruction: str = None) -> str:
+        """New v5.1: Specialized reasoning for structured JSON data with strict enforcement."""
+        if not self.enabled: return "[]"
+        
+        try:
+            response = self.client.models.generate_content(
+                model=state.GEMINI_MODEL,
+                contents=prompt,
+                config={'system_instruction': system_instruction or self.SYSTEM_PROMPT}
+            )
+            raw = response.text.strip().replace("```json", "").replace("```", "").strip()
+            # Basic validation: must start with [ or {
+            if raw.startswith("[") or raw.startswith("{"):
+                return raw
+            return "[]"
+        except Exception as e:
+            logger.error(f"AuraBrain JSON Reason: {e}")
+            return "[]"
+
     def analyze_behavior(self, url: str, payload: str, delay_ms: int, length: int, status: int, body: str) -> dict:
         """Deep behavioral analysis for Blind vulnerabilities and WAF evasion indicators."""
         if not self.enabled: return {"vulnerable": False}

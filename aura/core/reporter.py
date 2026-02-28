@@ -261,26 +261,30 @@ class AuraReporter:
                 # Collapse into a Pattern entry
                 all_urls = [url for url, _ in instances]
                 base_finding = instances[0][1]  # Use first finding as template
-                url_list = "\n".join(f"  • {u}" for u in all_urls[:50])  # Cap at 50 URLs
-                suffix = f"\n  ... and {len(all_urls) - 50} more." if len(all_urls) > 50 else ""
+                
+                # Use a small font and limited list for PDF layout safety
+                PDF_LIMIT = 12
+                url_list = "<br/>".join(f"  • <font size='8' face='Courier'>{u}</font>" for u in all_urls[:PDF_LIMIT])
+                suffix = f"<br/><i>  ... and {len(all_urls) - PDF_LIMIT} more paths.</i>" if len(all_urls) > PDF_LIMIT else ""
 
                 pattern_finding = {
                     **base_finding,
                     "type": f"{f_type} (Pattern — {len(all_urls)} paths)",
                     "content": (
-                        f"⚠ PATTERN DETECTED: '{f_type}' found across {len(all_urls)} paths.\n"
-                        f"Affected paths:\n{url_list}{suffix}"
+                        f"⚠ <b>PATTERN DETECTED:</b> '{f_type}' discovered across {len(all_urls)} endpoints.<br/><br/>"
+                        f"<b>Top Affected Paths:</b><br/>{url_list}{suffix}"
                     ),
                     "severity": base_finding.get("severity", "MEDIUM"),
                     "cvss_score": base_finding.get("cvss_score"),
                     "cvss_vector": base_finding.get("cvss_vector"),
                     "remediation_fix": base_finding.get("remediation_fix",
-                        "Apply systematic fix across all affected paths listed above."),
+                        "Implement a global sanitization/filtering layer to fix this pattern across all endpoints."),
                     "impact_desc": (
                         f"This finding type affects {len(all_urls)} endpoints, indicating a "
-                        f"systemic issue rather than an isolated occurrence."
+                        f"systemic layout/config issue. Scale of compromise is magnified."
                     ),
                 }
+
                 unique_findings.append(pattern_finding)
 
         return unique_findings

@@ -37,14 +37,14 @@ class AuraPatternEngine:
         """
         
         try:
-            ai_probes_raw = self.brain.reason({"task": "generate_probes", "prompt": prompt})
-            # Remove markdown code blocks if any
-            clean_probes = ai_probes_raw.replace("```json", "").replace("```", "").strip()
-            ai_probes = json.loads(clean_probes)
+            raw_json = self.brain.reason_json(prompt)
+            ai_probes = json.loads(raw_json)
             if isinstance(ai_probes, list):
                 probes.extend(ai_probes)
         except Exception as e:
             print(f"[!] PatternEngine Warning: AI generation failed: {e}")
+
+
 
         return probes
 
