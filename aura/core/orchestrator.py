@@ -16,6 +16,8 @@ from aura.modules.leaks import LeakProber
 from aura.modules.threat_intel import ThreatIntel
 from aura.modules.bounty import BountyHunter
 from aura.modules.banner_grabber import BannerGrabber
+from aura.modules.recon_pipeline import ReconPipeline   # v5.0
+from aura.modules.secret_hunter import SecretHunter      # v5.0
 from aura.core import state
 from aura.core.storage import AuraStorage
 from rich.console import Console
@@ -42,8 +44,10 @@ class NeuralOrchestrator:
         self.leaks = LeakProber()
         self.intel = ThreatIntel(stealth=self.stealth)
         self.bounty = BountyHunter()
-        self.banner_grabber = BannerGrabber()  # v3.0: OSINT Resiliency
-        self.dast_semaphore = asyncio.Semaphore(5) # Velocity v14.4
+        self.banner_grabber = BannerGrabber()            # v3.0: OSINT Resiliency
+        self.recon_pipeline = ReconPipeline()             # v5.0: Subfinder→HTTPX→Nmap
+        self.secret_hunter  = SecretHunter()              # v5.0: TruffleHog-style
+        self.dast_semaphore = asyncio.Semaphore(5)        # Velocity v14.4
         self.sing_semaphore = asyncio.Semaphore(3) # Velocity v14.4
         self.plugins = []
         self._load_plugins()
@@ -154,6 +158,16 @@ class NeuralOrchestrator:
         
         findings = [] # Persistent finding aggregation for CoT
         vulns = []    # Shared vulnerability list for AI and DAST
+
+        # v5.0: RECON PIPELINE (Subfinder → HTTPX → Nmap)
+        console.print("[bold cyan][*] Phase 0.6: v5.0 Recon Pipeline (Subfinder→HTTPX→Nmap)...[/bold cyan]")
+        recon_data = await self.recon_pipeline.run(domain, target_ip)
+        self.db.log_action("RECON_PIPELINE", domain, 
+            f"Subdomains: {len(recon_data.get('subdomains', []))}, "
+            f"HTTP: {len(recon_data.get('http_services', []))}, "
+            f"Ports: {len(recon_data.get('open_ports', []))}",
+            campaign_id)
+        await self.broadcast("Recon Pipeline complete.", type="recon", icon="radar", data=recon_data)
         
         # 2. Recon & Vision + Tech Analysis (Ghost v4 Intel)
         results = await self.scanner.discover_subdomains(domain)
@@ -215,8 +229,18 @@ class NeuralOrchestrator:
                     })
 
             
+        # v5.0: Secret Hunter — scans all discovered JS/config files for exposed keys
+        console.print("[bold yellow][*] Phase 2.2: v5.0 Secret Hunter (TruffleHog-style)...[/bold yellow]")
+        self.secret_hunter.session = self.session
+        secret_findings = await self.secret_hunter.hunt_js_files(discovered_urls)
+        for sf in secret_findings:
+            self.db.add_finding(domain, sf['content'], sf['type'], campaign_id=campaign_id)
+            findings.append(sf)
+            vulns.append(sf)  # All secrets are CRITICAL
+
         vision_data = await self.vision.capture_screenshot(domain, f"zenith_{domain.replace('.', '_')}")
         tech_stack = vision_data.get("techs", []) if vision_data else []
+
         
         # OCR Intelligence Gate (Ghost v5): Halt scan if site is dead/parked
         if vision_data:
