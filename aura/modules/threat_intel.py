@@ -14,11 +14,42 @@ class ThreatIntel:
         self.censys_id = os.getenv("CENSYS_API_ID")
         self.censys_secret = os.getenv("CENSYS_API_SECRET")
         self.greynoise_api_key = os.getenv("GREYNOISE_API_KEY")
+        self.abuseipdb_api_key = os.getenv("ABUSEIPDB_API_KEY")
         self.stealth = stealth or StealthEngine()
         self.session = AuraSession(self.stealth)
 
     def _warn_missing_key(self, service):
         console.print(f"[bold yellow][!] {service} API key missing. Aura is 'Blind' to historical external intelligence from this source.[/bold yellow]")
+
+    async def query_abuseipdb(self, target_ip):
+        """Query AbuseIPDB for IP reputation and reports."""
+        if not self.abuseipdb_api_key:
+            self._warn_missing_key("AbuseIPDB")
+            return None
+            
+        console.print(f"[blue][*] Querying AbuseIPDB for: {target_ip}...[/blue]")
+        url = "https://api.abuseipdb.com/api/v2/check"
+        params = {
+            'ipAddress': target_ip,
+            'maxAgeInDays': '90'
+        }
+        headers = {
+            'Accept': 'application/json',
+            'Key': self.abuseipdb_api_key
+        }
+        try:
+            response = await self.session.get(url, headers=headers, params=params, timeout=10)
+            if response.status_code == 200:
+                data = response.json().get("data", {})
+                score = data.get("abuseConfidenceScore", 0)
+                reports = data.get("totalReports", 0)
+                console.print(f"[green][+] AbuseIPDB: Confidence Score={score}%, Total Reports={reports}[/green]")
+                return {"abuse_score": score, "total_reports": reports, "last_reported": data.get("lastReportedAt")}
+            else:
+                console.print(f"[dim yellow][!] AbuseIPDB API returned: {response.status_code}[/dim yellow]")
+        except Exception as e:
+            console.print(f"[dim red][!] Failed to connect to AbuseIPDB: {str(e)}[/dim red]")
+        return None
 
     async def query_censys(self, target_ip):
         """Query Censys for host data."""
@@ -136,3 +167,4 @@ class ThreatIntel:
         except Exception as e:
             console.print(f"[dim red][!] Failed to connect to AlienVault OTX: {str(e)}[/dim red]")
         return None
+

@@ -144,13 +144,16 @@ class NeuralOrchestrator:
         otx_res = await self.intel.query_otx(domain)
         if otx_res: intel_data["otx"] = otx_res
 
-        # Query Censys & GreyNoise
+        # Query Censys, GreyNoise & AbuseIPDB
         if target_ip:
             censys_res = await self.intel.query_censys(target_ip)
             if censys_res: intel_data["censys"] = censys_res
             
             gn_res = await self.intel.query_greynoise(target_ip)
             if gn_res: intel_data["greynoise"] = gn_res
+
+            abuse_res = await self.intel.query_abuseipdb(target_ip)
+            if abuse_res: intel_data["abuseipdb"] = abuse_res
         
         if intel_data:
             await self.broadcast(f"Intel Gathered: {', '.join(intel_data.keys())}", type="intel", level="info", icon="satellite", data=intel_data)
