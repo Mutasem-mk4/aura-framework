@@ -75,24 +75,38 @@ class AuraScanner:
                 
         return open_ports
 
-    async def dirbust(self, base_url):
-        """Phase 23: Active Directory Brute Forcing to find hidden paths."""
+    # These paths are LEAF nodes — never recurse into them
+    DIRBUST_NO_RECURSE = {
+        ".env", ".git", ".svn", "docker-compose.yml",
+        "index.php", "home.php", "main.php", "robots.txt",
+        "phpmyadmin", "dvwa",  # Tool/UI paths, not real directories
+    }
+
+    async def dirbust(self, base_url, _depth=0):
+        """
+        Phase 23: Active Directory Brute Forcing to find hidden paths.
+        v3.0 Fix: Only recurse into 200 responses. Never recurse into 403 or
+        sensitive leaf-file paths. Hardcapped at depth 2 to prevent explosion.
+        """
+        MAX_DEPTH = 2  # Only go 2 levels deep from the base URL
+        
         common_dirs = [
-            "admin", "login", "api", "dvwa", "phpmyadmin", "backup", "db", 
+            "admin", "login", "api", "backup", "db",
             "test", "config", "setup", "dashboard", "portal", "old",
             "index.php", "home.php", "main.php", ".env", ".git", ".svn",
-            "docker-compose.yml", "jenkins", "gitlab", "bitbucket", "jira"
+            "docker-compose.yml", "jenkins", "gitlab", "phpmyadmin", "dvwa"
         ]
         
         if not base_url.startswith("http"):
             base_url = f"http://{base_url}"
         base_url = base_url.rstrip('/')
-            
-        console.print(f"[magenta][*] DirBusting {base_url} for hidden paths...[/magenta]")
+        
+        if _depth == 0:  # Only show the top-level message
+            console.print(f"[magenta][*] DirBusting {base_url} for hidden paths (max depth {MAX_DEPTH})...[/magenta]")
+        
         discovered_urls = []
         
-        # Phase 23: Catch-all 200 detection
-        # Get baseline length to identify parked domains/catch-all servers
+        # Baseline to detect catch-all servers
         baseline_len = 0
         try:
             base_res = await self.stealth_session.get(base_url, timeout=5)
@@ -103,21 +117,40 @@ class AuraScanner:
             url = f"{base_url}/{directory}"
             try:
                 res = await self.stealth_session.get(url, timeout=3, allow_redirects=False)
-                # Ignore if it matches the baseline length (likely a redirect/catch-all)
                 if abs(len(res.text) - baseline_len) < 10:
-                    return None
+                    return None, False  # Catch-all / redirect, ignore
                     
-                if res.status_code in [200, 301, 302, 403, 401]:
+                if res.status_code == 200:
+                    console.print(f"[green][+] Found hidden path: {url} (Status: 200)[/green]")
+                    return url, True   # 200 = real content, CAN recurse
+                    
+                elif res.status_code in [301, 302]:
                     console.print(f"[green][+] Found hidden path: {url} (Status: {res.status_code})[/green]")
-                    return url
-            except:
-                pass
-            return None
+                    return url, False  # Redirect = exists but don't recurse
+                    
+                elif res.status_code in [403, 401]:
+                    # EXISTS but ACCESS DENIED — log it but DO NOT recurse
+                    console.print(f"[yellow][~] Restricted path: {url} (Status: {res.status_code} - Access Denied)[/yellow]")
+                    return url, False  # 403 = dead end, no recursion
+                    
+            except: pass
+            return None, False
             
         tasks = [check_dir(d) for d in common_dirs]
         results = await asyncio.gather(*tasks)
         
-        for r in results:
-            if r: discovered_urls.append(r)
+        for url, can_recurse in results:
+            if not url:
+                continue
+            discovered_urls.append(url)
+            
+            # Recurse ONLY into 200-status directories, not files, not 403s
+            last_segment = url.rstrip('/').split('/')[-1]
+            if (can_recurse
+                    and _depth < MAX_DEPTH
+                    and last_segment not in self.DIRBUST_NO_RECURSE
+                    and '.' not in last_segment):  # Never recurse into files
+                sub_paths = await self.dirbust(url, _depth=_depth + 1)
+                discovered_urls.extend(sub_paths)
             
         return discovered_urls
