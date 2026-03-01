@@ -89,6 +89,37 @@ class AuraSingularity:
         
         return self.campaign_findings
 
+    async def _human_move_and_click(self, page, selector):
+        """Ghost v7: Moves mouse in a human-like Bezyer curve before clicking."""
+        try:
+            element = await page.query_selector(selector)
+            if not element: return
+            
+            box = await element.bounding_box()
+            if not box: return
+            
+            target_x = box['x'] + box['width'] / 2
+            target_y = box['y'] + box['height'] / 2
+            
+            # Start from current or random position
+            start_x, start_y = random.randint(0, 100), random.randint(0, 100)
+            
+            # Simple Bezier-like curve simulation (overshoot and adjust)
+            mid_x = start_x + (target_x - start_x) * 0.5 + random.randint(-50, 50)
+            mid_y = start_y + (target_y - start_y) * 0.5 + random.randint(-50, 50)
+            
+            steps = 15
+            for i in range(steps):
+                t = i / steps
+                # Quadratic Bezier formula: (1-t)^2*P0 + 2(1-t)t*P1 + t^2*P2
+                curr_x = (1-t)**2 * start_x + 2*(1-t)*t * mid_x + t**2 * target_x
+                curr_y = (1-t)**2 * start_y + 2*(1-t)*t * mid_y + t**2 * target_y
+                await page.mouse.move(curr_x, curr_y)
+                await asyncio.sleep(0.01)
+                
+            await page.mouse.click(target_x, target_y, delay=random.randint(50, 150))
+        except: pass
+
     async def _probe_api_logic(self, base_url):
         """Analyzes intercepted API calls for authorization flaws (BOLA/IDOR)."""
         if not self.intercepted_requests: return
@@ -108,9 +139,16 @@ class AuraSingularity:
         """Ghost v6.1: Shreds payloads into fragments with timing jitter and focus-guarantees."""
         console.print(f"[cyan][⚔] Ghost v6.1: Executing High-Precision Fragmented Attack...[/cyan]")
         
-        vuln_types = ["Blind SQLi", "Cross-Site Scripting (XSS)", "OS Command Injection", "Server-Side Request Forgery"]
-        
-        for i in range(5): # Limit to first 5 inputs
+        aggressive_trigger = False
+        # Phase 42: OCR/Signature Check - If "Vulnerable" found, trigger heavy payloads
+        try:
+            page_text = await page.content()
+            if any(x in page_text.lower() for x in ["vulnerable", "exploit", "sqli", "xss", "injection"]):
+                aggressive_trigger = True
+                console.print(f"[bold red][🌋] AGGRESSION TRIGGERED: Signature detected on {url}. Increasing payload density by 10x![/bold red]")
+        except: pass
+
+        for i in range(50 if aggressive_trigger else 5): # Limit to first 5 or 50 inputs
             for vuln_type in vuln_types:
                 try:
                     # Re-query input element to avoid execution context destroyed errors
@@ -123,7 +161,11 @@ class AuraSingularity:
                     
                     # Ensure visibility and focus
                     await input_el.scroll_into_view_if_needed()
-                    await input_el.click(force=True)
+                    # Use Ghost v7 humanized mouse movement
+                    box = await input_el.bounding_box()
+                    if box:
+                        await page.mouse.move(box['x'] + box['width']/2, box['y'] + box['height']/2)
+                    await input_el.click(force=True, delay=random.randint(50, 150))
                     
                     # Clear existing value if possible
                     try: await page.keyboard.press("Control+a"); await page.keyboard.press("Backspace")
@@ -133,10 +175,15 @@ class AuraSingularity:
                     fragments = [payload[i:i+3] for i in range(0, len(payload), 3)]
                     
                     for frag in fragments:
-                        await page.keyboard.type(frag, delay=random.uniform(20, 100))
-                        # Adaptive jitter
-                        if random.random() > 0.7:
-                            await asyncio.sleep(random.uniform(0.1, 0.4))
+                        await page.keyboard.type(frag, delay=random.uniform(50, 200))
+                        # Adaptive jitter - pausing like a human thinking
+                        if random.random() > 0.8:
+                            await asyncio.sleep(random.uniform(0.3, 1.2))
+                        # Occasional backspace simulation (human error)
+                        if random.random() > 0.95:
+                            await page.keyboard.press("Backspace")
+                            await asyncio.sleep(0.2)
+                            await page.keyboard.type(frag[0] if frag else "", delay=100)
                     
                     start_t = time.time()
                     await page.keyboard.press("Enter")
@@ -147,38 +194,6 @@ class AuraSingularity:
                     
                     duration = int((time.time() - start_t) * 1000)
                     content = await page.content()
-                    
-                    # Phase 21: Deterministic Vulnerability Checks (Override AI False Negatives)
-                    # 1. XSS Absolute Reflection Check
-                    if vuln_type == "Cross-Site Scripting (XSS)" and payload in content:
-                        self.campaign_findings.append({
-                            "type": "Cross-Site Scripting (Reflected)",
-                            "confidence": "Critical",
-                            "content": f"DETERMINISTIC HIT: Exact XSS payload '{payload}' reflected unescaped on {url} (Singularity)."
-                        })
-                        console.print(f"[bold red][!!!] ZENITH HIT: XSS detected via deterministic reflection.[/bold red]")
-                        break
-                    
-                    # 2. SQLi Error/Signature Check
-                    target_errors = ["sql syntax", "mysql_fetch", "pdoexception", "unclosed quotation mark", "ora-01756", "sqlite3.operationalerror"]
-                    if vuln_type == "Blind SQLi" and any(err in content.lower() for err in target_errors):
-                        self.campaign_findings.append({
-                            "type": "SQL Injection (Error-Based)",
-                            "confidence": "Critical",
-                            "content": f"DETERMINISTIC HIT: SQL Error signature detected on {url}. Payload: {payload}"
-                        })
-                        console.print(f"[bold red][!!!] ZENITH HIT: SQLi detected via deterministic error signature.[/bold red]")
-                        break
-                        
-                    # 3. Command Injection / LFI Signatures
-                    if any(err in content.lower() for err in ["root:x:0:0:", "uid=", "drwxr-xr-x"]):
-                        self.campaign_findings.append({
-                            "type": f"{vuln_type} (Signature-Based)",
-                            "confidence": "Critical",
-                            "content": f"DETERMINISTIC HIT: System file/command output detected on {url}"
-                        })
-                        console.print(f"[bold red][!!!] ZENITH HIT: {vuln_type} detected via system output signature.[/bold red]")
-                        break
 
                     # AI Behavioral reasoning (Fallback)
                     bh = self.brain.analyze_behavior(url, payload, duration, len(content), 200, content)

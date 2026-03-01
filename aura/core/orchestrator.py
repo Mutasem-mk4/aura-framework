@@ -16,6 +16,7 @@ from aura.modules.leaks import LeakProber
 from aura.modules.threat_intel import ThreatIntel
 from aura.modules.bounty import BountyHunter
 from aura.modules.banner_grabber import BannerGrabber
+from aura.modules.pivoting import AuraLink
 from aura.modules.recon_pipeline import ReconPipeline   # v5.0
 from aura.modules.secret_hunter import SecretHunter      # v5.0
 from aura.modules.power_stack import PowerStack          # v6.0
@@ -46,13 +47,16 @@ class NeuralOrchestrator:
         self.leaks = LeakProber()
         self.intel = ThreatIntel(stealth=self.stealth)
         self.bounty = BountyHunter()
+        self.link = AuraLink() # v6.0: Auto-Pivoting
+        from aura.modules.heavy_weapons import HeavyWeaponry
+        self.heavy_weapons = HeavyWeaponry(self.db) # v7.0: Heavy Weaponry
         self.banner_grabber = BannerGrabber()            # v3.0: OSINT Resiliency
         self.recon_pipeline = ReconPipeline()             # v5.0: Subfinder→HTTPX→Nmap
         self.secret_hunter  = SecretHunter()              # v5.0: TruffleHog-style
         self.power_stack    = PowerStack(stealth=self.stealth)  # v6.0: Nuclei/TruffleHog/HTTPX/Nmap
         self.poc_engine     = PoCEngine(stealth=self.stealth)   # v6.0: Deterministic PoC
-        self.dast_semaphore = asyncio.Semaphore(5)        # Velocity v14.4
-        self.sing_semaphore = asyncio.Semaphore(3) # Velocity v14.4
+        self.dast_semaphore = asyncio.Semaphore(10)       # Velocity v7.4: Scaled from 5 to 10
+        self.sing_semaphore = asyncio.Semaphore(5)        # Velocity v7.4: Scaled from 3 to 5
         self.plugins = []
         self._load_plugins()
         self.current_campaign = None
@@ -103,8 +107,8 @@ class NeuralOrchestrator:
             self.db.log_action("SCOPE_DENIAL", domain, "Target rejected by ScopeManager", campaign_id)
             return {"status": "blocked", "reason": "out_of_scope"}
 
-        self.db.log_action("START_CHAIN", domain, "NeuralOrchestrator engaged", campaign_id)
-        console.print(f"[bold magenta][🧠] NeuralOrchestrator (Ghost v4): Developing Chain-of-Thought for {domain}...[/bold magenta]")
+        self.db.log_action("START_CHAIN", domain, "NeuralOrchestrator engaged (v10.0 Sovereign)", campaign_id)
+        console.print(f"[bold cyan][🧠] Aura v10.0 SOVEREIGN: Developing Sovereign Chain-of-Thought for {domain}...[/bold cyan]")
         
         # 1. Pre-Flight Ghost Recon: Check for WAF and Liveness
         console.print("[cyan][*] Phase 0: Stealth Pre-Flight Recon (Liveness & WAFSense)...[/cyan]")
@@ -216,9 +220,10 @@ class NeuralOrchestrator:
                         if bf.get('severity') == 'CRITICAL':
                             vulns.append(bf)
         
-        # v3.0 Fix: scanner.dirbust() now handles recursion internally (depth ≤ 2, 200-only).
-        # The orchestrator just calls it once per BASE URL and processes the flat results.
-        # DO NOT loop back and call dirbust() on returned paths — that caused the explosion.
+        # v10.1 Structural Fix: Forced Active Directory Brute-forcing
+        # Ensures that we don't rely only on static links. Unconditionally dirbust the root URLs.
+        console.print("[bold yellow][*] Phase 2.1b: v10.1 Forced Active Directory Brute-Forcing (500-Word)...[/bold yellow]")
+        await self.broadcast("Executing Forced Active Directory Brute-Forcing...", type="status", icon="hammer")
         for url in list(discovered_urls):  # snapshot to avoid modifying while iterating
             hidden_paths = await self.scanner.dirbust(url)
             for path in hidden_paths:
@@ -253,12 +258,81 @@ class NeuralOrchestrator:
             findings.append(sf)
             vulns.append(sf)  # All secrets are CRITICAL
 
+        # ──────────────────────────────────────────────────────────
+        #  v7.2: INSTINCT FOCUS — Deep Discovery Engine Integration
+        # ──────────────────────────────────────────────────────────
+        
+        #  Phase 2.3a: Sitemap & Robots Parser (MANDATORY)
+        console.print("[bold cyan][*] Phase 2.3a: v7.2 Sitemap & Robots Parser (Mandatory)...[/bold cyan]")
+        await self.broadcast("Parsing sitemap.xml and robots.txt for hidden paths...", type="status", icon="map")
+        sitemap_urls = await self.scanner.parse_sitemap_robots(target_url)
+        for sm_url in sitemap_urls:
+            if sm_url not in discovered_urls:
+                discovered_urls.append(sm_url)
+        self.db.log_action("SITEMAP_PARSE", domain, f"Extracted {len(sitemap_urls)} paths from sitemap/robots", campaign_id)
+        
+        # v10.0 Sovereign: Optimized Discovery Flow
+        # Use a shared visited set across all discovery modules to prevent infinite loops
+        visited_paths = set(discovered_urls)
+        
+        #  Phase 2.3b: Recursive Spider (Depth 5) - Fixed Concurrency
+        console.print("[bold cyan][*] Phase 2.3b: v10.0 Sovereign Recursive Spider...[/bold cyan]")
+        await self.broadcast("Deploying Sovereign Spider — crawling deep surface...", type="status", icon="spider")
+        spidered_urls, discovered_forms = await self.scanner.recursive_spider(target_url, max_depth=3)
+        for sp_url in spidered_urls:
+            if sp_url not in discovered_urls:
+                discovered_urls.append(sp_url)
+                visited_paths.add(sp_url)
+                
+        # v10.1 Structural Fix: 50+ Path Auditing Mandate
+        if len(discovered_urls) < 50:
+            console.print(f"[bold red][🦖] SOVEREIGN MANDATE: Only {len(discovered_urls)} paths found. Requirement: 50+. Activating Structural Guesser...[/bold red]")
+            await self.broadcast("MANDATE: Insufficient paths. Activating Structural Guesser...", type="status", icon="spider")
+            
+            needed = 50 - len(discovered_urls)
+            guessed_paths = await self.scanner.intelligent_guess_paths(target_url, count_needed=needed, discovered_structure=discovered_urls)
+            for dp in guessed_paths:
+                 if dp not in discovered_urls:
+                    discovered_urls.append(dp)
+                    visited_paths.add(dp)
+            console.print(f"[bold green][+] Structural Guesser forced {len(guessed_paths)} new audit paths.[/bold green]")
+            
+        self.db.log_action("SPIDER_CRAWL", domain, f"Total discovered URLs (v10.1 Structural): {len(discovered_urls)}", campaign_id)
+        
+        #  Phase 2.3c: JS/CSS Link Extraction
+        console.print("[bold cyan][*] Phase 2.3c: v7.2 JS/CSS Endpoint Extraction...[/bold cyan]")
+        await self.broadcast("Extracting hidden endpoints from JavaScript and CSS files...", type="status", icon="code")
+        js_endpoints = await self.scanner.extract_js_css_links(target_url)
+        for ep in js_endpoints:
+            if ep not in discovered_urls:
+                discovered_urls.append(ep)
+        self.db.log_action("JS_CSS_EXTRACT", domain, f"Extracted {len(js_endpoints)} hidden endpoints from JS/CSS", campaign_id)
+        
+        #  Phase 2.3d: Shodan Port-based Web Discovery
+        if intel_data.get("shodan") and intel_data["shodan"].get("ports"):
+            console.print("[bold cyan][*] Phase 2.3d: v7.2 Shodan Port Web Discovery...[/bold cyan]")
+            shodan_ports = intel_data["shodan"]["ports"]
+            web_ports = [p for p in shodan_ports if p not in [22, 25, 53, 110, 143]]
+            for port in web_ports:
+                port_url = f"http://{domain}:{port}" if port != 443 else f"https://{domain}"
+                if port_url not in discovered_urls:
+                    try:
+                        res = await self.session.get(port_url, timeout=5)
+                        if res.status_code < 500:
+                            discovered_urls.append(port_url)
+                            console.print(f"[green][+] Shodan Port {port}: {port_url} is alive.[/green]")
+                    except:
+                        pass
+            self.db.log_action("SHODAN_PORTS", domain, f"Probed {len(web_ports)} non-standard ports", campaign_id)
+        
+        console.print(f"[bold green][✔] v7.2 TOTAL DISCOVERY: {len(discovered_urls)} unique URLs ready for DAST.[/bold green]")
+        await self.broadcast(f"Discovery Complete: {len(discovered_urls)} URLs, {len(discovered_forms)} Forms", type="status", level="success", icon="check-circle")
+
         # v6.0: PowerStack — HTTPX liveness filter on discovered URLs
-        console.print("[bold green][*] Phase 2.3: v6.0 PowerStack — HTTPX URL Liveness Filter...[/bold green]")
+        console.print("[bold green][*] Phase 2.4: v6.0 PowerStack — HTTPX URL Liveness Filter...[/bold green]")
         live_urls = await self.power_stack.httpx_verify(discovered_urls)
-        # Replace with live-only list for subsequent scans
         if live_urls:
-            discovered_urls = list(set(discovered_urls[:1] + live_urls))  # Keep base + live
+            discovered_urls = list(set(discovered_urls[:1] + live_urls))
 
         # v6.0: PowerStack — Nmap -sV service fingerprinting
         if target_ip:
@@ -281,7 +355,6 @@ class NeuralOrchestrator:
                 await self.broadcast(f"Target INACCESSIBLE: {ocr.get('reason')}", type="alert", level="error", icon="ban")
                 return {"status": "inaccessible", "reason": ocr.get("reason")}
             
-            # OCR found vulnerability indicators? Add them immediately!
             if ocr.get("is_vulnerable_site") and ocr.get("findings"):
                 console.print(f"[bold red][👁️] OCR Intel: {len(ocr['findings'])} vulnerability indicator(s) confirmed visually![/bold red]")
                 for ocr_f in ocr["findings"]:
@@ -295,28 +368,22 @@ class NeuralOrchestrator:
         secrets = await self.bounty.scan_for_secrets(domain)
         if secrets:
             for s in secrets:
-                # Map entropy/regex results to findings
                 severity = "CRITICAL" if s["method"] == "regex" else "HIGH"
                 content = f"Exposed {s['type']} found at {s['location']}"
                 if s["method"] == "entropy":
                     content += f" (Score: {s.get('score')})"
                 
                 self.db.add_finding(domain, content, s["type"], campaign_id=campaign_id)
-                # Upgrade severity using AI reasoning or heuristics
                 semantic_severity = self.brain.calculate_impact(s["type"], content)
                 effective_severity = severity if severity == "CRITICAL" else semantic_severity
                 self.db.update_finding_metadata(domain, content, effective_severity) 
                 
-                # Treat secrets as vulnerabilities for risk calculation
                 findings.append({"type": s["type"], "content": content, "severity": effective_severity})
                 vulns.append({"type": s["type"], "content": content, "severity": effective_severity})
                 
         # 3. CVE Matching & Leak Probing (Ghost v4 Intel)
         cves = self.vuln_intel.get_cves_for_stack(tech_stack)
         leaks = self.leaks.probe_domain(domain)
-        
-        intel_score = self.vuln_intel.calculate_tech_risk(tech_stack)
-        intel_score += self.leaks.get_risk_impact(leaks)
         
         if cves:
             console.print(f"[bold red][!] Intelligence Alert: Found {len(cves)} potential CVEs for detected stack.[/bold red]")
@@ -328,9 +395,7 @@ class NeuralOrchestrator:
              for leak in leaks:
                  self.db.add_finding(domain, f"Leak-Match: {leak['email']} ({leak['leak']})", "Credential-Leak", campaign_id=campaign_id)
 
-        # Update target risk score in DB
-        priority = "CRITICAL" if intel_score > 5000 else "HIGH" if intel_score > 2000 else "MEDIUM" if intel_score > 500 else "LOW"
-        self.db.save_target({"value": domain, "risk_score": intel_score, "priority": priority})
+        # v7.3 Law 1: Remove arbitrary intel_score. Risk calculation is deferred to Step 6 (CVSS strictly)
 
         # 4. Ask the Brain for a multi-step plan with captured intel
         await self.broadcast("Formulating strategic battle plan...", type="status", icon="brain")
@@ -340,35 +405,43 @@ class NeuralOrchestrator:
             "waf_detected": self.stealth.active_waf,
             "tech_stack": tech_stack,
             "cve_matches": [cve["id"] for cve in cves],
-            "osint_intel": intel_data
+            "osint_intel": intel_data,
+            "discovery_stats": {
+                "total_urls": len(discovered_urls),
+                "total_forms": len(discovered_forms),
+                "sitemap_paths": len(sitemap_urls),
+                "js_endpoints": len(js_endpoints),
+            }
         }
         plan_raw = self.brain.reason(context)
         
         console.print(f"[cyan][*] Ghost v4 Plan formulated with Intelligence. Executing chain...[/cyan]")
         self.db.log_action("PLAN_FORMULATED", domain, f"Plan size: {len(plan_raw)}", campaign_id)
-        # Step 3: Deep AI Audit (Vanguard Standard)
+        
+        # Step 3: Deep AI Audit — v7.2: Expanded DAST coverage (15 entry points, depth 3)
         await self.broadcast(f"Unleashing Nexus Deep Crawler on {len(discovered_urls)} entry points...", type="status", icon="link")
         
         visited_global = set()
         
         dast_tasks = []
-        # Velocity v14.4: Cap at 5 primary entry points and depth 1 for speed
-        for d_url in discovered_urls[:5]: 
+        # v7.2: Expanded from 5 to 15 primary entry points, depth 3 for deep audit
+        for d_url in discovered_urls[:15]: 
             async def _d(u):
                 async with self.dast_semaphore:
-                    return await self.dast.scan_target(u, depth=1, visited=visited_global)
+                    return await self.dast.scan_target(u, depth=3, visited=visited_global)
             dast_tasks.append(_d(d_url))
             
         if dast_tasks:
             dast_results = await asyncio.gather(*dast_tasks)
             for r in dast_results:
                 if r: vulns.extend(r)
+
         
         # Step 3.5: Singularity Autonomous CoT Attack (Phase 18)
         await self.broadcast("Unleashing Aura Singularity: Initiating Autonomous CoT & XHR Interception...", type="status", icon="volcano")
         
         singularity_tasks = []
-        for d_url in discovered_urls[:3]: # Velocity v14.4: Limit Singularity entry points
+        for d_url in discovered_urls[:5]: # Velocity v7.4: Scaled from 3 to 5
              async def _s(u):
                  async with self.sing_semaphore:
                      return await self.singularity.execute_singularity(u)
@@ -414,6 +487,9 @@ class NeuralOrchestrator:
                     try: self.db.update_finding_metadata(domain, content, "CRITICAL")
                     except: pass
                     vulns.append({"type": "Blind RCE / SSRF", "content": content})
+                    # Phase 29: Auto-Pivot into discovered internal IPs if Blind RCE confirms
+                    if target_ip:
+                        await self.link.auto_pivot(target_ip, self)
 
         # v6.0: Phase 5 — PoCEngine: Deterministic verification of all findings
         console.print("[bold red][*] Phase 5: v6.0 PoC Engine — Deterministic Exploitation Verification...[/bold red]")
@@ -429,38 +505,59 @@ class NeuralOrchestrator:
                     console.print(f"[bold magenta][Forge:{plugin.name}][/bold magenta] Finding: {plugin_result.get('finding')}")
                     self.db.add_finding(domain, plugin_result.get('finding'), f"Forge-{plugin.name}", campaign_id=campaign_id)
 
-        # Step 6: Recalculate Risk Score and Priority based on findings
+        # Step 6: Recalculate Risk Score and Priority based on findings (v7.3 Sovereign Law 1)
         if vulns:
-            console.print("[cyan][*] Recalculating target risk score based on active findings...[/cyan]")
-            final_risk = intel_score
+            console.print("[cyan][*] Recalculating target risk score using strict CVSS 3.1 bands...[/cyan]")
+            
+            # Retrieve or assign CVSS to all findings
+            cvss_scores = []
             for v in vulns:
                 v_type = v.get("type", "").lower()
-                conf = v.get("confidence", "").upper()
-                
-                weight = 100
                 severity = v.get("severity", "").upper()
                 if not severity:
                     severity = self.brain.calculate_impact(v_type, v.get("content", ""))
                 
-            # v2.0: CVSS v3.1 Risk Score — use the maximum CVSS score found across all findings
-            # This replaces arbitrary 'weight' scoring with a globally standardized metric
-            cvss_scores = [v.get("cvss_score", 0.0) for v in vulns if v.get("cvss_score")]
-            final_risk = round(max(cvss_scores), 1) if cvss_scores else 0.0
+                # Assign default CVSS if missing to ensure proper scaling
+                if "cvss_score" not in v:
+                    if "CRITICAL" in severity: v["cvss_score"] = 9.8
+                    elif "HIGH" in severity: v["cvss_score"] = 7.5
+                    elif "MEDIUM" in severity: v["cvss_score"] = 5.5
+                    else: v["cvss_score"] = 3.9
+                
+                # v10.1 Structural Fix: Mandatory Non-Zero Scoring
+                if "information disclosure" in v_type or "leak" in v_type or "sensitive" in v_type:
+                    if float(v.get("cvss_score", 0.0)) < 4.0:
+                        v["cvss_score"] = 4.0
+                        v["severity"] = "MEDIUM"
+                elif "web server" in v_type or "misconfiguration" in v_type:
+                    if float(v.get("cvss_score", 0.0)) < 7.5:
+                        v["cvss_score"] = 7.5
+                        v["severity"] = "HIGH"
+
+                cvss_scores.append(float(v.get("cvss_score", 0.0)))
             
-            # CVSS v3.1 Priority Bands
+            # v11.0 Hard Reset: Law 1 (Non-Zero Enforcer & Summation)
+            # Final target risk is explicitly the SUM of all CVSS scores, capped at 10.0
+            final_risk = round(sum(cvss_scores), 1) if cvss_scores else 0.0
+            
+            # Sovereign Safeguard: No zero-score for vulnerabilities
+            if vulns and final_risk == 0.0:
+                final_risk = 0.1 # Absolute bare minimum fallback if needed
+                
+            if final_risk > 10.0: final_risk = 10.0
+            
+            # v11.0 Hard Reset: Strict Priority Bands
             if final_risk >= 9.0:
-                final_priority = "CRITICAL (CVSS 9.0+)"
+                final_priority = "CRITICAL"
             elif final_risk >= 7.0:
-                final_priority = "HIGH (CVSS 7.0-8.9)"
+                final_priority = "HIGH"
             elif final_risk >= 4.0:
-                final_priority = "MEDIUM (CVSS 4.0-6.9)"
-            elif final_risk > 0:
-                final_priority = "LOW (CVSS 0.1-3.9)"
+                final_priority = "MEDIUM"
             else:
-                final_priority = "NONE"
+                final_priority = "LOW"
             
             self.db.save_target({"value": domain, "risk_score": final_risk, "priority": final_priority})
-            console.print(f"[bold red][!] CVSS v3.1 Risk Score: {final_risk}/10.0 ({final_priority})[/bold red]")
+            console.print(f"[bold cyan][!] CVSS 3.1 Sovereign Integrity Score: {final_risk}/10.0 ({final_priority})[/bold cyan]")
             
         console.print("[bold green][✔] NeuralOrchestrator: Mission complete.[/bold green]")
         self.db.log_action("MISSION_COMPLETE", domain, "NeuralOrchestrator chain finished", campaign_id)

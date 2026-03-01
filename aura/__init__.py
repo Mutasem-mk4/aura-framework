@@ -1,2 +1,2 @@
 # Aura Zenith Singularity
-__version__ = "3.0.0"
+__version__ = "10.0.0"

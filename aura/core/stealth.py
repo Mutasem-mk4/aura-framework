@@ -5,6 +5,28 @@ import asyncio
 from typing import Dict, Optional, List
 from aura.core import state
 
+class SwarmManager:
+    """v6.0: Manages a swarm of proxies and nodes with adaptive health tracking."""
+    def __init__(self, proxies: List[str]):
+        self.proxies = {p: {"hits": 0, "failures": 0, "status": "HEALTHY"} for p in proxies}
+        self.active_index = 0
+
+    def get_best_proxy(self) -> Optional[str]:
+        healthy = [p for p, stats in self.proxies.items() if stats["status"] == "HEALTHY"]
+        if not healthy: return None
+        return random.choice(healthy)
+
+    def report_failure(self, proxy: str):
+        if proxy in self.proxies:
+            self.proxies[proxy]["failures"] += 1
+            if self.proxies[proxy]["failures"] > 5:
+                self.proxies[proxy]["status"] = "BURNED"
+
+    def report_success(self, proxy: str):
+        if proxy in self.proxies:
+            self.proxies[proxy]["hits"] += 1
+            self.proxies[proxy]["failures"] = 0
+
 class StealthEngine:
     """The Ghost Mode v3 engine for anonymizing and diversifying Aura's traffic."""
     
@@ -27,6 +49,9 @@ class StealthEngine:
         
         if final_proxy_file:
             self.load_proxies(final_proxy_file)
+        
+        self.swarm = SwarmManager(self.proxy_list)
+        self.battle_mode = False
             
     def load_proxies(self, file_path: str):
         """Loads a list of HTTP/HTTPS proxies from a file."""
@@ -156,10 +181,10 @@ class StealthEngine:
         return random.choice(templates)
 
 
-    def get_proxy_dict(self) -> Optional[Dict]:
+    def get_proxy_dict(self, rotate: bool = False) -> Optional[Dict]:
         if not self.proxy_list:
             return None
-        proxy = random.choice(self.proxy_list)
+        proxy = self.swarm.get_best_proxy() or random.choice(self.proxy_list)
         return {"http": proxy, "https": proxy}
 
 class AuraSession:
@@ -174,8 +199,12 @@ class AuraSession:
 
     async def request(self, method, url, **kwargs):
         """Executes a request with JA3 impersonation and Ghost v3 adaptive evasion."""
-        for attempt in range(self.retries):
+        from aura.core.brain import AuraBrain
+        brain = AuraBrain()
+        
+        for attempt in range(self.retries + (3 if self.stealth.active_waf else 0)):
             params = self.stealth.get_stealth_params(force_rotate=(attempt > 0))
+            current_proxy = params["proxies"]["http"] if params["proxies"] else None
             
             # Ghost v4: Advanced Behavioral Jitter (Humanized Delays)
             # We sleep BEFORE grabbing the semaphore to avoid blocking the whole framework
@@ -199,9 +228,20 @@ class AuraSession:
                     resp = await asyncio.to_thread(curlr.request, method, url, **req_kwargs)
                     
                     waf = self.stealth.detect_waf(resp.headers, resp.text)
-                    if resp.status_code in [403, 429] and attempt < self.retries - 1:
-                        continue
+                    if resp.status_code in [403, 429]:
+                        if current_proxy: self.stealth.swarm.report_failure(current_proxy)
                         
+                        # Phase 28: Battle Loop - AI analyzes and mutates immediately
+                        if waf:
+                            suggestion = brain.suggest_waf_evasion(waf)
+                            req_kwargs["headers"].update({"X-Aura-Battle": "Active"})
+                            # Mutate any data/params if present
+                            if "data" in req_kwargs and isinstance(req_kwargs["data"], str):
+                                req_kwargs["data"] = self.stealth.mutate_payload(req_kwargs["data"])
+                                
+                        if attempt < self.retries - 1: continue
+                        
+                    if current_proxy: self.stealth.swarm.report_success(current_proxy)
                     return resp
                 except Exception as e:
                     if attempt == self.retries - 1:

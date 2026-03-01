@@ -1,0 +1,187 @@
+﻿      +-----------------------------------------------------------------+      
+      |                                                                 |      
+      |                                                                 |      
+      |                                                                 |      
+python : Traceback 
+(most recent call 
+last):
+At line:1 char:1
++ python -m aura.cli 
+zenith zero.webappsecur
+ity.com > 
+error_trace.log 2 ...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (Traceback (mo   
+ st recent call las    
+t)::String) [], Re    
+moteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+  File "<frozen 
+runpy>", line 198, in 
+_run_module_as_main
+  File "<frozen 
+runpy>", line 88, in 
+_run_code
+  File "C:\Users\User\.
+gemini\antigravity\scra
+tch\aura\aura\cli.py", 
+line 420, in <module>
+    cli()
+  File "C:\Users\User\A
+ppData\Local\Programs\P
+ython\Python312\Lib\sit
+e-packages\click\core.p
+y", line 1485, in 
+__call__
+    return 
+self.main(*args, 
+**kwargs)
+           ^^^^^^^^^^^^
+^^^^^^^^^^^^^^
+  File "C:\Users\User\A
+ppData\Local\Programs\P
+ython\Python312\Lib\sit
+e-packages\click\core.p
+y", line 1406, in main
+    rv = 
+self.invoke(ctx)
+         
+^^^^^^^^^^^^^^^^
+  File "C:\Users\User\A
+ppData\Local\Programs\P
+ython\Python312\Lib\sit
+e-packages\click\core.p
+y", line 1873, in 
+invoke
+    return _process_res
+ult(sub_ctx.command.inv
+oke(sub_ctx))
+                       
+    ^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^
+  File "C:\Users\User\A
+ppData\Local\Programs\P
+ython\Python312\Lib\sit
+e-packages\click\core.p
+y", line 1269, in 
+invoke
+    return ctx.invoke(s
+elf.callback, 
+**ctx.params)
+           ^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^
+^^^^
+  File "C:\Users\User\A
+ppData\Local\Programs\P
+ython\Python312\Lib\sit
+e-packages\click\core.p
+y", line 824, in invoke
+    return 
+callback(*args, 
+**kwargs)
+           ^^^^^^^^^^^^
+^^^^^^^^^^^^^
+  File "C:\Users\User\.
+gemini\antigravity\scra
+tch\aura\aura\cli.py", 
+line 253, in zenith
+    show_banner()
+  File "C:\Users\User\.
+gemini\antigravity\scra
+tch\aura\aura\ui\dashbo
+ard.py", line 59, in 
+show_banner
+    console.print(Align
+.center(Panel(banner_te
+xt, border_style="magen
+ta", padding=(1, 4))))
+  File "C:\Users\User\A
+ppData\Local\Programs\P
+ython\Python312\Lib\sit
+e-packages\rich\console
+.py", line 1697, in 
+print
+    with self:
+         ^^^^
+  File "C:\Users\User\A
+ppData\Local\Programs\P
+ython\Python312\Lib\sit
+e-packages\rich\console
+.py", line 870, in 
+__exit__
+    self._exit_buffer()
+  File "C:\Users\User\A
+ppData\Local\Programs\P
+ython\Python312\Lib\sit
+e-packages\rich\console
+.py", line 826, in 
+_exit_buffer
+    
+self._check_buffer()
+  File "C:\Users\User\A
+ppData\Local\Programs\P
+ython\Python312\Lib\sit
+e-packages\rich\console
+.py", line 2042, in 
+_check_buffer
+    
+self._write_buffer()
+  File "C:\Users\User\A
+ppData\Local\Programs\P
+ython\Python312\Lib\sit
+e-packages\rich\console
+.py", line 2078, in 
+_write_buffer
+    legacy_windows_rend
+er(buffer, LegacyWindow
+sTerm(self.file))
+  File "C:\Users\User\A
+ppData\Local\Programs\P
+ython\Python312\Lib\sit
+e-packages\rich\_window
+s_renderer.py", line 
+17, in 
+legacy_windows_render
+    term.write_styled(t
+ext, style)
+  File "C:\Users\User\A
+ppData\Local\Programs\P
+ython\Python312\Lib\sit
+e-packages\rich\_win32_
+console.py", line 441, 
+in write_styled
+    
+self.write_text(text)
+  File "C:\Users\User\A
+ppData\Local\Programs\P
+ython\Python312\Lib\sit
+e-packages\rich\_win32_
+console.py", line 402, 
+in write_text
+    self.write(text)
+  File "C:\Users\User\A
+ppData\Local\Programs\P
+ython\Python312\Lib\enc
+odings\cp1252.py", 
+line 19, in encode
+    return codecs.charm
+ap_encode(input,self.er
+rors,encoding_table)[0]
+           ^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 
+'charmap' codec can't 
+encode characters in 
+position 4-9: 
+character maps to 
+<undefined>
+      |    

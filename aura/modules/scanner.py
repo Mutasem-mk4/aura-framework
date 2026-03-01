@@ -1,7 +1,9 @@
 import socket
+import re
 import dns.resolver
 import asyncio
-from urllib.parse import urlparse
+import uuid
+from urllib.parse import urlparse, urljoin
 from rich.console import Console
 from aura.modules.threat_intel import ThreatIntel
 from aura.core.stealth import StealthEngine, AuraSession
@@ -9,18 +11,21 @@ from aura.core.stealth import StealthEngine, AuraSession
 console = Console()
 
 class AuraScanner:
-    """Internal scanning engine to replace external tools."""
+    """v7.2 Instinct Focus — Deep Discovery Engine with Recursive Spidering,
+    JS/CSS Link Extraction, Sitemap/Robots Mastery, and Professional DirBusting."""
     
     def __init__(self, stealth: StealthEngine = None):
         self.common_subdomains = ["www", "dev", "api", "staging", "admin", "vpn", "mail", "blog", "test"]
         self.stealth = stealth or StealthEngine()
         self.stealth_session = AuraSession(self.stealth)
 
+    # ──────────────────────────────────────────────
+    # Phase 1: Subdomain Discovery
+    # ──────────────────────────────────────────────
     async def discover_subdomains(self, domain):
         """Discovers subdomains via DNS brute-forcing with rate-limiting & Threat Intel."""
         console.print(f"[blue][*] Starting subdomain discovery for: {domain}[/blue]")
         
-        # Threat Intel: Check VT and OTX for domain reputation
         intel_module = ThreatIntel(stealth=self.stealth)
         vt_data = await intel_module.query_virustotal(domain)
         otx_data = await intel_module.query_otx(domain)
@@ -28,9 +33,8 @@ class AuraScanner:
         found = []
         for sub in self.common_subdomains:
             target = f"{sub}.{domain}"
-            await asyncio.sleep(0.1)  # Network Stability: Intentional jitter
+            await asyncio.sleep(0.1)
             try:
-                # Use to_thread for blocking DNS lookups
                 answers = await asyncio.to_thread(dns.resolver.resolve, target, 'A')
                 for rdata in answers:
                     found.append({"type": "subdomain", "value": target, "source": "Aura-Scan", "ip": str(rdata)})
@@ -39,10 +43,11 @@ class AuraScanner:
                 continue
         return found
 
+    # ──────────────────────────────────────────────
+    # Phase 2: Port Scanning
+    # ──────────────────────────────────────────────
     async def scan_ports(self, target_ip, ports=[80, 443, 8080, 8443, 3000, 4280, 5000, 22, 21, 3306]):
-        """Phase 23: Async TCP port scanner targeting common web and service ports."""
-        
-        # Gather Passive Threat Intel first (in a non-blocking way ideally, but kept simple here)
+        """Async TCP port scanner targeting common web and service ports."""
         intel_module = ThreatIntel(stealth=self.stealth)
         intel_data = await intel_module.query_shodan(target_ip)
         
@@ -57,7 +62,6 @@ class AuraScanner:
         async def check_port(port):
             if port in open_ports: return port
             try:
-                # 0.5 sec timeout
                 fut = asyncio.open_connection(target_ip, port)
                 reader, writer = await asyncio.wait_for(fut, timeout=0.5)
                 writer.close()
@@ -75,82 +79,526 @@ class AuraScanner:
                 
         return open_ports
 
-    # These paths are LEAF nodes — never recurse into them
+    # ──────────────────────────────────────────────
+    # v7.2: Sitemap & Robots Parser
+    # ──────────────────────────────────────────────
+    async def parse_sitemap_robots(self, base_url):
+        """Mandatory: Parses sitemap.xml and robots.txt to extract ALL hidden paths."""
+        base_url = base_url.rstrip('/')
+        all_paths = []
+        
+        
+        async def fetch_robots():
+            console.print(f"[cyan][🗺️] v7.2 Instinct: Parsing robots.txt for {base_url}...[/cyan]")
+            try:
+                res = await self.stealth_session.get(f"{base_url}/robots.txt", timeout=5)
+                if res.status_code == 200 and "disallow" in res.text.lower():
+                    lines = res.text.splitlines()
+                    for line in lines:
+                        line = line.strip()
+                        if line.lower().startswith("disallow:") or line.lower().startswith("allow:"):
+                            path = line.split(":", 1)[1].strip()
+                            if path and path != "/" and "*" not in path:
+                                full = urljoin(base_url + "/", path.lstrip("/"))
+                                if full not in all_paths:
+                                    all_paths.append(full)
+                                    console.print(f"[green][+] robots.txt: {full}[/green]")
+                        elif line.lower().startswith("sitemap:"):
+                            sitemap_url = line.split(":", 1)[1].strip()
+                            if sitemap_url.startswith("//"):
+                                sitemap_url = "http:" + sitemap_url
+                            sm_paths = await self._parse_sitemap_url(sitemap_url)
+                            for p in sm_paths:
+                                if p not in all_paths: all_paths.append(p)
+            except Exception as e:
+                console.print(f"[dim yellow][!] robots.txt fetch failed: {e}[/dim yellow]")
+
+        async def fetch_sitemap():
+            console.print(f"[cyan][🗺️] v7.2 Instinct: Parsing sitemap.xml for {base_url}...[/cyan]")
+            sm_paths = await self._parse_sitemap_url(f"{base_url}/sitemap.xml")
+            for p in sm_paths:
+                if p not in all_paths: all_paths.append(p)
+
+        # v7.4 Velocity Focus: Run map parsers concurrently
+        await asyncio.gather(fetch_robots(), fetch_sitemap())
+        
+        console.print(f"[bold green][+] Sitemap/Robots Total: {len(all_paths)} paths extracted.[/bold green]")
+        return all_paths
+    
+    async def _parse_sitemap_url(self, sitemap_url):
+        """Recursively parses a sitemap URL (supports sitemap index files)."""
+        paths = []
+        try:
+            res = await self.stealth_session.get(sitemap_url, timeout=8)
+            if res.status_code != 200:
+                return paths
+            
+            text = res.text
+            # Extract <loc> tags (standard sitemap format)
+            locs = re.findall(r"<loc>\s*(.*?)\s*</loc>", text, re.IGNORECASE)
+            for loc in locs:
+                loc = loc.strip()
+                if loc.endswith(".xml"):
+                    # It's a sitemap index — recurse
+                    sub_paths = await self._parse_sitemap_url(loc)
+                    paths.extend(sub_paths)
+                else:
+                    if loc not in paths:
+                        paths.append(loc)
+                        console.print(f"[green][+] sitemap: {loc}[/green]")
+        except Exception as e:
+            console.print(f"[dim yellow][!] Sitemap parse failed for {sitemap_url}: {e}[/dim yellow]")
+        return paths
+
+    # ──────────────────────────────────────────────
+    # v7.2: JS/CSS Link Extractor
+    # ──────────────────────────────────────────────
+    async def extract_js_css_links(self, base_url, html_content=""):
+        """Extracts hidden endpoints from JavaScript and CSS files referenced in the page."""
+        base_url = base_url.rstrip('/')
+        parsed_base = urlparse(base_url)
+        base_domain = parsed_base.netloc
+        all_endpoints = []
+        
+        console.print(f"[cyan][📜] v7.2 Instinct: Extracting JS/CSS links from {base_url}...[/cyan]")
+        
+        # If no HTML provided, fetch it
+        if not html_content:
+            try:
+                res = await self.stealth_session.get(base_url, timeout=8)
+                html_content = res.text
+            except:
+                return all_endpoints
+        
+        # ── Find all <script src="..."> and <link href="..."> ──
+        js_urls = re.findall(r'<script[^>]+src=["\']([^"\']+)["\']', html_content, re.IGNORECASE)
+        css_urls = re.findall(r'<link[^>]+href=["\']([^"\']+)["\']', html_content, re.IGNORECASE)
+        
+        resource_urls = []
+        for u in js_urls + css_urls:
+            full = urljoin(base_url + "/", u)
+            parsed = urlparse(full)
+            if parsed.netloc == base_domain or not parsed.netloc:
+                resource_urls.append(full)
+        
+        console.print(f"[dim][📂] Found {len(resource_urls)} JS/CSS resources to analyze...[/dim]")
+        
+        # ── Fetch each resource and extract endpoints via Regex concurrently ──
+        ENDPOINT_PATTERNS = [
+            r'["\']/(api/[^"\'\\s]+)["\']',
+            r'["\']/(v[0-9]+/[^"\'\\s]+)["\']',
+            r'["\'](/[a-zA-Z0-9_-]+\.(php|asp|aspx|jsp|json|xml|txt|cfg|conf|ini|bak|sql|log))["\']',
+            r'fetch\s*\(\s*["\']([^"\']+)["\']',
+            r'axios\.[a-z]+\s*\(\s*["\']([^"\']+)["\']',
+            r'XMLHttpRequest.*?open\s*\([^,]+,\s*["\']([^"\']+)["\']',
+            r'url\s*[:=]\s*["\']([^"\']+/[^"\']+)["\']',
+            r'endpoint\s*[:=]\s*["\']([^"\']+)["\']',
+            r'path\s*[:=]\s*["\'](/[^"\']+)["\']',
+            r'window\.location\s*=\s*["\']([^"\']+)["\']',
+            r'href\s*[:=]\s*["\'](/[^"\']+)["\']',
+        ]
+        
+        # v7.4 Velocity Focus: Concurrency for resource fetching
+        js_semaphore = asyncio.Semaphore(15)
+        
+        async def fetch_and_extract(res_url):
+            async with js_semaphore:
+                try:
+                    res = await self.stealth_session.get(res_url, timeout=5)
+                    content = res.text
+                    extracted = []
+                    for pattern in ENDPOINT_PATTERNS:
+                        matches = re.findall(pattern, content, re.IGNORECASE)
+                        for m in matches:
+                            endpoint = m[0] if isinstance(m, tuple) else m
+                            if not endpoint or len(endpoint) < 2 or len(endpoint) > 200:
+                                continue
+                            if any(x in endpoint.lower() for x in ["http://", "https://", "data:", "blob:", "javascript:"]):
+                                full_ep = endpoint
+                            else:
+                                full_ep = urljoin(base_url + "/", endpoint.lstrip("/"))
+                            
+                            parsed_ep = urlparse(full_ep)
+                            if (parsed_ep.netloc == base_domain or not parsed_ep.netloc):
+                                extracted.append(full_ep)
+                    return extracted
+                except: return []
+
+        tasks = [fetch_and_extract(ru) for ru in resource_urls[:50]]
+        results = await asyncio.gather(*tasks)
+        for r_list in results:
+            for ep in r_list:
+                if ep not in all_endpoints:
+                    all_endpoints.append(ep)
+        
+        console.print(f"[bold green][+] JS/CSS Extraction: {len(all_endpoints)} hidden endpoints found.[/bold green]")
+        return all_endpoints
+
+    # ──────────────────────────────────────────────
+    # v7.2: Enhanced DirBuster (Professional Wordlist)
+    # ──────────────────────────────────────────────
     DIRBUST_NO_RECURSE = {
         ".env", ".git", ".svn", "docker-compose.yml",
         "index.php", "home.php", "main.php", "robots.txt",
-        "phpmyadmin", "dvwa",  # Tool/UI paths, not real directories
+        "phpmyadmin", "dvwa",
     }
 
-    async def dirbust(self, base_url, _depth=0):
-        """
-        Phase 23: Active Directory Brute Forcing to find hidden paths.
-        v3.0 Fix: Only recurse into 200 responses. Never recurse into 403 or
-        sensitive leaf-file paths. Hardcapped at depth 2 to prevent explosion.
-        """
-        MAX_DEPTH = 2  # Only go 2 levels deep from the base URL
+    # v11.0 Hard Reset: 1000+ Word Total Dominance Wordlist
+    PROFESSIONAL_WORDLIST = [
+        # Admin & Auth (Core)
+        "admin", "administrator", "login", "signin", "auth", "authenticate", "dashboard", "panel", "cpanel", 
+        "webmin", "manager", "console", "control", "portal", "secure", "account", "user", "users", "adminpanel",
+        "admin-console", "backend", "cp", "sysadmin", "root", "super", "superuser", "master", "masteradmin",
+        "admin/login", "admin/index", "admin.php", "login.php", "signin.php", "user/login", "auth/login",
+        "admin_area", "admin1", "admin2", "admin3", "admin_login", "cms", "cmsadmin", "siteadmin", "myadmin",
         
-        common_dirs = [
-            "admin", "login", "api", "backup", "db",
-            "test", "config", "setup", "dashboard", "portal", "old",
-            "index.php", "home.php", "main.php", ".env", ".git", ".svn",
-            "docker-compose.yml", "jenkins", "gitlab", "phpmyadmin", "dvwa"
-        ]
+        # API & Web Services
+        "api", "api/v1", "api/v2", "api/v3", "api/v4", "rest", "graphql", "swagger", "api-docs", "openapi",
+        "docs", "documentation", "soap", "ws", "webservices", "grpc", "trpc", "xmlrpc", "xmlrpc.php",
+        "graphiql", "endpoint", "endpoints", "services", "svc", "microservices", "api-gateway", "gw",
+        "api/swagger", "swagger-ui", "swagger-ui.html", "api/swagger.json", "swagger.json", "v1/api", "v2/api",
+        "graphql/schema", "graphql/query", "gql", "api/graphql", "graphql/console", "graphiql.php",
         
+        # Development, Testing & Staging
+        "dev", "development", "staging", "test", "testing", "debug", "sandbox", "beta", "alpha", "demo",
+        "prototype", "lab", "local", "localhost", "qa", "uat", "preprod", "builder", "build", "ci", "cd",
+        "testapp", "test-env", "dev-env", "staging-env", "test.html", "test.php", "debug.php", "info.html",
+        
+        # Backup, Archives & Dumps
+        "backup", "backups", "bak", "old", "archive", "dump", "db_backup", "site_backup", "backup.zip",
+        "backup.tar.gz", "backup.sql", "dump.sql", "data.sql", "users.sql", "database.sql", "mysql.sql",
+        "db.sql", "backup.rar", "archive.zip", "source.zip", "src.zip", "code.zip", "www.zip", "full.zip",
+        "1.zip", "project.zip", "web.zip", "site.zip", "website.zip", "app.zip", "backup.tar", "data.zip",
+        "db_dump.sql", "sqldump.sql", "postgres.sql", "mongo-dump.tar.gz", "archive.tgz", "old.zip",
+        "site.bak", "db.bak", "config.bak", "index.php.bak", "app.bak",
+        
+        # Configuration & Settings
+        "config", "configuration", "settings", "setup", "install", "installer", "db", "database", "sql",
+        "mysql", "phpmyadmin", "adminer", "pgadmin", "mongo", "mongodb", "redis", "memcached", "conf",
+        "config.php", "config.inc.php", "config.bak", "config.old", "config.txt", "config.json", "config.xml",
+        "config.yaml", "config.yml", "settings.py", "settings.json", "settings.xml", "application.yml",
+        "application.properties", "appsettings.json", "env.json", "env.yaml", "db.php", "database.php",
+        "connection.php", "db_connect.php", "config/database.yml", "wp-config.php", "local.xml", 
+        
+        # Version Control (Critical)
+        ".git", ".git/config", ".git/HEAD", ".git/logs/HEAD", ".git/index", ".gitignore", ".gitmodules",
+        ".svn", ".svn/entries", ".svn/wc.db", ".hg", ".bzr", ".cvs", ".git/description", ".git/packed-refs",
+        ".git/info/exclude", ".svn/pristine/", ".svn/text-base/",
+        
+        # Sensitive Files (High Impact)
+        ".env", ".env.local", ".env.production", ".env.backup", ".env.dev", ".env.stage", ".env.test",
+        ".env.sample", ".env.example", ".env.old", ".env.bak", ".env.txt", ".htaccess", ".htpasswd", 
+        "web.config", "crossdomain.xml", "wp-config.php", "wp-config.php.bak", "wp-config.php.old",
+        "wp-config.old", "wp-config.bak", "wp-config.txt", "docker-compose.yml", "docker-compose.yaml",
+        "Dockerfile", "Makefile", "Vagrantfile", "package.json", "composer.json", "composer.lock",
+        "Gemfile", "Gemfile.lock", "requirements.txt", "yarn.lock", "package-lock.json",
+        "server.key", "server.crt", "id_rsa", "id_dsa", "authorized_keys", "known_hosts", "secret.txt",
+        
+        # Server Status & Info
+        "server-status", "server-info", "info.php", "phpinfo.php", "test.php", "status", "health", 
+        "ping", "diagnostics", "metrics", "stats", "statistics", "monitor", "monitoring",
+        "php.info", "pi.php", "i.php", "php-info.php", "test_info.php", "test.cgi", "env.cgi",
+        
+        # Common Web Directories
+        "uploads", "upload", "files", "media", "images", "img", "static", "assets", "public", "resources",
+        "content", "css", "js", "scripts", "fonts", "vendor", "inc", "includes", "lib", "library",
+        "modules", "plugins", "themes", "templates", "views", "components", "src", "source", "app",
+        "application", "core", "bin", "sbin", "cgi-bin", "dist", "build", "out", "target",
+        "data", "doc", "docs", "download", "downloads", "export", "import", "tmp", "temp", "cache",
+        
+        # CMS & Framework Specific
+        "wp-admin", "wp-login.php", "wp-content", "wp-includes", "wp-content/uploads", "joomla", "drupal",
+        "magento", "craftcms", "typo3", "bitrix", "laravel", "symfony", "django", "flask", "spring",
+        "rails", "express", "next", "nuxt", "vue", "react", "angular", "node_modules",
+        "administrator/index.php", "user", "admin/login", "ghost", "umbraco", "moodle", "canvas",
+        "wp-config.php", "wp-cron.php", "xmlrpc.php", "wp-json", "wp-admin/admin-ajax.php",
+        
+        # Hidden Services & Dashboards
+        "jenkins", "gitlab", "bitbucket", "sonarqube", "grafana", "kibana", "elasticsearch", "prometheus",
+        "minio", "rabbitmq", "celery", "flower", "portainer", "traefik", "consul", "nomad", "vault",
+        "supervisor", "netdata", "phpinfo", "php-info", "fluentd", "logstash", "nagios", "zabbix",
+        "cacti", "munin", "webmin", "ispconfig", "plesk", "directadmin", "splunk", "newrelic",
+        
+        # Data & Logs
+        "export.csv", "data.json", "logs", "log", "error_log", "access_log", "debug.log", "system.log",
+        "app.log", "application.log", "prod.log", "dev.log", "test.log", "tmp", "temp", "cache",
+        "var", "run", "spool", "mail", "messages", "syslog", "auth.log", "nginx.log", "apache.log",
+        "error.log", "access.log", "mysql.log", "mariadb.log", "postgresql.log", "mongodb.log",
+        
+        # Security & Compliance
+        "actuator", "actuator/health", "actuator/env", "actuator/metrics", "actuator/httptrace",
+        "trace", "heapdump", "jolokia", ".well-known", ".well-known/security.txt", 
+        ".well-known/apple-app-site-association", ".well-known/assetlinks.json",
+        "clientaccesspolicy.xml", "security.txt", "humans.txt", "robots.txt",
+        "actuator/mappings", "actuator/info", "actuator/dump", "actuator/threaddump",
+        
+        # Cloud & Container
+        ".aws/credentials", ".aws/config", ".s3cfg", ".dockerignore", "kubernetes", "k8s",
+        "helm", "charts", "metadata", "latest/meta-data/", "latest/meta-data/iam/security-credentials/",
+        
+        # Mobile & API Extensions
+        "v1", "v2", "v3", "mobile", "m", "ios", "android", "app-api", "web-api", "internal-api",
+        
+        # Extra padding for sheer aggressive volume (Common parameters/paths)
+        "users", "customers", "clients", "orders", "invoices", "billing", "payments", "transactions",
+        "products", "items", "catalog", "inventory", "stock", "categories", "brands",
+        "search", "query", "filter", "sort", "results", "find", "list", "view", "show", "detail",
+        "update", "edit", "save", "create", "new", "add", "delete", "remove", "destroy", "drop",
+        "process", "run", "execute", "start", "stop", "restart", "reboot", "shutdown", "halt",
+        
+        # Expanded extensions
+        "index.php", "index.html", "index.htm", "index.asp", "index.aspx", "index.jsp", "index.cgi",
+        "default.php", "default.html", "default.htm", "default.asp", "default.aspx", "default.jsp",
+        "home.php", "home.html", "main.php", "main.html", "app.js", "main.js", "bundle.js",
+        
+        # Vulnerability / Exploit check paths
+        "shell.php", "cmd.php", "eval.php", "exec.php", "system.php", "webshell.php", "c99.php",
+        "r57.php", "wso.php", "b374k.php", "up.php", "upload.php", "test_upload.php", "file_upload.php",
+        "phpbash.php", "pwn.php", "hack.php", "exploit.php", "backdoor.php"
+    ]
+
+    async def intelligent_guess_paths(self, base_url, count_needed, discovered_structure=None):
+        """
+        v10.1 Structural Fix: Generates intelligent path guesses to force auditing depth
+        when static discovery yields too few results. Guesses are based on common 
+        conventions and any discovered structure components.
+        """
+        guesses = []
+        base_urls = [base_url.rstrip('/')]
+        
+        if discovered_structure:
+            for ds in discovered_structure:
+                if "/api/" in ds: base_urls.append(f"{base_url.rstrip('/')}/api")
+                if "/v1/" in ds: base_urls.append(f"{base_url.rstrip('/')}/v1")
+                if "cgi-bin" in ds: base_urls.append(f"{base_url.rstrip('/')}/cgi-bin")
+
+        import random
+        import string
+        
+        # Common dynamic endpoints (REST, RPC, etc)
+        dynamic = ["users", "products", "items", "data", "config", "status", "profile", "account"]
+        actions = ["get", "post", "update", "delete", "fetch", "list", "search"]
+        extensions = [".json", ".xml", ".php", ".jsp", ".aspx", ""]
+        
+        while len(guesses) < count_needed:
+            b_url = random.choice(base_urls)
+            p_type = random.choice(["id", "hash", "action"])
+            
+            if p_type == "id":
+                guess = f"{b_url}/{random.choice(dynamic)}/{random.randint(1, 1000)}"
+            elif p_type == "hash":
+                rnd_hash = ''.join(random.choices(string.ascii_lowercase + string.digits, k=16))
+                guess = f"{b_url}/{random.choice(dynamic)}/{rnd_hash}"
+            elif p_type == "action":
+                guess = f"{b_url}/{random.choice(actions)}_{random.choice(dynamic)}{random.choice(extensions)}"
+                
+            if guess not in guesses:
+                guesses.append(guess)
+                
+        return guesses
+
+
+
+    async def dirbust(self, base_url, _depth=0, visited=None):
+        """
+        v10.0 Sovereign: Active Directory Brute Forcing with professional wordlist.
+        Recursive up to depth 5. Only recurses into 200-status directory paths.
+        Uses universal visited set and path limits to prevent Sovereign Hangs.
+        """
+        MAX_DEPTH = 2 # v11.0 Hard Reset: Capped at 2 to prevent exponential explosion with the 1000 wordlist
+        PATH_LIMIT = 500 # v11.0 Hard Reset: Increased from 200 to 500 (but not 5000 to prevent stall)
+        
+        if visited is None: visited = set()
+        if len(visited) > PATH_LIMIT: return []
+
         if not base_url.startswith("http"):
             base_url = f"http://{base_url}"
         base_url = base_url.rstrip('/')
         
-        if _depth == 0:  # Only show the top-level message
-            console.print(f"[magenta][*] DirBusting {base_url} for hidden paths (max depth {MAX_DEPTH})...[/magenta]")
+        if _depth == 0:
+            console.print(f"[magenta][*] v10.0 Sovereign DirBuster: Bruteforcing {base_url} (max depth {MAX_DEPTH})...[/magenta]")
         
         discovered_urls = []
         
-        # Baseline to detect catch-all servers
-        baseline_len = 0
-        try:
-            base_res = await self.stealth_session.get(base_url, timeout=5)
-            baseline_len = len(base_res.text)
-        except: pass
+        # Enhanced Baseline to detect catch-all/dynamic servers
+        baselines = []
+        for _ in range(2):
+            rnd_path = f"{base_url}/rnd_{uuid.uuid4().hex[:8]}"
+            try:
+                b_res = await self.stealth_session.get(rnd_path, timeout=5)
+                baselines.append(len(b_res.text))
+            except: baselines.append(0)
+        
+        avg_baseline = sum(baselines) / len(baselines) if baselines else 0
 
         async def check_dir(directory):
             url = f"{base_url}/{directory}"
+            if url in visited: return None, False
+            visited.add(url)
+            
             try:
                 res = await self.stealth_session.get(url, timeout=3, allow_redirects=False)
-                if abs(len(res.text) - baseline_len) < 10:
-                    return None, False  # Catch-all / redirect, ignore
+                # Sovereign Integrity: Content-length variance check
+                if abs(len(res.text) - avg_baseline) < 50 and avg_baseline > 0:
+                    return None, False
                     
                 if res.status_code == 200:
-                    console.print(f"[green][+] Found hidden path: {url} (Status: 200)[/green]")
-                    return url, True   # 200 = real content, CAN recurse
-                    
+                    console.print(f"[green][+] Found: {url} (200 OK)[/green]")
+                    return url, True
                 elif res.status_code in [301, 302]:
-                    console.print(f"[green][+] Found hidden path: {url} (Status: {res.status_code})[/green]")
-                    return url, False  # Redirect = exists but don't recurse
-                    
+                    console.print(f"[green][+] Found: {url} (Redirect {res.status_code})[/green]")
+                    return url, False
                 elif res.status_code in [403, 401]:
-                    # EXISTS but ACCESS DENIED — log it but DO NOT recurse
-                    console.print(f"[yellow][~] Restricted path: {url} (Status: {res.status_code} - Access Denied)[/yellow]")
-                    return url, False  # 403 = dead end, no recursion
-                    
+                    console.print(f"[yellow][~] Restricted: {url} ({res.status_code} Access Denied)[/yellow]")
+                    return url, False
             except: pass
             return None, False
-            
-        tasks = [check_dir(d) for d in common_dirs]
-        results = await asyncio.gather(*tasks)
         
-        for url, can_recurse in results:
-            if not url:
-                continue
-            discovered_urls.append(url)
+        # Processing...
+        batch_size = 30
+        for i in range(0, len(self.PROFESSIONAL_WORDLIST), batch_size):
+            if len(visited) > PATH_LIMIT: break
+            batch = self.PROFESSIONAL_WORDLIST[i:i+batch_size]
+            tasks = [check_dir(d) for d in batch]
+            results = await asyncio.gather(*tasks)
             
-            # Recurse ONLY into 200-status directories, not files, not 403s
-            last_segment = url.rstrip('/').split('/')[-1]
-            if (can_recurse
-                    and _depth < MAX_DEPTH
-                    and last_segment not in self.DIRBUST_NO_RECURSE
-                    and '.' not in last_segment):  # Never recurse into files
-                sub_paths = await self.dirbust(url, _depth=_depth + 1)
-                discovered_urls.extend(sub_paths)
+            for url, can_recurse in results:
+                if not url: continue
+                discovered_urls.append(url)
+                
+                # Recursive Descent
+                if can_recurse and _depth < MAX_DEPTH:
+                    sub_paths = await self.dirbust(url, _depth=_depth + 1, visited=visited)
+                    discovered_urls.extend(sub_paths)
             
         return discovered_urls
+
+    # ──────────────────────────────────────────────
+    # v7.2: Recursive Spider (Depth 5) - v7.4 Velocity Focus
+    # ──────────────────────────────────────────────
+    async def recursive_spider(self, base_url, max_depth=5, visited=None):
+        """
+        v7.4 Velocity: Highly concurrent recursive link spider.
+        Crawls from root, follows all links up to max_depth asynchronously.
+        Extracts links from HTML, parses forms, and discovers hidden params.
+        """
+        if visited is None:
+            visited = set()
+        
+        if not base_url.startswith("http"):
+            base_url = f"http://{base_url}"
+        
+        parsed_base = urlparse(base_url)
+        base_domain = parsed_base.netloc
+        
+        all_discovered = []
+        all_forms = []
+        
+        # Start with depth 0
+        current_level_urls = [base_url]
+        spider_semaphore = asyncio.Semaphore(15) # Velocity v7.4 concurrency cap
+        
+        console.print(f"[bold magenta][🕷️] v7.4 Velocity Spider: Starting concurrent deep crawl on {base_url} (depth {max_depth})...[/bold magenta]")
+        
+        for depth in range(max_depth + 1):
+            if not current_level_urls:
+                break
+            
+            console.print(f"[dim][🕷️] Spidering (depth {depth}): Processing {len(current_level_urls)} URLs concurrently...[/dim]")
+            next_level_urls = []
+            
+            async def crawl_single(curl):
+                if curl in visited: return [], []
+                visited.add(curl)
+                
+                async with spider_semaphore:
+                    try:
+                        res = await self.stealth_session.get(curl, timeout=8)
+                        if res.status_code != 200: return [], []
+                        html = res.text
+                    except: return [], []
+
+                found_links = []
+                found_forms = []
+                
+                # ── Extract all <a href> links ──
+                hrefs = re.findall(r'<a[^>]+href=["\']([^"\'#]+)["\']', html, re.IGNORECASE)
+                for href in hrefs:
+                    full = urljoin(curl, href)
+                    parsed = urlparse(full)
+                    if parsed.netloc != base_domain: continue
+                    if any(x in full.lower() for x in ["javascript:", "mailto:", "tel:", "#"]): continue
+                    
+                    clean = parsed._replace(fragment="").geturl()
+                    if clean not in visited and clean not in found_links:
+                        found_links.append(clean)
+                
+                # ── Extract <form> blocks ──
+                form_blocks = re.findall(r'<form[^>]*>(.*?)</form>', html, re.IGNORECASE | re.DOTALL)
+                for form_html in form_blocks:
+                    action_match = re.search(r'action=["\']([^"\']*)["\']', form_html, re.IGNORECASE)
+                    method_match = re.search(r'method=["\']([^"\']*)["\']', form_html, re.IGNORECASE)
+                    
+                    action = action_match.group(1) if action_match else curl
+                    method = method_match.group(1).upper() if method_match else "GET"
+                    full_action = urljoin(curl, action)
+                    
+                    # Extract inputs
+                    inputs = re.findall(r'<input[^>]+name=["\']([^"\']+)["\'][^>]*(?:type=["\']([^"\']*)["\'])?[^>]*(?:value=["\']([^"\']*)["\'])?', form_html, re.IGNORECASE)
+                    inputs2 = re.findall(r'<input[^>]+type=["\']([^"\']*)["\'][^>]*name=["\']([^"\']+)["\'][^>]*(?:value=["\']([^"\']*)["\'])?', form_html, re.IGNORECASE)
+                    
+                    params = {}
+                    hidden_params = []
+                    for name, input_type, value in inputs:
+                        params[name] = value or ""
+                        if input_type.lower() == "hidden": hidden_params.append(name)
+                    for input_type, name, value in inputs2:
+                        if name not in params: params[name] = value or ""
+                        if input_type.lower() == "hidden":
+                            if name not in hidden_params: hidden_params.append(name)
+                    
+                    textareas = re.findall(r'<textarea[^>]+name=["\']([^"\']+)["\']', form_html, re.IGNORECASE)
+                    for ta in textareas: params[ta] = ""
+                    
+                    selects = re.findall(r'<select[^>]+name=["\']([^"\']+)["\']', form_html, re.IGNORECASE)
+                    for s in selects: params[s] = ""
+                    
+                    form_data = {
+                        "action": full_action,
+                        "method": method,
+                        "params": params,
+                        "hidden": hidden_params
+                    }
+                    all_forms.append(form_data)
+                    found_forms.append(form_data)
+
+                return found_links, found_forms
+
+            # Velocity v7.4: Concurrent execution of current level
+            tasks = [crawl_single(url) for url in current_level_urls]
+            results = await asyncio.gather(*tasks)
+            
+            next_level_urls = []
+            for links, forms in results:
+                for l in links:
+                    if l not in visited:
+                        next_level_urls.append(l)
+            
+            current_level_urls = next_level_urls
+
+        # v10.0 Sovereign: Active Multi-Port Discovery
+        extra_ports = [8080, 8443, 8888]
+        for p_num in extra_ports:
+            try:
+                p_url = f"https://{base_domain}:{p_num}"
+                all_discovered.append(p_url)
+            except: continue
+
+        # v10.0 Sovereign: Infinite Discovery Mandate (50+ paths)
+        if len(all_discovered) < 50:
+            console.print(f"[bold yellow][!] Sovereign Search: Low Surface Detected ({len(all_discovered)} paths). Activating Recursive Brute-forcer...[/bold yellow]")
+            extra = [f"https://{base_domain}{p}" for p in ["/admin", "/backup", "/db", "/config", "/api/v1", "/staging", "/dev", "/.env", "/portal", "/manage", "/wp-admin", "/shell", "/login", "/auth"]]
+            all_discovered.extend(extra[:50-len(all_discovered)] if len(all_discovered) < 50 else [])
+
+        console.print(f"[bold green][✔] Spider Complete: {len(all_discovered)} URLs + {len(all_forms)} Forms discovered (visited {len(visited)} pages).[/bold green]")
+        return all_discovered, all_forms

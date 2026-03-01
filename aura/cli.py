@@ -58,10 +58,10 @@ class AuraHelpGroup(click.Group):
     def format_help(self, ctx, formatter):
         show_banner()
         console.print(Panel(
-            "[bold white]AURA v4.0 (Vanguard)[/bold white]\n"
-            "Autonomous Multi-Stage offensive framework.",
-            title="[bold magenta]ZENITH COMMAND CENTER[/bold magenta]",
-            border_style="magenta",
+            "[bold cyan]AURA v10.0 (Sovereign)[/bold cyan]\n"
+            "Autonomous Domain Dominance & Offensive Intelligence Framework.",
+            title="[bold cyan]SOVEREIGN CONTROL CENTER[/bold cyan]",
+            border_style="cyan",
             padding=(1, 2)
         ))
 
@@ -278,8 +278,9 @@ def zenith(domain, plugin=None, campaign=None, whitelist=None, blacklist=None, o
     
     asyncio.run(orchestrator.execute_advanced_chain(domain, campaign_id=campaign_id))
     
-    # [Simplified Reporting] Automate PDF report after scan
+    # [v8.0.1] CONSOLIDATED REPORTING: Single PDF Entry Point
     try:
+        from aura.core.reporter import AuraReporter
         reporter = AuraReporter()
         report_path = reporter.generate_pdf_report(target_filter=domain)
         console.print(f"[bold green][+] Professional Mission Report generated: {report_path}[/bold green]")

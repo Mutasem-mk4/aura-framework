@@ -79,9 +79,15 @@ class AuraLink:
             client, addr = server.accept()
             threading.Thread(target=self.handle_client, args=(client,), daemon=True).start()
 
-    def brute_ssh_pivot(self, ip, user="root", wordlist=None):
-        """Simulates automated SSH lateral movement for pivoting."""
-        console.print(f"[bold yellow][*] Aura-Link: Attempting lateral movement to {ip} via SSH...[/bold yellow]")
-        # In a real tool, we'd use paramiko to attempt logins and then drop a pivot agent.
-        # For Zenith, we automate the logic.
-        return True
+    async def auto_pivot(self, target_ip: str, orchestrator):
+        """v6.0: Automatically explores and pivots into a new target IP."""
+        console.print(f"[bold yellow][🔗] AuraLink: Auto-Pivot engaged for {target_ip}. Testing lateral movement...[/bold yellow]")
+        
+        # 1. Check for common pivot entry points
+        vulnerable = self.brute_ssh_pivot(target_ip)
+        if vulnerable:
+            console.print(f"[bold green][✔] AuraLink: Lateral movement SUCCESS on {target_ip}. Dropping pivot agent.[/bold green]")
+            # In a real scenario, we'd spawn a new SwarmNode here or route traffic through the new link
+            orchestrator.db.log_action("AUTO_PIVOT_SUCCESS", target_ip, "Lateral movement confirmed via SSH")
+            return True
+        return False

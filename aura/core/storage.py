@@ -324,3 +324,19 @@ class AuraStorage:
                 except:
                     pass
             return intel_summary
+    def get_attack_stats(self, target_value: str = None):
+        """v7.1: Retrieves attack attempt statistics for a target."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            if target_value:
+                cursor.execute("SELECT COUNT(*) FROM audit_log WHERE target = ? AND action = 'INJECTION_ATTEMPT'", (target_value,))
+                attempts = cursor.fetchone()[0]
+                cursor.execute("SELECT COUNT(*) FROM findings WHERE target_id = (SELECT id FROM targets WHERE value = ?)", (self.normalize_target(target_value),))
+                hits = cursor.fetchone()[0]
+            else:
+                cursor.execute("SELECT COUNT(*) FROM audit_log WHERE action = 'INJECTION_ATTEMPT'")
+                attempts = cursor.fetchone()[0]
+                cursor.execute("SELECT COUNT(*) FROM findings")
+                hits = cursor.fetchone()[0]
+            
+            return {"attempts": attempts, "hits": hits, "success_rate": round((hits/attempts * 100) if attempts > 0 else 0, 2)}
