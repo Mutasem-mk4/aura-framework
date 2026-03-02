@@ -87,7 +87,7 @@ class ReconPipeline:
             try:
                 input_hosts = "\n".join(hosts)
                 proc = await asyncio.create_subprocess_exec(
-                    "httpx", "-silent", "-json", "-title", "-tech-detect", "-status-code",
+                    "httpx", "-silent", "-json", "-title", "-tech-detect", "-status-code", "-k",
                     stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.DEVNULL
@@ -108,11 +108,16 @@ class ReconPipeline:
                         })
                     except: pass
                 console.print(f"[green][+] HTTPX: {len(results)} live HTTP services.[/green]")
+                if not results:
+                    return await self.stage2_fallback(hosts)
                 return results
             except Exception as e:
                 console.print(f"[yellow][!] HTTPX failed: {e}. Falling back to Python HTTP probe.[/yellow]")
 
-        # Fallback: Python HTTP probe
+        return await self.stage2_fallback(hosts)
+
+    async def stage2_fallback(self, hosts: list[str]) -> list[dict]:
+        """Fallback: Python HTTP probe"""
         console.print(f"[cyan][🌐 Recon] Stage 2 (HTTP Fallback): Probing {len(hosts)} hosts...[/cyan]")
         results = []
 

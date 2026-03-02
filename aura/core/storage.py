@@ -78,6 +78,17 @@ class AuraStorage:
                 )
             ''')
             
+            # Table for v12.0 Operation Logs
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS operation_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp DATETIME,
+                    path TEXT,
+                    payload TEXT,
+                    status_code INTEGER
+                )
+            ''')
+            
             # Migration logic for findings table
             cursor.execute("PRAGMA table_info(findings)")
             findings_cols = [column[1] for column in cursor.fetchall()]
@@ -166,6 +177,28 @@ class AuraStorage:
                 VALUES (?, ?, ?, ?, ?)
             ''', (now, action, target, details, campaign_id))
             conn.commit()
+
+    def log_operation(self, path: str, payload: str, status_code: int):
+        """v12.0 Hardcoded Execution: Logs a raw operation directly to the Operation Logs table."""
+        now = datetime.now().isoformat()
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO operation_logs (timestamp, path, payload, status_code)
+                VALUES (?, ?, ?, ?)
+            ''', (now, path, payload, status_code))
+            conn.commit()
+
+    def get_operation_logs(self):
+        """Fetches all operation logs."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute('SELECT * FROM operation_logs ORDER BY id DESC LIMIT 500')
+                return [dict(row) for row in cursor.fetchall()]
+        except:
+            return []
 
     def create_campaign(self, name: str, target_config: dict = None):
         """Creates a new mission campaign."""

@@ -142,12 +142,14 @@ class AuraSingularity:
         aggressive_trigger = False
         # Phase 42: OCR/Signature Check - If "Vulnerable" found, trigger heavy payloads
         try:
+            await page.wait_for_load_state("networkidle", timeout=5000)
             page_text = await page.content()
             if any(x in page_text.lower() for x in ["vulnerable", "exploit", "sqli", "xss", "injection"]):
                 aggressive_trigger = True
                 console.print(f"[bold red][🌋] AGGRESSION TRIGGERED: Signature detected on {url}. Increasing payload density by 10x![/bold red]")
         except: pass
 
+        vuln_types = ["SQLi", "XSS"]
         for i in range(50 if aggressive_trigger else 5): # Limit to first 5 or 50 inputs
             for vuln_type in vuln_types:
                 try:

@@ -278,6 +278,25 @@ def zenith(domain, plugin=None, campaign=None, whitelist=None, blacklist=None, o
     
     asyncio.run(orchestrator.execute_advanced_chain(domain, campaign_id=campaign_id))
     
+    # v12.0 Hardcoded Execution: Verbose Operation Logs output
+    op_logs = db.get_operation_logs()
+    if op_logs:
+        console.print("\n[bold magenta]Aura v12.0 Hardcoded Execution: Verbose Operation Logs[/bold magenta]")
+        op_table = Table(show_header=True, header_style="bold magenta", border_style="grey39")
+        op_table.add_column("Timestamp", style="dim", width=20)
+        op_table.add_column("Path", style="cyan")
+        op_table.add_column("Payload", style="red")
+        op_table.add_column("Status", justify="right", style="green")
+        
+        for log in op_logs[:100]: # display max 100 on CLI
+            op_table.add_row(
+                str(log["timestamp"])[:19].replace("T", " "), 
+                str(log["path"])[:60], 
+                str(log["payload"])[:60] if log["payload"] else "N/A", 
+                str(log["status_code"])
+            )
+        console.print(op_table)
+    
     # [v8.0.1] CONSOLIDATED REPORTING: Single PDF Entry Point
     try:
         from aura.core.reporter import AuraReporter
