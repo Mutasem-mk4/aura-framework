@@ -96,6 +96,7 @@ class AuraReporter:
                 --text: #ffffff; 
                 --text-dim: #9494a0;
                 --border: #1a1a24;
+                --warning: #ffcc00;
             }
             body { 
                 font-family: 'Inter', -apple-system, sans-serif; 
@@ -369,11 +370,14 @@ class AuraReporter:
             output_path = os.path.join(self.report_dir, f"aura_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html")
             
         targets, critical_count, attack_stats = self._fetch_data(target_filter)
+        operation_logs = storage.get_operation_logs()
+        
         template = Template(self.HTML_TEMPLATE)
         report_html = template.render(
             targets=targets,
             critical_count=critical_count,
             attack_stats=attack_stats,
+            operation_logs=operation_logs,
             timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         )
         with open(output_path, "w", encoding="utf-8") as f:
@@ -725,6 +729,41 @@ class AuraReporter:
                 "• <b>AI Engine:</b> Behavioral reasoning verified by Gemini-1.5-Flash (Ghost v5)."
             )
             elements.append(Paragraph(diag_text, styles['Normal']))
+            elements.append(Spacer(1, 25))
+
+            # v14.0 [FINAL SIEGE]: Audit Transparency Table
+            elements.append(Paragraph("Audit Transparency: Full Siege Logs", h2_style))
+            elements.append(Paragraph("Chronological record of every systemic probe attempt (v14.0 Mandate):", styles['Normal']))
+            elements.append(Spacer(1, 10))
+            
+            storage = AuraStorage()
+            ops = storage.get_operation_logs()
+            if ops:
+                log_data = [["Timestamp", "Target Path", "Payload", "Status"]]
+                for log in ops:
+                    # Filter for this target domain
+                    if target['value'] in log['path']:
+                        log_data.append([
+                            log['timestamp'].split('T')[1].split('.')[0],
+                            Paragraph(f"<font face='Courier' size='7'>{log['path'].split('/')[-1]}</font>", styles['Normal']),
+                            Paragraph(f"<font face='Courier' size='7'>{log['payload']}</font>", styles['Normal']),
+                            str(log['status_code'])
+                        ])
+                
+                if len(log_data) > 1:
+                    lt = Table(log_data, colWidths=[60, 150, 190, 45])
+                    lt.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                        ('GRID', (0, 0), (-1, -1), 0.25, colors.lightgrey),
+                        ('FONTSIZE', (0, 1), (-1, -1), 6),
+                    ]))
+                    elements.append(lt)
+                else:
+                    elements.append(Paragraph("<i>No operations logged for this specific target asset.</i>", styles['Normal']))
+            else:
+                elements.append(Paragraph("<i>[!] Siege Log is synchronized but empty.</i>", styles['Normal']))
+
             elements.append(Spacer(1, 25))
             elements.append(Paragraph("<hr/>", styles['Normal'])) # Section divider
             

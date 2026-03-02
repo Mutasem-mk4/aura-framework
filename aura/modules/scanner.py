@@ -15,6 +15,12 @@ class AuraScanner:
     """v7.2 Instinct Focus — Deep Discovery Engine with Recursive Spidering,
     JS/CSS Link Extraction, Sitemap/Robots Mastery, and Professional DirBusting."""
     
+    BLIND_SIEGE_LIST = [
+        "admin/login.asp", "admin/db", "account/transfer", "feedback/send", "search?query=test",
+        "manager/html", "docs/config", "cgi-bin/test.sh", "server-status", "logs/access.log",
+        "api/v1/user", "api/v1/debug", "backup/db.sql", ".git/config", ".env"
+    ]
+
     def __init__(self, stealth: StealthEngine = None):
         self.common_subdomains = ["www", "dev", "api", "staging", "admin", "vpn", "mail", "blog", "test"]
         self.stealth = stealth or StealthEngine()
@@ -566,6 +572,43 @@ class AuraScanner:
             if r: discovered_urls.append(r)
             
         return discovered_urls
+
+    async def blind_siege(self, base_url):
+        """
+        v14.0 The Final Siege: Mandatory Blind Path Injection.
+        Force-requests specific high-value paths regardless of discovery.
+        """
+        import requests
+        import random
+        base_url = base_url.rstrip('/')
+        hits = []
+        
+        console.print(f"🔥 [bold red]FINAL SIEGE[/bold red]: Deploying Blind Path Injection on {base_url}...")
+        
+        user_agents = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+        ]
+
+        from aura.core.storage import AuraStorage
+        db_logger = AuraStorage()
+
+        for path in self.BLIND_SIEGE_LIST:
+            url = f"{base_url}/{path}"
+            try:
+                headers = {'User-Agent': random.choice(user_agents)}
+                res = requests.get(url, verify=False, timeout=5, allow_redirects=False, headers=headers)
+                
+                # Log EVERY attempt for Audit Transparency (v14.0 mandate)
+                db_logger.log_operation(url, "BlindSiege", res.status_code)
+                
+                if res.status_code in [200, 301, 302, 403]: # Log 403 too as it proves existence
+                    console.print(f"[bold cyan][!] Siege Hit: {url} ({res.status_code})[/bold cyan]")
+                    hits.append(url)
+            except Exception as e:
+                db_logger.log_operation(url, "BlindSiege", 999) # 999 for error
+                
+        return hits
 
     # ──────────────────────────────────────────────
     # v7.2: Recursive Spider (Depth 5) - v7.4 Velocity Focus
