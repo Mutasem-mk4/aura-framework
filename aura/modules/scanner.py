@@ -617,6 +617,7 @@ class AuraScanner:
         import requests
         import random
         import uuid
+        from concurrent.futures import ThreadPoolExecutor
         base_url = base_url.rstrip('/')
         hits = []
 
