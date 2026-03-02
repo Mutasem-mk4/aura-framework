@@ -586,13 +586,14 @@ class NeuralOrchestrator:
         all_findings = self.db.get_findings_by_target(domain)
         if all_findings:
             console.print(f"[bold red][!!!] ZENITH ALERT: {len(all_findings)} findings identified. Initiating exfiltration verification...[/bold red]")
+            # v19.4 Performance Fix: Only attempt exfiltration ONCE per vulnerability type to avoid runaway loops
+            _exfil_attempted = set()
             for v in all_findings:
-                # Attempt safe exfil for proven findings
                 v_type = v.get("type", "").lower()
-                if "sql" in v_type or "injection" in v_type:
+                if ("sql" in v_type or "injection" in v_type) and "sqli" not in _exfil_attempted:
                     await self.dast.attempt_exfiltration(domain, "SQLi")
                     self.db.log_action("EXFIL_ATTEMPT", domain, "SQLi Data Probe", campaign_id)
-            
+                    _exfil_attempted.add("sqli")            
             
         # Step 4.5: Phase 26 OAST Polling
         if self.dast.oast.uuid:

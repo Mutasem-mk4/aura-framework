@@ -600,7 +600,8 @@ class AuraScanner:
                 pass
             return None
 
-        with ThreadPoolExecutor(max_workers=15) as executor:
+        # v19.5 Performance: Increased max_workers from 15 to 40 for faster force fuzzing
+        with ThreadPoolExecutor(max_workers=40) as executor:
             results = list(executor.map(raw_check, words))
 
         for r in results:
@@ -640,12 +641,12 @@ class AuraScanner:
         from aura.core.storage import AuraStorage
         db_logger = AuraStorage()
 
-        for path in self.BLIND_SIEGE_LIST:
+        def siege_check(path):
             url = f"{base_url}/{path}"
             try:
                 headers = {'User-Agent': random.choice(user_agents)}
                 res = requests.get(url, verify=False, timeout=5, allow_redirects=False, headers=headers)
-
+                
                 # Audit log EVERY attempt (v14.0 mandate)
                 db_logger.log_operation(url, "BlindSiege", res.status_code)
 
@@ -653,13 +654,21 @@ class AuraScanner:
                 if siege_baseline_200:
                     if res.status_code in [301, 302, 403]:
                         console.print(f"[bold cyan][!] Siege Hit: {url} ({res.status_code})[/bold cyan]")
-                        hits.append(url)
+                        return url
                 else:
                     if res.status_code in [200, 301, 302, 403]:
                         console.print(f"[bold cyan][!] Siege Hit: {url} ({res.status_code})[/bold cyan]")
-                        hits.append(url)
+                        return url
             except Exception:
                 db_logger.log_operation(url, "BlindSiege", 999)
+            return None
+
+        # v19.5 Performance: Concurrent execution for Blind Siege (previously sequential causing delays)
+        with ThreadPoolExecutor(max_workers=20) as executor:
+            results = list(executor.map(siege_check, self.BLIND_SIEGE_LIST))
+            
+        for r in results:
+            if r: hits.append(r)
 
         return hits
 

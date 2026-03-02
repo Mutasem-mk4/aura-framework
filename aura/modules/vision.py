@@ -101,7 +101,8 @@ class VisualEye:
                 browser = await p.chromium.launch(headless=True)
                 page = await browser.new_page()
                 await page.set_viewport_size({"width": 1280, "height": 720})
-                await page.goto(url, timeout=15000, wait_until="networkidle")
+                # v19.4: Raised timeout to 30s to support heavy SPAs
+                await page.goto(url, timeout=30000, wait_until="networkidle")
                 await asyncio.sleep(1)
                 
                 # OCR Intelligence: analyze page body text directly

@@ -229,6 +229,9 @@ class PoCEngine:
         Upgrades confirmed findings with poc_evidence field.
         """
         console.print(f"[bold cyan][🔬 PoC Engine] Running deterministic verification on {len(findings)} findings...[/bold cyan]")
+        
+        # v19.4: Track verified signatures to prevent redundant 15-second timeouts
+        verified_signatures = set()
 
         for f in findings:
             f_type    = (f.get("type") or f.get("finding_type") or "").lower()
@@ -238,6 +241,10 @@ class PoCEngine:
             if "sql" in f_type and not f.get("confirmed"):
                 url_match = re.search(r'(https?://[^?\s]+)\?(\w+)', content)
                 if url_match:
+                    sig = f"sqli_{url_match.group(1)}_{url_match.group(2)}"
+                    if sig in verified_signatures: continue
+                    verified_signatures.add(sig)
+                    
                     # 1. Try UNION/sqlmap first
                     result = await self.verify_sqli(url_match.group(1), url_match.group(2))
                     if not result:
@@ -252,6 +259,9 @@ class PoCEngine:
             elif "xss" in f_type and not f.get("confirmed"):
                 url_match = re.search(r'(https?://[^\s\'\"]+)', content)
                 if url_match:
+                    sig = f"xss_{url_match.group(1)}"
+                    if sig in verified_signatures: continue
+                    verified_signatures.add(sig)
                     result = await self.verify_xss(url_match.group(1))
                     if result:
                         f.update(result)
@@ -263,6 +273,10 @@ class PoCEngine:
                 if url_match:
                     base = f"{url_match.group(1)}"
                     path = url_match.group(2).split("?")[0]
+                    sig = f"lfi_{base}_{path}"
+                    if sig in verified_signatures: continue
+                    verified_signatures.add(sig)
+                    
                     if any(sensitive in path.lower() for sensitive in [".env", ".git", "config", "backup", "secret", "docker", ".svn", "password"]):
                         result = await self.verify_lfi(base, path)
                         if result:
@@ -272,6 +286,9 @@ class PoCEngine:
             elif any(k in f_type for k in ("auth", "bypass", "idor", "unauthorized")) and not f.get("confirmed"):
                 url_match = re.search(r'(https?://[^\s\'\"]+)', content)
                 if url_match:
+                    sig = f"auth_{url_match.group(1)}"
+                    if sig in verified_signatures: continue
+                    verified_signatures.add(sig)
                     result = await self.verify_auth_bypass(url_match.group(1))
                     if result:
                         f.update(result)

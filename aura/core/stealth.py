@@ -255,13 +255,14 @@ class AuraSession:
             params = self.stealth.get_stealth_params(force_rotate=(attempt > 0))
             current_proxy = params["proxies"]["http"] if params["proxies"] else None
             
-            # v15.0: Enterprise Adaptive Backoff (Ghost v6)
-            # Dynamically scale delay based on previous successes/failures
-            delay = self.base_delay * random.uniform(0.8, 1.5)
+            # v19.5 Performance Speedup: Cap jitter at 0.5s unless WAF is active
+            # Previous v15.0 logic reached 20s delays per request causing extreme "freezing"
+            delay = min(self.base_delay * random.uniform(0.8, 1.2), 2.0)
             if self.stealth.active_waf:
-                delay *= 2.0
+                delay = min(delay * 1.5, 3.0)
             
-            await asyncio.sleep(delay)
+            if delay > 0.1:
+                await asyncio.sleep(delay)
             
             async with self._semaphore:
                 # Merge kwargs with Ghost v3 params
