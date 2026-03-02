@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AURA OMNI-HUB | v17.0</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="bg-grid"></div>
+    
+    <div class="dashboard">
+        <header class="card">
+            <div class="logo">AURA ZENITH</div>
+            <div class="system-status">
+                <span id="status-text">SYSTEM ONLINE</span>
+                <span class="btn" onclick="startCampaign()">NEW MISSION</span>
+            </div>
+        </header>
+
+        <aside class="sidebar card">
+            <h3 class="stat-label">Mission Control</h3>
+            <div class="stat-item">
+                <div class="stat-label">AI ENGINE</div>
+                <div class="stat-value" id="ai-engine">Sentinel-G</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">TOTAL FINDINGS</div>
+                <div class="stat-value" id="total-findings">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">SWARM NODES</div>
+                <div class="stat-value" id="swarm-nodes">0</div>
+            </div>
+            
+            <nav style="margin-top: 40px;">
+                <div class="btn" style="width: 100%; margin-bottom: 10px; text-align: center;">Vulnerability Map</div>
+                <div class="btn" style="width: 100%; margin-bottom: 10px; text-align: center;">Nexus War Room</div>
+                <div class="btn" style="width: 100%; margin-bottom: 10px; text-align: center;">Generate Report</div>
+            </nav>
+        </aside>
+
+        <main class="main-view">
+            <div class="card" style="flex: 1; min-height: 400px;">
+                <h3 class="stat-label">Omni-Sovereign Visualization</h3>
+                <canvas id="viz-canvas" style="width: 100%; height: 100%; margin-top: 20px;"></canvas>
+            </div>
+        </main>
+
+        <div class="right-panel card">
+            <h3 class="stat-label">Real-time Findings</h3>
+            <div id="findings-list" style="margin-top: 20px;">
+                <div class="finding-item">Awaiting data stream...</div>
+            </div>
+        </div>
+
+        <div class="bottom-console card">
+            <h3 class="stat-label">Nexus Command Log</h3>
+            <div id="console-output" style="font-family: monospace; font-size: 12px; color: #0f0; margin-top: 10px; height: 150px; overflow-y: auto;">
+                [INF] AURA-ZENITH v17.0 initialized...<br>
+                [INF] Connecting to Sentinel-G Core...<br>
+                [INF] Swarm connection established.<br>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function updateStats() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                document.getElementById('ai-engine').innerText = data.brain;
+                document.getElementById('total-findings').innerText = data.findings;
+                document.getElementById('swarm-nodes').innerText = data.swarm_nodes;
+            } catch (e) { console.error(e); }
+        }
+
+        async function updateFindings() {
+            try {
+                const res = await fetch('/api/findings');
+                const data = await res.json();
+                const list = document.getElementById('findings-list');
+                list.innerHTML = '';
+                data.forEach(f => {
+                    const div = document.createElement('div');
+                    div.className = 'finding-item';
+                    div.innerHTML = `<span class="severity-high">[${f.severity || 'LOW'}]</span> ${f.type}: ${f.content.substring(0, 50)}...`;
+                    list.appendChild(div);
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        setInterval(updateStats, 2000);
+        setInterval(updateFindings, 3000);
+        
+        // Initial call
+        updateStats();
+        updateFindings();
+
+        function startCampaign() {
+             const log = document.getElementById('console-output');
+             log.innerHTML += "[CMD] Initiating new autonomous campaign...<br>";
+        }
+    </script>
+</body>
+</html>

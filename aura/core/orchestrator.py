@@ -1,5 +1,7 @@
 import json
 import asyncio
+import os
+import random
 from aura.core.brain import AuraBrain
 from aura.core.stealth import StealthEngine, AuraSession
 from aura.modules.scanner import AuraScanner
@@ -20,7 +22,13 @@ from aura.modules.pivoting import AuraLink
 from aura.modules.recon_pipeline import ReconPipeline   # v5.0
 from aura.modules.secret_hunter import SecretHunter      # v5.0
 from aura.modules.power_stack import PowerStack          # v6.0
-from aura.modules.poc_engine import PoCEngine            # v6.0
+from aura.modules.poc_engine import PoCEngine            # v6.0: Deterministic PoC
+from aura.modules.cloud_recon import AuraCloudRecon    # v15.0: Cloud Predator
+from aura.modules.logic_engine import LogicBlueprinter # v16.0 Omni-Sovereign
+from aura.modules.synthesizer import ProtocolSynthesizer # v16.1 Omni-Sovereign
+from aura.modules.lateral_engine import LateralEngine # v18.0 Nebula Ghost
+from aura.modules.neural_forge import NeuralForge    # v19.0 The Singularity
+from aura.modules.ghost_ops import GhostOps        # v19.0 The Singularity
 from aura.core import state
 from aura.core.storage import AuraStorage
 from rich.console import Console
@@ -55,6 +63,12 @@ class NeuralOrchestrator:
         self.secret_hunter  = SecretHunter()              # v5.0: TruffleHog-style
         self.power_stack    = PowerStack(stealth=self.stealth)  # v6.0: Nuclei/TruffleHog/HTTPX/Nmap
         self.poc_engine     = PoCEngine(stealth=self.stealth)   # v6.0: Deterministic PoC
+        self.cloud_recon    = AuraCloudRecon(self.db)           # v15.0: Cloud Discovery
+        self.logic_engine   = LogicBlueprinter(self.brain)      # v16.0 Omni-Sovereign
+        self.synthesizer    = ProtocolSynthesizer(self.brain)   # v16.1 Omni-Sovereign
+        self.lateral        = LateralEngine(self.brain)         # v18.0 Nebula Ghost
+        self.forge          = NeuralForge(self.brain)           # v19.0 The Singularity
+        self.ghost_ops      = GhostOps(self)                    # v19.0 The Singularity
         self.dast_semaphore = asyncio.Semaphore(10)       # Velocity v7.4: Scaled from 5 to 10
         self.sing_semaphore = asyncio.Semaphore(5)        # Velocity v7.4: Scaled from 3 to 5
         self.plugins = []
@@ -128,7 +142,7 @@ class NeuralOrchestrator:
             except Exception as e:
                 console.print(f"[yellow][!] Pre-Flight Connection Failed for {domain}: {e}[/yellow]")
                 self.db.save_target({"target": domain, "type": "Domain", "status": "DOWN"})
-                return {"status": "error", "reason": "connection_failed"}
+                return {"status": "ERROR", "reason": "connection_failed"}
         
         # 1.5 Global Threat Intelligence (OSINT)
         console.print("[cyan][*] Phase 0.5: Gathering Global Threat Intelligence...[/cyan]")
@@ -166,6 +180,12 @@ class NeuralOrchestrator:
         if intel_data:
             await self.broadcast(f"Intel Gathered: {', '.join(intel_data.keys())}", type="intel", level="info", icon="satellite", data=intel_data)
             self.db.log_action("INTEL_GATHERED", domain, f"Sources: {', '.join(intel_data.keys())}", campaign_id)
+        
+        # v15.0 / v19.4: Cloud Asset Discovery (Phase 0.7) - Full async
+        try:
+            await self.cloud_recon.hunt(domain)
+        except Exception as e:
+            console.print(f"[dim red][!] Cloud Predator failed gracefully: {e}[/dim red]")
         
         findings = [] # Persistent finding aggregation for CoT
         vulns = []    # Shared vulnerability list for AI and DAST
@@ -210,6 +230,19 @@ class NeuralOrchestrator:
                         discovered_urls.append(url)
                 self.db.log_action("PORT_SCAN", domain, f"Open Ports: {open_ports}", campaign_id)
                 
+                # v16.1 Omni-Sovereign: Protocol Synthesis on binary ports
+                for p in open_ports:
+                    if p not in [80, 443, 8080, 8443]:
+                        await self.synthesizer.synthesize_and_fuzz(target_ip, p)
+                
+                # v15.0 / v19.4: gRPC service check — stored SEPARATELY, never fed to HTTP DirBuster
+                grpc_urls = await self.scanner.check_grpc(target_url)
+                if grpc_urls:
+                    console.print(f"[bold magenta][📡] gRPC Services Found: {len(grpc_urls)} endpoint(s). Logging as attack surface.[/bold magenta]")
+                    for gu in grpc_urls:
+                        self.db.add_finding(domain, f"gRPC Endpoint Exposed: {gu}", "gRPC Exposure", campaign_id=campaign_id)
+                        findings.append({"type": "gRPC Exposure", "content": f"gRPC Endpoint Exposed: {gu}", "severity": "MEDIUM"})
+                
                 # v3.0: OSINT Resiliency — Banner Grabbing when API keys are missing
                 if is_api_blind:
                     console.print(f"[bold cyan][🔍] v3.0 OSINT Failover: API keys missing. Running Banner Grabbing on {domain}...[/bold cyan]")
@@ -224,7 +257,9 @@ class NeuralOrchestrator:
         # Ensures that we don't rely only on static links. Unconditionally dirbust the root URLs.
         console.print("[bold yellow][*] Phase 2.1b: v12.0 Hardcoded Execution (500-Word Force Fuzz)...[/bold yellow]")
         await self.broadcast("Executing Raw Python Fuzzer...", type="status", icon="hammer")
-        for url in list(discovered_urls):  # snapshot to avoid modifying while iterating
+        # v19.4: Only run DirBuster on clean HTTP/HTTPS root URLs (not gRPC / deep paths)
+        http_roots = [u for u in list(discovered_urls) if u.startswith("http") and len(u.split("/")) <= 4 and "/grpc" not in u.lower()]
+        for url in http_roots:  # snapshot to avoid modifying while iterating
             hidden_paths = await self.scanner.force_fuzz(url)
             for path in hidden_paths:
                 full_path_url = path if path.startswith("http") else f"{url.rstrip('/')}/{path.lstrip('/')}"
@@ -291,6 +326,15 @@ class NeuralOrchestrator:
             if sh not in discovered_urls:
                 discovered_urls.append(sh)
                 visited_paths.add(sh)
+                
+        # v16.0 Omni-Sovereign: State Machine Blueprinting
+        if discovered_urls:
+            await self.logic_engine.blueprint_target(discovered_urls)
+            logic_vectors = self.logic_engine.identify_state_skipping_vectors()
+            for lv in logic_vectors:
+                self.db.add_finding(domain, lv, "Business Logic Violation", campaign_id=campaign_id)
+                findings.append({"type": "Business Logic Violation", "content": lv, "severity": "HIGH"})
+                console.print(f"[bold red][🕵️] BI-LOGIC EXPLOIT IDENTIFIED: {lv}[/bold red]")
                 
         # v13.0 [STEALTH PREDATOR]: 50+ Path Auditing Mandate Unstoppable
         if len(discovered_urls) < 50:
@@ -371,7 +415,7 @@ class NeuralOrchestrator:
                 console.print(f"[bold red][🔴] SCAN HALTED: Target appears to be a dead/parked page. Reason: {ocr.get('reason')}[/bold red]")
                 console.print(f"[yellow][?] Aura v15.1 Advice: This domain has no live application. Run 'aura zenith' on a live target.[/yellow]")
                 await self.broadcast(f"Target INACCESSIBLE: {ocr.get('reason')}", type="alert", level="error", icon="ban")
-                return {"status": "inaccessible", "reason": ocr.get("reason")}
+                return {"status": "INACCESSIBLE", "reason": ocr.get("reason")}
             
             if ocr.get("is_vulnerable_site") and ocr.get("findings"):
                 console.print(f"[bold red][👁️] OCR Intel: {len(ocr['findings'])} vulnerability indicator(s) confirmed visually![/bold red]")
@@ -435,6 +479,13 @@ class NeuralOrchestrator:
         
         console.print(f"[cyan][*] Ghost v4 Plan formulated with Intelligence. Executing chain...[/cyan]")
         self.db.log_action("PLAN_FORMULATED", domain, f"Plan size: {len(plan_raw)}", campaign_id)
+
+        # v19.0 Ghost-Ops: Tactical Diversion
+        await self.ghost_ops.launch_diversion(domain)
+        
+        # v19.0 Neural-Forge: 0-Day Logic Synthesis
+        # We pass the discovery 'stats' as a proxy for the state machine for now
+        await self.forge.synthesize_0day_vectors(context["discovery_stats"], tech_stack)
         
         # Step 3: Deep AI Audit — v7.2: Expanded DAST coverage (15 entry points, depth 3)
         await self.broadcast(f"Unleashing Nexus Deep Crawler on {len(discovered_urls)} entry points...", type="status", icon="link")
@@ -473,7 +524,7 @@ class NeuralOrchestrator:
                     console.print(f"[bold red][🌋] SINGULARITY HIT: {len(res)} deep logic flaws detected on entry point.[/bold red]")
 
         # Step 4: Strategic Exploit (v12.1 Fully-Persistent)
-        if state.is_halted(): return {"status": "aborted"}
+        if state.is_halted(): return {"status": "ABORTED"}
 
         all_findings = self.db.get_findings_by_target(domain)
         if all_findings:
@@ -505,6 +556,9 @@ class NeuralOrchestrator:
                     # Phase 29: Auto-Pivot into discovered internal IPs if Blind RCE confirms
                     if target_ip:
                         await self.link.auto_pivot(target_ip, self)
+                    
+                    # v18.0 Nebula Ghost: Autonomous Lateral Pivoting
+                    await self.lateral.pivot_from_finding(hit)
 
         # v6.0: Phase 5 — PoCEngine: Deterministic verification of all findings (v12.1 Force Mode)
         console.print("[bold red][*] Phase 5: v6.0 PoC Engine — Deterministic Exploitation Verification...[/bold red]")
@@ -565,7 +619,30 @@ class NeuralOrchestrator:
             self.db.save_target({"value": domain, "risk_score": final_risk, "priority": final_priority})
             console.print(f"[bold cyan][!] CVSS 3.1 Predator Stance: {final_risk}/10.0 ({final_priority})[/bold cyan]")
             
+            # v17.0: Shadow-Scripting — Autonomous Weaponization
+            if vulns:
+                console.print(f"[bold red][⚔️] Shadow-Scripting: Weaponizing {len(vulns)} vulnerability findings...[/bold red]")
+                exploit_dir = os.path.join(os.getcwd(), "aura_exploits")
+                if not os.path.exists(exploit_dir): os.makedirs(exploit_dir)
+                
+                for i, v in enumerate(vulns):
+                    v_type = v.get("type") or v.get("finding_type")
+                    v_content = v.get("content")
+                    script = self.brain.generate_exploit_script(v_type, v_content, target_url)
+                    
+                    filename = f"exploit_{domain.replace('.', '_')}_{i}.py"
+                    filepath = os.path.join(exploit_dir, filename)
+                    with open(filepath, "w", encoding="utf-8") as f:
+                        f.write(script)
+                    console.print(f"[bold green][✔] Weaponized: {filename} (Shadow-Script Generated)[/bold green]")
+
         console.print("[bold green][✔] NeuralOrchestrator: Mission complete.[/bold green]")
         self.db.log_action("MISSION_COMPLETE", domain, "NeuralOrchestrator chain finished", campaign_id)
-        return {"plan": plan_raw, "findings": vulns, "waf": self.stealth.active_waf, "techs": tech_stack}
+        return {
+            "status": "COMPLETE",
+            "plan": plan_raw, 
+            "findings": vulns, 
+            "waf": self.stealth.active_waf, 
+            "techs": tech_stack
+        }
 

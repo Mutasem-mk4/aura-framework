@@ -276,7 +276,17 @@ def zenith(domain, plugin=None, campaign=None, whitelist=None, blacklist=None, o
             if isinstance(cls, type) and issubclass(cls, AuraPlugin) and cls is not AuraPlugin:
                 orchestrator.plugins.append(cls())
     
-    asyncio.run(orchestrator.execute_advanced_chain(domain, campaign_id=campaign_id))
+    # v19.3: Mission Status Guard
+    result = asyncio.run(orchestrator.execute_advanced_chain(domain, campaign_id=campaign_id))
+    status = result.get("status", "UNKNOWN") if result else "ERROR"
+    
+    if status != "COMPLETE":
+        console.print(f"\n[bold red][!] Mission Terminated Early: {status}[/bold red]")
+        if result and result.get("reason"):
+            console.print(f"[yellow][?] Reason: {result.get('reason')}[/yellow]")
+        
+        console.print("[dim]Use 'aura report' to generate a partial dossier manually if needed.[/dim]")
+        return
     
     # v12.0 Hardcoded Execution: Verbose Operation Logs output
     op_logs = db.get_operation_logs()
@@ -301,10 +311,15 @@ def zenith(domain, plugin=None, campaign=None, whitelist=None, blacklist=None, o
     try:
         from aura.core.reporter import AuraReporter
         reporter = AuraReporter()
+        
+        console.print(f"\n[bold magenta][✍️] Compiling Professional Offensive Intelligence Report...[/bold magenta]")
         report_path = reporter.generate_pdf_report(target_filter=domain)
-        console.print(f"[bold green][+] Professional Mission Report generated: {report_path}[/bold green]")
+        console.print(f"[bold green][✔] Success: {report_path}[/bold green]")
         
         if open_report:
+            import time
+            console.print("[cyan][*] Mission sequence complete. Opening dossier in 3 seconds...[/cyan]")
+            time.sleep(3)
             import subprocess
             if sys.platform == "win32":
                 os.startfile(report_path)

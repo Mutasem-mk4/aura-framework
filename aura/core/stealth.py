@@ -191,6 +191,44 @@ class StealthEngine:
         proxy = self.swarm.get_best_proxy() or random.choice(self.proxy_list)
         return {"http": proxy, "https": proxy}
 
+
+class MorphicEngine:
+    """
+    v18.0 NEBULA GHOST
+    AI Traffic Morphing & Behavioral Evasion Engine.
+    """
+    def __init__(self, brain):
+        self.brain = brain
+        self.user_session_templates = [
+            {"name": "YouTube-Standard", "min_delay": 0.5, "max_delay": 3.0, "headers": {"Referer": "https://www.youtube.com/"}},
+            {"name": "Google-Search", "min_delay": 1.0, "max_delay": 5.0, "headers": {"Referer": "https://www.google.com/"}},
+            {"name": "LinkedIn-Scroll", "min_delay": 2.0, "max_delay": 8.0, "headers": {"Referer": "https://www.linkedin.com/feed/"}}
+        ]
+        self.current_template = random.choice(self.user_session_templates)
+
+    async def apply_morphic_jitter(self):
+        """Applies bio-inspired timing jitter to the request."""
+        # v18.0: Mimic human 'thinking' time and 'scrolling' bursts
+        jitter = random.uniform(self.current_template["min_delay"], self.current_template["max_delay"])
+        await asyncio.sleep(jitter)
+
+    def get_morphic_headers(self, original_headers: dict) -> dict:
+        """Morphs headers to match the current session template."""
+        morphed = original_headers.copy()
+        morphed.update(self.current_template["headers"])
+        # v18.0: Dynamic User-Agent rotation within the same session 'persona'
+        morphed["User-Agent"] = self._get_persona_ua()
+        return morphed
+
+    def _get_persona_ua(self):
+        # High-reputation desktop UAs
+        uas = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2.1 Safari/605.1.15",
+            "Mozilla/5.0 (X11; Linux x86_64; rv:122.0) Gecko/20100101 Firefox/122.0"
+        ]
+        return random.choice(uas)
+
 class AuraSession:
     """A high-stealth wrapper using curl_cffi for Ghost v3 evasion."""
     
@@ -198,24 +236,30 @@ class AuraSession:
     _semaphore = asyncio.Semaphore(state.GLOBAL_CONCURRENCY_LIMIT)
 
     def __init__(self, stealth: StealthEngine):
+        from aura.core.brain import AuraBrain
         self.stealth = stealth
+        self.brain = AuraBrain()
+        self.morphic = MorphicEngine(self.brain) # v18.0 Nebula Ghost
         self.retries = 3
+        self.base_delay = 1.0 # v15.0: Adaptive Throttling Baseline
 
     async def request(self, method, url, **kwargs):
         """Executes a request with JA3 impersonation and Ghost v3 adaptive evasion."""
-        from aura.core.brain import AuraBrain
-        brain = AuraBrain()
+        brain = self.brain
         
         for attempt in range(self.retries + (3 if self.stealth.active_waf else 0)):
+            # v18.0 Nebula Ghost: Morphic Stealth Activation
+            if self.stealth.active_waf:
+                await self.morphic.apply_morphic_jitter()
+                
             params = self.stealth.get_stealth_params(force_rotate=(attempt > 0))
             current_proxy = params["proxies"]["http"] if params["proxies"] else None
             
-            # Ghost v4: Advanced Behavioral Jitter (Humanized Delays)
-            # We sleep BEFORE grabbing the semaphore to avoid blocking the whole framework
-            if not self.stealth.active_waf:
-                delay = random.uniform(0.5, 2.5)
-            else:
-                delay = random.uniform(3.0, 7.0)
+            # v15.0: Enterprise Adaptive Backoff (Ghost v6)
+            # Dynamically scale delay based on previous successes/failures
+            delay = self.base_delay * random.uniform(0.8, 1.5)
+            if self.stealth.active_waf:
+                delay *= 2.0
             
             await asyncio.sleep(delay)
             
@@ -223,7 +267,14 @@ class AuraSession:
                 # Merge kwargs with Ghost v3 params
                 req_kwargs = kwargs.copy()
                 req_kwargs.setdefault("impersonate", params["impersonate"])
-                req_kwargs.setdefault("headers", params["headers"])
+                
+                # v18.0 Morphic Headers
+                if self.stealth.active_waf:
+                    headers = self.morphic.get_morphic_headers(params["headers"])
+                    req_kwargs.setdefault("headers", headers)
+                else:
+                    req_kwargs.setdefault("headers", params["headers"])
+                    
                 req_kwargs.setdefault("proxies", params["proxies"])
                 req_kwargs.setdefault("timeout", 20)
                 req_kwargs.setdefault("verify", False)
@@ -234,16 +285,34 @@ class AuraSession:
                     waf = self.stealth.detect_waf(resp.headers, resp.text)
                     if resp.status_code in [403, 429]:
                         if current_proxy: self.stealth.swarm.report_failure(current_proxy)
+                        self.base_delay = min(self.base_delay * 1.5, 20.0) # Adaptive Backoff Trigger
                         
-                        # Phase 28: Battle Loop - AI analyzes and mutates immediately
-                        if waf:
-                            suggestion = brain.suggest_waf_evasion(waf)
-                            req_kwargs["headers"].update({"X-Aura-Battle": "Active"})
-                            # Mutate any data/params if present
-                            if "data" in req_kwargs and isinstance(req_kwargs["data"], str):
-                                req_kwargs["data"] = self.stealth.mutate_payload(req_kwargs["data"])
-                                
-                        if attempt < self.retries - 1: continue
+                        # v16.0 Omni-Sovereign: Self-Healing Loop Activation
+                        if brain.enabled:
+                             print(f"[bold yellow][🩹] Self-Heal: Block detected ({resp.status_code}). Mutating payload...[/bold yellow]")
+                             # Mutate POST data if string
+                             if "data" in req_kwargs and isinstance(req_kwargs["data"], str):
+                                 req_kwargs["data"] = brain.self_heal_mutation(
+                                     req_kwargs["data"], 
+                                     resp.status_code, 
+                                     resp.text, 
+                                     attempt
+                                 )
+                             # Mutate GET parameters
+                             if "params" in req_kwargs and isinstance(req_kwargs["params"], dict):
+                                 for k, v in req_kwargs["params"].items():
+                                     req_kwargs["params"][k] = brain.self_heal_mutation(
+                                         str(v), 
+                                         resp.status_code, 
+                                         resp.text, 
+                                         attempt
+                                     )
+                                 
+                        if attempt < self.retries + (3 if self.stealth.active_waf else 0) - 1: continue
+                    
+                    # v15.0: On Success, gradually increase speed
+                    if resp.status_code < 400:
+                        self.base_delay = max(self.base_delay * 0.95, 0.3)
                         
                     if current_proxy: self.stealth.swarm.report_success(current_proxy)
                     return resp

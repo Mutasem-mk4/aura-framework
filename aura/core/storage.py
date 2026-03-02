@@ -178,6 +178,19 @@ class AuraStorage:
             ''', (now, action, target, details, campaign_id))
             conn.commit()
 
+    def get_stats(self) -> dict:
+        """v17.0: Quick stats for the Omni-Hub dashboard."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM findings")
+                findings_count = cursor.fetchone()[0]
+                cursor.execute("SELECT COUNT(DISTINCT domain) FROM findings")
+                targets_count = cursor.fetchone()[0]
+                return {"findings": findings_count, "targets": targets_count}
+        except:
+            return {"findings": 0, "targets": 0}
+
     def log_operation(self, path: str, payload: str, status_code: int):
         """v12.0 Hardcoded Execution: Logs a raw operation directly to the Operation Logs table."""
         now = datetime.now().isoformat()

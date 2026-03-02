@@ -50,41 +50,51 @@ class AuraScanner:
                 continue
         return found
 
-    # ──────────────────────────────────────────────
-    # Phase 2: Port Scanning
-    # ──────────────────────────────────────────────
-    async def scan_ports(self, target_ip, ports=[80, 443, 8080, 8443, 3000, 4280, 5000, 22, 21, 3306]):
-        """Async TCP port scanner targeting common web and service ports."""
-        intel_module = ThreatIntel(stealth=self.stealth)
-        intel_data = await intel_module.query_shodan(target_ip)
-        
+    # v15.0: Universal IPv4/IPv6 Port Scanner
+    async def scan_ports(self, target_host, ports=[80, 443, 8080, 8443, 3000, 4280, 5000, 22, 21, 3306]):
+        """Dual-stack (IPv4/v6) asynchronous port scanner."""
+        console.print(f"[blue][*] Aura v15.0: Universal Dual-Stack Port Scan on {target_host}...[/blue]")
         open_ports = []
-        if intel_data and intel_data.get("ports"):
-            for p in intel_data["ports"]:
-                if p not in open_ports and p in ports:
-                    open_ports.append(p)
-                    
-        console.print(f"[blue][*] Active Port Scanning on: {target_ip}...[/blue]")
         
         async def check_port(port):
-            if port in open_ports: return port
             try:
-                fut = asyncio.open_connection(target_ip, port)
-                reader, writer = await asyncio.wait_for(fut, timeout=0.5)
-                writer.close()
-                await writer.wait_closed()
-                console.print(f"[green][+] Port {port} is OPEN[/green]")
-                return port
-            except:
-                return None
+                # Automatic Address Family Selection
+                addr_info = await asyncio.to_thread(socket.getaddrinfo, target_host, port, proto=socket.IPPROTO_TCP)
+                for res in addr_info:
+                    family, socktype, proto, canonname, sockaddr = res
+                    try:
+                        _, writer = await asyncio.wait_for(asyncio.open_connection(sockaddr[0], port, family=family), timeout=2.0)
+                        open_ports.append(port)
+                        console.print(f"[green][+] Port {port} is OPEN[/green]")
+                        writer.close()
+                        await writer.wait_closed()
+                        break 
+                    except: continue
+            except: pass
 
-        tasks = [check_port(p) for p in ports]
-        results = await asyncio.gather(*tasks)
-        for r in results:
-            if r and r not in open_ports:
-                open_ports.append(r)
-                
+        await asyncio.gather(*(check_port(port) for port in ports))
         return open_ports
+
+    # v15.0: gRPC & Protobuf Discovery (Enterprise Standard)
+    async def check_grpc(self, base_url):
+        """Probes for gRPC reflection or common gRPC services."""
+        console.print(f"[cyan][📡] v15.0: Probing for gRPC/Protobuf Endpoints...[/cyan]")
+        grpc_paths = [
+            "/grpc.reflection.v1alpha.ServerReflection/ServerReflectionInfo",
+            "/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
+            "/google.pubsub.v1.Publisher/ListTopics"
+        ]
+        found_grpc = []
+        async with aiohttp.ClientSession() as session:
+            for path in grpc_paths:
+                try:
+                    url = urljoin(base_url, path)
+                    async with session.post(url, headers={"content-type": "application/grpc"}, timeout=3) as r:
+                        if "grpc-status" in r.headers or r.status in [200, 415]:
+                            found_grpc.append(url)
+                            console.print(f"[bold green][+] gRPC Service Detected: {url}[/bold green]")
+                except: pass
+        return found_grpc
 
     # ──────────────────────────────────────────────
     # v7.2: Sitemap & Robots Parser
@@ -510,6 +520,13 @@ class AuraScanner:
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         
         console.print(f"☠️ [bold red]v13.0 STEALTH PREDATOR[/bold red]: Forcing RAW DirBuster on {base_url}")
+        
+        # v19.4: Guard — skip gRPC endpoints and deep URLs (not root targets)
+        if any(x in base_url.lower() for x in ["grpc", "/reflection/", "pubsub", "/v1alpha", "/v1."]) or \
+           len(base_url.split("/")) > 5:
+            console.print(f"[dim yellow][!] DirBuster skipped: Not a root HTTP target: {base_url}[/dim yellow]")
+            return []
+        
         if not base_url.startswith("http"):
             base_url = f"http://{base_url}"
         base_url = base_url.rstrip('/')
@@ -517,12 +534,21 @@ class AuraScanner:
         discovered_urls = []
         words = self._get_top_500_words()[:500] 
         
-        # Test baseline
+        # v19.4: Catch-all detection — probe 2 random nonexistent paths
+        baseline_200 = False
+        b_len = 0
+        b_len2 = 0
         try:
-            b_res = requests.get(f"{base_url}/rnd_{uuid.uuid4().hex[:8]}", verify=False, timeout=3, allow_redirects=False)
-            b_len = len(b_res.text)
+            r1 = requests.get(f"{base_url}/rnd_{uuid.uuid4().hex[:8]}", verify=False, timeout=4, allow_redirects=False)
+            r2 = requests.get(f"{base_url}/rnd_{uuid.uuid4().hex[:8]}", verify=False, timeout=4, allow_redirects=False)
+            b_len = len(r1.text)
+            b_len2 = len(r2.text)
+            # If BOTH random paths return 200, server is a catch-all (SPA/Angular/React routing)
+            if r1.status_code == 200 and r2.status_code == 200:
+                baseline_200 = True
+                console.print(f"[dim yellow][!] Catch-All Detected: Server returns 200 for all paths. Filtering 200s — only 301/302/403 accepted as real hits.[/dim yellow]")
         except:
-            b_len = 0
+            pass
 
         # v12.1 Persistence Check
         from aura.core.storage import AuraStorage
@@ -538,53 +564,74 @@ class AuraScanner:
         def raw_check(directory):
             url = f"{base_url}/{directory}"
             try:
-                # Randomize jitter to mimic humans and stay under rate-limits
                 time.sleep(random.uniform(0.1, 0.4))
-                
-                # Raw synchronous aggressive requests with UA rotation
                 headers = {'User-Agent': random.choice(user_agents)}
                 res = requests.get(url, verify=False, timeout=5, allow_redirects=False, headers=headers)
-                
-                if b_len > 0 and abs(len(res.text) - b_len) < 50:
+
+                # v19.4: If server is catch-all, only report non-200 findings (redirects, forbidden)
+                if baseline_200:
+                    if res.status_code in [301, 302]:
+                        console.print(f"[green][+] Predator Hit: {url} (Redirect {res.status_code})[/green]")
+                        try: db_logger.log_operation(url, "StealthPredator", res.status_code)
+                        except: pass
+                        return url
+                    elif res.status_code == 403:
+                        console.print(f"[green][+] Predator Hit: {url} (403 Forbidden — exists)[/green]")
+                        try: db_logger.log_operation(url, "StealthPredator", 403)
+                        except: pass
+                        return url
+                    return None  # Skip 200 on catch-all servers
+
+                # Normal mode: filter if content length matches baseline (same page served)
+                if b_len > 0 and abs(len(res.text) - b_len) < 200 and abs(len(res.text) - b_len2) < 200:
                     return None
-                    
+
                 if res.status_code == 200:
                     console.print(f"[green][+] Predator Hit: {url} (200 OK)[/green]")
-                    try:
-                        db_logger.log_operation(url, "StealthPredator", 200)
+                    try: db_logger.log_operation(url, "StealthPredator", 200)
                     except: pass
                     return url
                 elif res.status_code in [301, 302]:
                     console.print(f"[green][+] Predator Hit: {url} (Redirect {res.status_code})[/green]")
-                    try:
-                        db_logger.log_operation(url, "StealthPredator", res.status_code)
+                    try: db_logger.log_operation(url, "StealthPredator", res.status_code)
                     except: pass
                     return url
             except:
                 pass
             return None
 
-        # Execute as fast as possible using ThreadPool (capped at 15 for 'Stealth' balance)
         with ThreadPoolExecutor(max_workers=15) as executor:
             results = list(executor.map(raw_check, words))
-            
+
         for r in results:
             if r: discovered_urls.append(r)
-            
+
         return discovered_urls
 
     async def blind_siege(self, base_url):
         """
         v14.0 The Final Siege: Mandatory Blind Path Injection.
-        Force-requests specific high-value paths regardless of discovery.
+        v19.4: Added catch-all detection to prevent false positives on SPAs.
         """
         import requests
         import random
+        import uuid
         base_url = base_url.rstrip('/')
         hits = []
-        
+
         console.print(f"🔥 [bold red]FINAL SIEGE[/bold red]: Deploying Blind Path Injection on {base_url}...")
-        
+
+        # v19.4: Detect catch-all servers before blasting paths
+        siege_baseline_200 = False
+        try:
+            _r1 = requests.get(f"{base_url}/rnd_{uuid.uuid4().hex[:8]}", verify=False, timeout=4, allow_redirects=False)
+            _r2 = requests.get(f"{base_url}/rnd_{uuid.uuid4().hex[:8]}", verify=False, timeout=4, allow_redirects=False)
+            if _r1.status_code == 200 and _r2.status_code == 200:
+                siege_baseline_200 = True
+                console.print(f"[dim yellow][!] Siege Catch-All: SPA detected. Only 301/302/403 accepted as Siege Hits.[/dim yellow]")
+        except:
+            pass
+
         user_agents = [
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
@@ -598,16 +645,22 @@ class AuraScanner:
             try:
                 headers = {'User-Agent': random.choice(user_agents)}
                 res = requests.get(url, verify=False, timeout=5, allow_redirects=False, headers=headers)
-                
-                # Log EVERY attempt for Audit Transparency (v14.0 mandate)
+
+                # Audit log EVERY attempt (v14.0 mandate)
                 db_logger.log_operation(url, "BlindSiege", res.status_code)
-                
-                if res.status_code in [200, 301, 302, 403]: # Log 403 too as it proves existence
-                    console.print(f"[bold cyan][!] Siege Hit: {url} ({res.status_code})[/bold cyan]")
-                    hits.append(url)
-            except Exception as e:
-                db_logger.log_operation(url, "BlindSiege", 999) # 999 for error
-                
+
+                # v19.4: On catch-all servers, ignore 200 responses (they're all false positives)
+                if siege_baseline_200:
+                    if res.status_code in [301, 302, 403]:
+                        console.print(f"[bold cyan][!] Siege Hit: {url} ({res.status_code})[/bold cyan]")
+                        hits.append(url)
+                else:
+                    if res.status_code in [200, 301, 302, 403]:
+                        console.print(f"[bold cyan][!] Siege Hit: {url} ({res.status_code})[/bold cyan]")
+                        hits.append(url)
+            except Exception:
+                db_logger.log_operation(url, "BlindSiege", 999)
+
         return hits
 
     # ──────────────────────────────────────────────
@@ -715,13 +768,17 @@ class AuraScanner:
             tasks = [crawl_single(url) for url in current_level_urls]
             results = await asyncio.gather(*tasks)
             
-            next_level_urls = []
+            # v18.1 Efficiency Fix: Use a set for next level to prevent redundant tasks
+            next_level_set = set()
             for links, forms in results:
                 for l in links:
                     if l not in visited:
-                        next_level_urls.append(l)
+                        next_level_set.add(l)
+                        # v18.1 Fix: Actually record the discovered URL in the master list!
+                        if l not in all_discovered:
+                            all_discovered.append(l)
             
-            current_level_urls = next_level_urls
+            current_level_urls = list(next_level_set)
 
         # v10.0 Sovereign: Active Multi-Port Discovery
         extra_ports = [8080, 8443, 8888]

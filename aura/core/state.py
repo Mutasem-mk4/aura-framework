@@ -1,5 +1,9 @@
 # aura/core/state.py
 import os
+from dotenv import load_dotenv
+
+# v19.4: Auto-load environment from project root
+load_dotenv()
 
 # Create the halt signal file in the root of the project to be accessible by all processes
 HALT_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".aura_halt_signal")
@@ -11,9 +15,9 @@ PROXY_FILE = None
 GLOBAL_CONCURRENCY_LIMIT = 10  # Increased for Protocol Warp parallelization
 REQUEST_JITTER_MODE = True      # Forces subtle random delays to avoid triggering system-wide blocks
 
-# Gemini AI Configuration
-GEMINI_API_KEY = os.environ.get("AURA_GEMINI_API_KEY")
-GEMINI_MODEL = "gemini-1.5-flash" # High-speed default for offensive operations
+# Gemini AI Configuration: Primary and Secondary mappings for resilience
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or os.environ.get("AURA_GEMINI_API_KEY")
+GEMINI_MODEL = "gemini-2.5-flash" # v19.4: gemini-2.5-flash (confirmed available with this API key)
 
 # OSINT API Keys (read from environment or .env)
 SHODAN_API_KEY = os.environ.get("SHODAN_API_KEY")

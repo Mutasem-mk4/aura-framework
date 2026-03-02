@@ -650,10 +650,10 @@ class AuraDAST:
         for headers in jwt_tests:
             try:
                 res = await self.session.get(f"{url}/api/v1/user", headers=headers, timeout=5)
-                # Catch-all check: If /api/v1/user returns same page as home, it's a parked domain
-                if home_len > 0 and abs(len(res.text) - home_len) < 50:
-                    console.print(f"[dim yellow][-] Aborting API fuzzing: Catch-all behavior detected (matches home page).[/dim yellow]")
-                    return []
+                # v15.1 Smart Triage: Only skip if status AND content match almost exactly
+                if home_len > 0 and res.status_code == home_res.status_code and abs(len(res.text) - home_len) < 20:
+                    console.print(f"[dim yellow][-] Smart Triage: Catch-all detected at {url}/api/v1/user.[/dim yellow]")
+                    continue
                     
                 if res.status_code == 200 and "admin" in res.text.lower():
                     api_findings.append({"type": "JWT Weakness", "confidence": "High", "details": "Found session impersonation through JWT manipulation."})
@@ -686,6 +686,23 @@ class AuraDAST:
 
         if api_findings:
             console.print(f"[bold green][!!!] API VULNERABILITIES DETECTED: {len(api_findings)}[/bold green]")
+
+        # v15.0: Specialized AI Logic Audit (Quantum Dominion)
+        if self.brain and self.brain.enabled and home_len > 0:
+            console.print(f"[cyan][🧠] v15.0: AI Brain performing Deep Logic Audit on {url}...[/cyan]")
+            req_info = {"method": "GET", "url": url, "headers": "Aura-Ghost-v4"}
+            res_info = {"status": home_res.status_code, "length": len(home_res.text), "body": home_res.text[:2000]}
+            
+            logic_results = self.brain.analyze_business_logic(req_info, res_info)
+            for flaw in logic_results:
+                console.print(f"[bold red][!] Logic Flaw Identified: {flaw.get('type')}[/bold red]")
+                api_findings.append({
+                    "type": flaw.get('type', 'Business Logic Violation'),
+                    "confidence": "High",
+                    "severity": flaw.get('severity', 'HIGH'),
+                    "details": f"{flaw.get('reason')} | Implementation fix: {flaw.get('remediation')}"
+                })
+
         return api_findings
 
     async def _fuzz_graphql(self, url):

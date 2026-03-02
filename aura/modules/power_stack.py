@@ -179,43 +179,54 @@ class PowerStack:
             try:
                 input_data = "\n".join(urls).encode()
                 proc = await asyncio.create_subprocess_exec(
-                    "httpx", "-sc", "-silent",
+                    "httpx", "-sc", "-silent", "-t", "10", # Added 10s timeout per request
                     stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.DEVNULL
                 )
                 stdout, _ = await asyncio.wait_for(
-                    proc.communicate(input=input_data), timeout=60
+                    proc.communicate(input=input_data), timeout=120 # Increased total timeout
                 )
                 live_urls = []
                 for line in stdout.decode("utf-8", errors="ignore").strip().splitlines():
                     # httpx format: "https://url [STATUS_CODE]"
-                    match = re.match(r'(https?://\S+)\s+\[(\d+)\]', line)
+                    match = re.search(r'(https?://\S+)\s+\[(\d+)\]', line)
                     if match:
                         url, status = match.group(1), int(match.group(2))
-                        if status < 400:
+                        if status < 500: # v19.2: Accept 404s/403s as 'reachable' enough for fuzzer
                             live_urls.append(url)
-                console.print(f"[green][+] HTTPX: {len(live_urls)}/{len(urls)} URLs are live.[/green]")
-                return live_urls
+                
+                if live_urls:
+                    console.print(f"[green][+] HTTPX: {len(live_urls)}/{len(urls)} URLs are reachable.[/green]")
+                    return live_urls
+                else:
+                    console.print(f"[yellow][!] HTTPX verified 0 live URLs. Falling back to aiohttp...[/yellow]")
             except Exception as e:
                 console.print(f"[dim yellow][!] HTTPX failed: {e}. Using aiohttp fallback.[/dim yellow]")
 
-        # Fallback: aiohttp HEAD probe
-        console.print(f"[dim cyan][*] aiohttp HEAD probing {len(urls)} URLs for liveness...[/dim cyan]")
-        live_urls = []
-
-        async def probe(url: str) -> str | None:
-            try:
-                async with aiohttp.ClientSession() as http:
-                    resp = await http.head(url, timeout=aiohttp.ClientTimeout(total=8), allow_redirects=True)
-                    if resp.status < 400:
-                        return url
-            except Exception:
-                pass
+        # Fallback: aiohttp HEAD probe with retries and longer timeouts
+        console.print(f"[dim cyan][*] aiohttp probing {len(urls)} URLs for liveness...[/dim cyan]")
+        
+        async def probe(url: str, retries=2) -> str | None:
+            for attempt in range(retries):
+                try:
+                    # Use GET if HEAD is blocked/weird
+                    async with aiohttp.ClientSession() as http:
+                        timeout = aiohttp.ClientTimeout(total=15)
+                        async with http.get(url, timeout=timeout, allow_redirects=True, ssl=False) as resp:
+                            if resp.status < 500: # Anything reachable is better than nothing
+                                return url
+                except Exception:
+                    await asyncio.sleep(1)
             return None
 
-        tasks = [probe(u) for u in urls]
+        tasks = [probe(u) for u in urls[:100]] # Cap fallback to first 100 for speed
         results = await asyncio.gather(*tasks, return_exceptions=True)
         live_urls = [r for r in results if r and isinstance(r, str)]
-        console.print(f"[green][+] aiohttp Probe: {len(live_urls)}/{len(urls)} URLs are live.[/green]")
+        
+        if not live_urls and urls:
+            console.print(f"[bold red][!] Warning: All liveness probes failed. v19.2: Forcing first 5 URLs as 'Reachable' to prevent engine stall.[/bold red]")
+            return urls[:5]
+
+        console.print(f"[green][+] Liveness Probe: {len(live_urls)} services confirmed reachable.[/green]")
         return live_urls

