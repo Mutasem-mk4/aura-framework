@@ -137,6 +137,8 @@ class AuraBrain:
                 contents=prompt,
                 config={'system_instruction': system_instruction or self.SYSTEM_PROMPT}
             )
+            if not response or not response.text:
+                return "[]"
             raw = response.text.strip().replace("```json", "").replace("```", "").strip()
             if raw.startswith("[") or raw.startswith("{"):
                 return raw
