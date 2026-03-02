@@ -130,7 +130,7 @@ class AuraBrain:
     def reason_json(self, prompt: str, system_instruction: str = None) -> str:
         """v5.1 / v19.4: Synchronized JSON reasoning using google-genai SDK (matches _call_ai)."""
         if not self.enabled: return "[]"
-        
+
         try:
             response = self.client.models.generate_content(
                 model=state.GEMINI_MODEL,
@@ -140,9 +140,17 @@ class AuraBrain:
             if not response or not response.text:
                 return "[]"
             raw = response.text.strip().replace("```json", "").replace("```", "").strip()
-            if raw.startswith("[") or raw.startswith("{"):
-                return raw
-            return "[]"
+            if not (raw.startswith("[") or raw.startswith("{")):
+                return "[]"
+            # v19.4: Strip invalid JSON escape sequences before parsing
+            import re
+            raw = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', raw)
+            try:
+                import json as _json
+                _json.loads(raw)   # validate
+            except Exception:
+                return "[]"
+            return raw
         except Exception as e:
             logger.error(f"AuraBrain JSON Reason: {e}")
             return "[]"

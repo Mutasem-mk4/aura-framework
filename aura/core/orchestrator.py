@@ -394,7 +394,64 @@ class NeuralOrchestrator:
             if live_urls:
                 discovered_urls = list(set(discovered_urls[:1] + live_urls))
             else:
-                console.print("[yellow][!] Warning: HTTPX verified 0 live URLs. v12.1: Bypassing filter to preserve custom fuzzer hits.[/yellow]")
+                console.print("[yellow][!] HTTPX verified 0 live URLs. Falling back to aiohttp...[/yellow]")
+                # aiohttp fallback — but with catch-all detection
+                import aiohttp, uuid, random as _random
+                async def _probe_urls(urls):
+                    reachable = []
+                    async with aiohttp.ClientSession() as sess:
+                        for u in urls:
+                            try:
+                                async with sess.get(u, timeout=aiohttp.ClientTimeout(total=5), ssl=False, allow_redirects=True) as r:
+                                    if r.status < 500:
+                                        reachable.append(u)
+                            except: pass
+                    return reachable
+                
+                # v19.4: Detect catch-all BEFORE accepting all 200s as real
+                import requests as _req
+                _is_catchall = False
+                try:
+                    _rnd1 = _req.get(f"{target_url}/rnd_{uuid.uuid4().hex[:8]}", verify=False, timeout=4, allow_redirects=False)
+                    _rnd2 = _req.get(f"{target_url}/rnd_{uuid.uuid4().hex[:8]}", verify=False, timeout=4, allow_redirects=False)
+                    if _rnd1.status_code == 200 and _rnd2.status_code == 200:
+                        _is_catchall = True
+                        console.print(f"[yellow][!] Liveness Catch-All: SPA detected. Filtering discovered_urls to real endpoints only.[/yellow]")
+                except: pass
+                
+                if _is_catchall:
+                    # On catch-all SPA: only keep URLs with meaningful paths (from robots/JS/redirects)
+                    # NOT the spider's Angular route hrefs (/open, /close, /_blank etc.)
+                    # Keep: target root, robots paths (/ftp), JS-extracted paths, port:8080/8443
+                    spa_noise = {"/open", "/close", "/_blank", "/portal", "/backup", "/dev",
+                                 "/staging", "/db", "/shell", "/manage", "/config", "/wp-admin",
+                                 "/admin", "/auth", "/login", "/server-status", "/engine.io"}
+                    filtered = []
+                    for u in discovered_urls:
+                        path = u.replace(target_url, "").split("?")[0].rstrip("/")
+                        if not path or path not in spa_noise:
+                            filtered.append(u)
+                    discovered_urls = filtered
+                    live_urls = await _probe_urls(discovered_urls)
+                    if live_urls:
+                        discovered_urls = list(set(live_urls))
+                    console.print(f"[green][+] Liveness Probe: {len(discovered_urls)} services confirmed reachable.[/green]")
+                else:
+                    live_urls = await _probe_urls(discovered_urls)
+                    reached = len(live_urls) if live_urls else 0
+                    if reached == 0:
+                        console.print(f"[yellow][!] Warning: All liveness probes failed. v19.2: Forcing first 5 URLs as 'Reachable' to prevent engine stall.[/yellow]")
+                        live_urls = discovered_urls[:5]
+                    else:
+                        console.print(f"[green][+] Liveness Probe: {reached} services confirmed reachable.[/green]")
+                    discovered_urls = list(set(live_urls))
+
+        # v19.4: Cap DAST at 20 URLs max to prevent runaway scans on large catch-all surfaces
+        MAX_DAST_URLS = 20
+        if len(discovered_urls) > MAX_DAST_URLS:
+            console.print(f"[yellow][!] v19.4 DAST Cap: Trimming {len(discovered_urls)} URLs to {MAX_DAST_URLS} highest-priority targets.[/yellow]")
+            # Prioritize: shorter paths first (roots before sub-paths), then alphabetical
+            discovered_urls = sorted(discovered_urls, key=lambda u: (len(u), u))[:MAX_DAST_URLS]
 
         # v6.0: PowerStack — Nmap -sV service fingerprinting
         if target_ip:
