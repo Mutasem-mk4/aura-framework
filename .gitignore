@@ -32,3 +32,16 @@ venv/
 screenshots/
 aura_report.html
 nexus/
+*.log
+*.txt
+!requirements.txt
+!help.txt
+!help_output.txt
+!domains.txt
+!proxies.txt
+!targets.txt
+!trace.txt
+!trace_output.txt
+*.db
+!aura.db
+.aura_state
