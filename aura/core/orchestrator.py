@@ -742,9 +742,8 @@ class NeuralOrchestrator:
         # v19.0 Ghost-Ops: Tactical Diversion
         await self.ghost_ops.launch_diversion(domain)
         
-        # v19.0 Neural-Forge: 0-Day Logic Synthesis
-        # We pass the discovery 'stats' as a proxy for the state machine for now
-        await self.forge.synthesize_0day_vectors(context["discovery_stats"], tech_stack)
+        # v19.0 Neural-Forge: 0-Day Logic Synthesis (Integrated into ThreatIntel)
+        # 0-Day Radar is now handled during initial recon or on-demand.
         
         # Step 2.5 (Phase 6): Universal Bounty Maximizer - CORS Misconfiguration Hunt
         await self.broadcast("Activating CORS Misconfiguration Hunter on API endpoints...", type="status", icon="zap")
