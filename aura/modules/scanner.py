@@ -606,17 +606,12 @@ class AuraScanner:
                 res = await self.stealth_session.get(url, timeout=state.NETWORK_TIMEOUT, allow_redirects=False, headers=headers)
 
                 if baseline_200:
-                    if res and res.status_code in [301, 302]:
-                        console.print(f"[green][+] Predator Hit: {url} (Redirect {res.status_code})[/green]")
-                        try: db_logger.log_operation(url, "StealthPredator", res.status_code)
-                        except: pass
-                        return url
-                    elif res and res.status_code == 403:
+                    if res and res.status_code == 403:
                         console.print(f"[green][+] Predator Hit: {url} (403 Forbidden — exists)[/green]")
                         try: db_logger.log_operation(url, "StealthPredator", 403)
                         except: pass
                         return url
-                    return None  # Skip 200 on catch-all servers
+                    return None  # Skip 200/301/302 on catch-all servers
 
                 # Normal mode: filter if content length matches baseline (same page served)
                 if res and b_len > 0 and abs(len(res.text) - b_len) < 200 and abs(len(res.text) - b_len2) < 200:
@@ -627,9 +622,9 @@ class AuraScanner:
                     try: db_logger.log_operation(url, "StealthPredator", 200)
                     except: pass
                     return url
-                elif res and res.status_code in [301, 302]:
-                    console.print(f"[green][+] Predator Hit: {url} (Redirect {res.status_code})[/green]")
-                    try: db_logger.log_operation(url, "StealthPredator", res.status_code)
+                elif res and res.status_code == 403:
+                    console.print(f"[green][+] Predator Hit: {url} (403 Forbidden)[/green]")
+                    try: db_logger.log_operation(url, "StealthPredator", 403)
                     except: pass
                     return url
             except:
@@ -705,11 +700,11 @@ class AuraScanner:
 
                 # v19.4: On catch-all servers, ignore 200 responses (they're all false positives)
                 if siege_baseline_200:
-                    if res.status_code in [301, 302, 403]:
+                    if res.status_code == 403:
                         console.print(f"[bold cyan][!] Siege Hit: {url} ({res.status_code})[/bold cyan]")
                         return url
                 else:
-                    if res.status_code in [200, 301, 302, 403]:
+                    if res.status_code in [200, 403]:
                         console.print(f"[bold cyan][!] Siege Hit: {url} ({res.status_code})[/bold cyan]")
                         return url
             except Exception:
