@@ -932,6 +932,7 @@ class NeuralOrchestrator:
 
         # v20.0 Phase 4: Wayback Machine Historical JS Scanner
         console.print("[cyan][*] Phase 4: Running Wayback Machine Historical JS Scanner...[/cyan]")
+        session = self.session
         try:
             wayback = WaybackScanner(session=session)
             wayback_findings = await wayback.scan_target(recon_domain)
