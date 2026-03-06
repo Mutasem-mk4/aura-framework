@@ -473,14 +473,15 @@ class NeuralOrchestrator:
                 discovered_urls.append(sh)
                 visited_paths.add(sh)
                 
-        # v16.0 Omni-Sovereign: State Machine Blueprinting
+        # v16.0 Omni-Sovereign: AI Logic Hunting
         if discovered_urls:
-            await self.logic_engine.blueprint_target(discovered_urls)
-            logic_vectors = self.logic_engine.identify_state_skipping_vectors()
-            for lv in logic_vectors:
-                self.db.add_finding(recon_domain, lv, "Business Logic Violation", campaign_id=campaign_id)
-                findings.append({"type": "Business Logic Violation", "content": lv, "severity": "HIGH"})
-                console.print(f"[bold red][[LOGIC]] BI-LOGIC EXPLOIT IDENTIFIED: {lv}[/bold red]")
+            logic_findings = await self.logic_engine.analyze(discovered_urls)
+            for lf in logic_findings:
+                self.db.add_finding(recon_domain, lf, lf.get("type"), campaign_id=campaign_id)
+                findings.append(lf)
+                console.print(f"[bold red][[LOGIC]] BI-LOGIC EXPLOIT IDENTIFIED: {lf.get('type')} at {lf.get('url')}[/bold red]")
+                # Phase 15: Exploit Chaining
+                await self._process_exploit_chain(recon_domain, lf.get("type"), lf)
                 
         # v13.0 [STEALTH PREDATOR]: 50+ Path Auditing Mandate Unstoppable
         # v14.2: Skip Stealth Predator in Fast Mode unless escalated
