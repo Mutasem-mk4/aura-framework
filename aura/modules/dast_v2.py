@@ -5,6 +5,8 @@ import time
 from playwright.async_api import async_playwright
 from rich.console import Console
 from aura.core.brain import AuraBrain
+from aura.core.stealth import StealthEngine, AuraSession
+from aura.core import state
 from aura.core import state
 
 console = Console()
@@ -20,16 +22,25 @@ class AuraSingularity:
     async def _handle_request(self, request):
         """Intercepts and logs XHR/Fetch requests for AI analysis."""
         if request.resource_type in ["fetch", "xhr"]:
+            post_data = None
+            try:
+                post_data = request.post_data
+            except UnicodeDecodeError:
+                post_data = "<binary payload>"
+            except Exception:
+                pass
+                
             req_data = {
                 "url": request.url,
                 "method": request.method,
                 "headers": request.headers,
-                "post_data": request.post_data
+                "post_data": post_data
             }
             self.intercepted_requests.append(req_data)
 
-    async def safe_get_content(self, page, timeout=5000):
+    async def safe_get_content(self, page, timeout=None):
         """Ghost v6.1: Safely retrieves page content with retry logic for navigation states."""
+        if timeout is None: timeout = state.NETWORK_TIMEOUT * 1000
         for _ in range(3):
             try:
                 # Wait for any pending navigation to settle
@@ -71,10 +82,10 @@ class AuraSingularity:
                 # 1. Initial Recon & Interception
                 console.print(f"[cyan][*] Intercepting network traffic for {search_url}...[/cyan]")
                 try:
-                    await page.goto(search_url, wait_until="networkidle", timeout=45000)
+                    await page.goto(search_url, wait_until="networkidle", timeout=max(30000, state.NETWORK_TIMEOUT * 1500))
                 except:
                     # Fallback for pages that never hit networkidle
-                    await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+                    await page.goto(search_url, wait_until="domcontentloaded", timeout=state.NETWORK_TIMEOUT * 1000)
                 
                 await asyncio.sleep(2) # Allow for dynamic loads
                 
@@ -156,17 +167,9 @@ class AuraSingularity:
         """Ghost v6.1: Shreds payloads into fragments with timing jitter and focus-guarantees."""
         console.print(f"[cyan][⚔] Ghost v6.1: Executing High-Precision Fragmented Attack...[/cyan]")
         
-        aggressive_trigger = False
-        # Phase 42: OCR/Signature Check - If "Vulnerable" found, trigger heavy payloads
-        try:
-            page_text = await self.safe_get_content(page)
-            if any(x in page_text.lower() for x in ["vulnerable", "exploit", "sqli", "xss", "injection"]):
-                aggressive_trigger = True
-                console.print(f"[bold red][🌋] AGGRESSION TRIGGERED: Signature detected on {url}. Increasing payload density by 10x![/bold red]")
-        except: pass
-
+        # Aggression mode disabled — false-triggers on security blog pages (e.g. aikido.dev)
         vuln_types = ["SQLi", "XSS"]
-        for i in range(50 if aggressive_trigger else 5): # Limit to first 5 or 50 inputs
+        for i in range(5):  # Always 5 inputs max for speed
             for vuln_type in vuln_types:
                 try:
                     # Re-query input element to avoid execution context destroyed errors
@@ -180,9 +183,18 @@ class AuraSingularity:
                     # Get a high-aggression Level 3 payload
                     payload = self.brain.generate_payload(vuln_type, "Next.js/Advanced", level=3)
                     
+                    # v15 Neural-Forge: Apply heavy obfuscation to bypass WAFs
+                    try:
+                        from aura.modules.neural_forge import NeuralForge
+                        forge = NeuralForge()
+                        morphed_list = forge.forge_payloads(payload, max_variations=5)
+                        if morphed_list:
+                            payload = random.choice(morphed_list)
+                    except: pass
+                    
                     # Ensure visibility and focus — v19.4: scroll first, then fill
                     try:
-                        await input_el.scroll_into_view_if_needed(timeout=3000)
+                        await input_el.scroll_into_view_if_needed(timeout=state.NETWORK_TIMEOUT * 100)
                         await asyncio.sleep(0.1)
                     except: pass
                     
@@ -217,7 +229,7 @@ class AuraSingularity:
                     
                     # v15.1 Atomic Navigation Guard
                     try: 
-                        await page.wait_for_load_state("domcontentloaded", timeout=5000)
+                        await page.wait_for_load_state("domcontentloaded", timeout=state.NETWORK_TIMEOUT * 1000)
                     except: pass
                     
                     duration = int((time.time() - start_t) * 1000)

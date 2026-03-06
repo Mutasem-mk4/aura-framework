@@ -207,18 +207,21 @@ class PowerStack:
         # Fallback: aiohttp HEAD probe with retries and longer timeouts
         console.print(f"[dim cyan][*] aiohttp probing {len(urls)} URLs for liveness...[/dim cyan]")
         
+        probe_semaphore = asyncio.Semaphore(10) # [WAF-Friendly] Prevent Cloudflare DDoS bans during mass liveness check
+        
         async def probe(url: str, retries=2) -> str | None:
-            for attempt in range(retries):
-                try:
-                    # Use GET if HEAD is blocked/weird
-                    async with aiohttp.ClientSession() as http:
-                        timeout = aiohttp.ClientTimeout(total=15)
-                        async with http.get(url, timeout=timeout, allow_redirects=True, ssl=False) as resp:
-                            if resp.status < 500: # Anything reachable is better than nothing
-                                return url
-                except Exception:
-                    await asyncio.sleep(1)
-            return None
+            async with probe_semaphore:
+                for attempt in range(retries):
+                    try:
+                        # Use GET if HEAD is blocked/weird
+                        async with aiohttp.ClientSession() as http:
+                            timeout = aiohttp.ClientTimeout(total=15)
+                            async with http.get(url, timeout=timeout, allow_redirects=True, ssl=False) as resp:
+                                if resp.status < 500: # Anything reachable is better than nothing
+                                    return url
+                    except Exception:
+                        await asyncio.sleep(1)
+                return None
 
         tasks = [probe(u) for u in urls[:100]] # Cap fallback to first 100 for speed
         results = await asyncio.gather(*tasks, return_exceptions=True)

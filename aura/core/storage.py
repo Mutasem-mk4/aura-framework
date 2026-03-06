@@ -101,7 +101,17 @@ class AuraStorage:
                 ("severity", "TEXT"),
                 ("status", "TEXT DEFAULT 'UNREVIEWED'"),
                 ("campaign_id", "INTEGER"),
-                ("proof", "TEXT")
+                ("proof", "TEXT"),
+                ("evidence_url", "TEXT"),
+                ("secret_type", "TEXT"),
+                ("secret_value", "TEXT"),
+                ("cvss_score", "REAL"),
+                ("cvss_vector", "TEXT"),
+                ("remediation_fix", "TEXT"),
+                ("impact_desc", "TEXT"),
+                ("patch_priority", "TEXT"),
+                ("bounty_estimate", "TEXT"),
+                ("platform_recommendation", "TEXT")
             ]
             
             for col_name, col_type in findings_migrations:
@@ -147,7 +157,10 @@ class AuraStorage:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(value) DO UPDATE SET
                     last_seen = excluded.last_seen,
-                    risk_score = MAX(risk_score, excluded.risk_score),
+                    risk_score = CASE 
+                        WHEN excluded.status = 'BLOCKED' THEN MAX(risk_score, 15) -- Hardened targets are high priority
+                        ELSE MAX(risk_score, excluded.risk_score)
+                    END,
                     status = excluded.status,
                     priority = CASE 
                         WHEN excluded.priority = 'CRITICAL' THEN 'CRITICAL'
@@ -243,17 +256,19 @@ class AuraStorage:
             else:
                 target_id = row[0]
             
+            content_str = content if isinstance(content, str) else __import__("json").dumps(content)
+            
             # Check for existing identical finding in this campaign to prevent inflation
             if campaign_id:
                 cursor.execute('''
                     SELECT id FROM findings 
                     WHERE target_id = ? AND content = ? AND finding_type = ? AND campaign_id = ?
-                ''', (target_id, content, finding_type, campaign_id))
+                ''', (target_id, content_str, finding_type, campaign_id))
             else:
                 cursor.execute('''
                     SELECT id FROM findings 
                     WHERE target_id = ? AND content = ? AND finding_type = ? AND campaign_id IS NULL
-                ''', (target_id, content, finding_type))
+                ''', (target_id, content_str, finding_type))
             
             existing = cursor.fetchone()
             if existing:
@@ -261,13 +276,30 @@ class AuraStorage:
                 cursor.execute("UPDATE findings SET created_at = ? WHERE id = ?", (now, existing[0]))
             else:
                 cursor.execute('''
-                    INSERT INTO findings (target_id, content, finding_type, created_at, owasp, mitre, severity, status, campaign_id, proof)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (target_id, content, finding_type, now, "None", "None", "MEDIUM", "UNREVIEWED", campaign_id, proof))
+                INSERT INTO findings (target_id, content, finding_type, created_at, owasp, mitre, severity, status, campaign_id, proof, cvss_score, cvss_vector, remediation_fix, impact_desc, patch_priority, evidence_url, secret_type, secret_value)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                target_id, content_str, finding_type, now,
+                getattr(content, 'get', lambda k: 'A00:2021-Unknown')('owasp') if isinstance(content, dict) else 'A00:2021-Unknown',
+                getattr(content, 'get', lambda k: 'T1592')('mitre') if isinstance(content, dict) else 'T1592',
+                getattr(content, 'get', lambda k: 'MEDIUM')('severity') if isinstance(content, dict) else 'MEDIUM',
+                "UNREVIEWED",
+                campaign_id,
+                proof,
+                getattr(content, 'get', lambda k: None)('cvss_score') if isinstance(content, dict) else None,
+                getattr(content, 'get', lambda k: None)('cvss_vector') if isinstance(content, dict) else None,
+                getattr(content, 'get', lambda k: None)('remediation_fix') if isinstance(content, dict) else None,
+                getattr(content, 'get', lambda k: None)('impact_desc') if isinstance(content, dict) else None,
+                getattr(content, 'get', lambda k: None)('patch_priority') if isinstance(content, dict) else None,
+                getattr(content, 'get', lambda k: None)('evidence_url') if isinstance(content, dict) else None,
+                getattr(content, 'get', lambda k: None)('secret_type') if isinstance(content, dict) else None,
+                getattr(content, 'get', lambda k: None)('secret_value') if isinstance(content, dict) else None
+            ))
             conn.commit()
 
     def update_finding_metadata(self, target_value, content, severity):
         """Updates the severity of a specific finding."""
+        content_str = content if isinstance(content, str) else __import__("json").dumps(content)
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
@@ -275,7 +307,7 @@ class AuraStorage:
                 SET severity = ? 
                 WHERE target_id = (SELECT id FROM targets WHERE value = ?) 
                 AND content = ?
-            ''', (severity, target_value, content))
+            ''', (severity, target_value, content_str))
             conn.commit()
 
     def get_audit_logs(self, campaign_id: int = None):
@@ -321,6 +353,17 @@ class AuraStorage:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM targets ORDER BY id DESC")
             return [dict(row) for row in cursor.fetchall()]
+
+    def is_target_scanned(self, target_value: str) -> bool:
+        """v14.2: Checks if a target has already been scanned (COMPLETED status)."""
+        norm_val = self.normalize_target(target_value)
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT status FROM targets WHERE value = ?", (norm_val,))
+            row = cursor.fetchone()
+            if row and row[0] == 'COMPLETED':
+                return True
+            return False
 
     def get_all_findings(self):
         """Retrieves all findings for the Nexus overview."""

@@ -1,5 +1,7 @@
 import asyncio
 import urllib.parse
+from aura.core.stealth import AuraSession, StealthEngine
+from aura.core import state
 from rich.console import Console
 
 console = Console()
@@ -64,7 +66,7 @@ class LogicAnalyzer:
         test_query = parsed_url.query.replace(f"{param}={original_val}", f"{param}={test_val}")
         test_url = parsed_url._replace(query=test_query).geturl()
         try:
-            await page.goto(test_url, wait_until="networkidle", timeout=5000)
+            await page.goto(test_url, wait_until="networkidle", timeout=state.NETWORK_TIMEOUT * 1000)
             content = await page.content()
             # If 200 OK and content is 'Meaningfully Different' but not an error
             if "unauthorized" not in content.lower() and original_val not in content:
@@ -81,7 +83,7 @@ class LogicAnalyzer:
         for p in admin_params:
             test_url = f"{url}&{p}" if "?" in url else f"{url}?{p}"
             try:
-                res = await page.goto(test_url, wait_until="networkidle", timeout=5000)
+                res = await page.goto(test_url, wait_until="networkidle", timeout=state.NETWORK_TIMEOUT * 1000)
                 # If we see 'admin' or 'dashboard' or 'settings' in page now, it might have worked
                 content = await page.content()
                 if any(kw in content.lower() for kw in ["admin dashboard", "root access", "superuser"]):

@@ -2,6 +2,7 @@ import requests
 import xml.etree.ElementTree as ET
 from rich.console import Console
 from aura.core.stealth import StealthEngine, AuraSession
+from aura.core import state
 
 console = Console()
 
@@ -33,7 +34,7 @@ class CloudHunter:
             url = self.S3_URL_PATTERN.format(bucket=bucket)
             try:
                 # Using throttled AuraSession for system stability
-                response = await session.get(url, timeout=5)
+                response = await session.get(url, timeout=state.NETWORK_TIMEOUT)
                 
                 # AWS S3 Status Codes:
                 # 200: Publicly Listable (GOLD MINE)

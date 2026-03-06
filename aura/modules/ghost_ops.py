@@ -1,5 +1,6 @@
 import asyncio
 import random
+from aura.core import state
 from rich.console import Console
 
 console = Console()
@@ -36,7 +37,8 @@ class GhostOps:
         try:
             # We use a non-stealth session for decoys to ensure they are logged
             import requests
-            requests.get(url, headers={"User-Agent": "Aura-Decoy-Subsystem", "X-Scanner-Loud": "True"}, verify=False, timeout=5)
+            from aura.core import state
+            requests.get(url, headers={"User-Agent": "Aura-Decoy-Subsystem", "X-Scanner-Loud": "True"}, verify=False, timeout=state.NETWORK_TIMEOUT)
         except:
             pass
 

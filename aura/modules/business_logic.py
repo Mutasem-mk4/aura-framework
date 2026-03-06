@@ -6,6 +6,8 @@ Thinks like a human hacker: 'If user_id=1 shows data, what about user_id=2?'
 import asyncio
 import re
 from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
+from aura.core.brain import AuraBrain
+from aura.core import state
 from rich.console import Console
 
 console = Console()
@@ -65,11 +67,11 @@ class BusinessLogicAuditor:
                         new_query = urlencode({k: v[0] for k, v in new_params.items()})
                         test_url = urlunparse(parsed._replace(query=new_query))
 
-                    res = await self.session.get(test_url, timeout=7)
+                    res = await self.session.get(test_url, timeout=state.NETWORK_TIMEOUT)
 
                     if res.status_code == 200 and len(res.text) > 200:
                         # Check if different data is returned (heuristic: different content length)
-                        original_res = await self.session.get(url, timeout=7)
+                        original_res = await self.session.get(url, timeout=state.NETWORK_TIMEOUT)
                         if abs(len(res.text) - len(original_res.text)) > 50:
                             # Ask AI to confirm if data leakage occurred
                             ai_confirm_prompt = f"""
@@ -124,14 +126,14 @@ class BusinessLogicAuditor:
         ]
 
         try:
-            original = await self.session.get(url, timeout=5)
+            original = await self.session.get(url, timeout=state.NETWORK_TIMEOUT)
             orig_len = len(original.text)
 
             for technique in bypass_techniques:
                 try:
                     test_url = url + technique.get("suffix", "")
                     extra_headers = technique.get("headers", {})
-                    res = await self.session.get(test_url, timeout=5, headers=extra_headers)
+                    res = await self.session.get(test_url, timeout=state.NETWORK_TIMEOUT, headers=extra_headers)
 
                     if res.status_code == 200 and abs(len(res.text) - orig_len) > 100:
                         findings.append({

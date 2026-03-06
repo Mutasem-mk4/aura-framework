@@ -10,10 +10,23 @@ HALT_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path
 
 # Global proxy configuration for Phase 5 Deep Proxy Architecture
 PROXY_FILE = None
+TOR_MODE = False
+TOR_PORT = 9050 # Dynamic: verified by stealth engine
+CLOUD_SWARM_MODE = False
+FAST_MODE = False # v14.2: Optimized rapid-fire mode (skips deep audits)
 
 # Network Stability & Performance Scaling (Hyper-Acceleration Phase 19)
 GLOBAL_CONCURRENCY_LIMIT = 10  # Increased for Protocol Warp parallelization
 REQUEST_JITTER_MODE = True      # Forces subtle random delays to avoid triggering system-wide blocks
+NETWORK_TIMEOUT = 30            # v18.1: Shared Framework-Wide Timeout (Single Source of Truth)
+
+# Phase 16.4: Authentication & Firewall Bypass (User-Defined)
+CUSTOM_HEADERS = {}
+CUSTOM_COOKIES = {}
+
+# Professional Reporting Options
+CUSTOM_CONSULTANT = "Independent Security Researcher"
+CUSTOM_COMPANY = "Security Assessment Team"
 
 # Gemini AI Configuration: Primary and Secondary mappings for resilience
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or os.environ.get("AURA_GEMINI_API_KEY")
@@ -26,6 +39,11 @@ OTX_API_KEY = os.environ.get("OTX_API_KEY")
 CENSYS_API_ID = os.environ.get("CENSYS_API_ID")
 CENSYS_API_SECRET = os.environ.get("CENSYS_API_SECRET")
 GREYNOISE_API_KEY = os.environ.get("GREYNOISE_API_KEY")
+SECURITYTRAILS_API_KEY = os.environ.get("SECURITYTRAILS_API_KEY")
+BINARYEDGE_API_KEY = os.environ.get("BINARYEDGE_API_KEY")
+INTELX_API_KEY = os.environ.get("INTELX_API_KEY")
+HUNTERIO_API_KEY = os.environ.get("HUNTERIO_API_KEY")
+FULLHUNT_API_KEY = os.environ.get("FULLHUNT_API_KEY")
 
 def is_halted():
     """Checks the filesystem for the halt signal marker."""

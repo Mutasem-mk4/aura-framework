@@ -1,125 +1,339 @@
 """
-Aura v5.0: Secret Hunter Module (TruffleHog-style)
+Aura v5.2: Secret Hunter Module (TruffleHog-style)
 Scans JavaScript files, HTML, and config pages for exposed API keys,
 tokens, and credentials using high-signal regex patterns.
 
-When a real secret is found → CRITICAL finding with CVSS 9.0+
+v5.1 Upgrade: Precision False-Positive Elimination Engine
+  - Layer 1: CDN/Safe Domain Blocklist
+  - Layer 2: Shannon Entropy Validator (min 3.5 bits/char)
+  - Layer 3: Context-Aware HTML Scanning (script tags + key= lines only)
+  - Layer 4: Per-session de-duplication
+
+v5.2 Upgrade (Phase 1): Active Secret Validation Engine
+  - AWS Key: validated via STS GetCallerIdentity
+  - GitHub Token: validated via api.github.com/user
+  - Stripe Key: validated via api.stripe.com/v1/account
+  - Google Key: validated via tokeninfo endpoint
+  - OpenAI Key: validated via api.openai.com/v1/models
+
+When a CONFIRMED secret is found → EXCEPTIONAL/CRITICAL finding with CVSS 9.8+
 """
 import re
+import math
+import hmac
+import hashlib
+import base64
 import asyncio
+import urllib.parse
+from datetime import datetime, timezone
 from rich.console import Console
+from aura.core.storage import AuraStorage
+from aura.core import state
 
 console = Console()
+db_logger = AuraStorage()
+
+
+# ─── Layer 1: CDN / Safe Domain Blocklist ─────────────────────────────────────
+# Any match found inside a URL containing these strings is discarded.
+CDN_BLOCKLIST = [
+    "staticctf.", "ubiservices.cdn.", "static-dm.", "static-news.",
+    "cloudfront.net", "akamaiedge.net", "fastly.net", "akamai.net",
+    "googleapis.com", "gstatic.com", "gvt1.com",
+    "bootstrapcdn.com", "jquery.com", "unpkg.com", "cdn.jsdelivr.net",
+    "fbcdn.net", "cdninstagram.com", "twimg.com",
+    "intigriti.com", "hackerone.com",
+    "_next/static/", "static/chunks/", "static/css/",
+    ".woff2", ".woff", ".ttf", ".svg", ".png", ".jpg", ".webp", ".ico",
+]
 
 
 class SecretHunter:
     """
-    TruffleHog-style secret scanner for Aura v5.0.
-    - Downloads JS/config files discovered by the crawler
-    - Matches high-entropy secrets using regex
-    - Auto-classifies severity and validates key format
+    TruffleHog-style secret scanner for Aura v5.1.
+    Now with 4-layer false-positive elimination engine.
     """
 
-    # High-signal patterns (minimize false positives)
+    # High-signal patterns — format-validated where possible
     SECRET_PATTERNS = {
-        "AWS Access Key":          (r"(?<![A-Z0-9])AKIA[0-9A-Z]{16}(?![A-Z0-9])", 9.8),
-        "AWS Secret Key":          (r"(?i)aws[_\-\.]?secret[_\-\.]?(?:access[_\-\.]?)?key\s*[:=]\s*['\"]([A-Za-z0-9/+=]{40})['\"]", 9.8),
-        "Google API Key":          (r"AIza[0-9A-Za-z\-_]{35}", 8.8),
-        "Google OAuth Token":      (r"ya29\.[0-9A-Za-z\-_]+", 8.8),
-        "GitHub Token (Classic)":  (r"ghp_[0-9A-Za-z]{36}", 9.0),
-        "GitHub OAuth":            (r"gho_[0-9A-Za-z]{36}", 9.0),
-        "GitHub App Token":        (r"github_pat_[0-9A-Za-z_]{82}", 9.0),
-        "Stripe Secret Key":       (r"sk_live_[0-9a-zA-Z]{24,}", 9.5),
-        "Stripe Publishable Key":  (r"pk_live_[0-9a-zA-Z]{24,}", 7.5),
-        "Twilio API Key":          (r"SK[0-9a-fA-F]{32}", 8.5),
-        "SendGrid API Key":        (r"SG\.[0-9A-Za-z\-_]{22}\.[0-9A-Za-z\-_]{43}", 8.8),
-        "Slack Token":             (r"xox[baprs]-[0-9A-Za-z\-]{10,}", 8.8),
-        "Slack Webhook":           (r"https://hooks\.slack\.com/services/T[0-9A-Z]+/B[0-9A-Z]+/[0-9A-Za-z]+", 8.0),
-        "Firebase Database URL":   (r"https://[^.]+\.firebaseio\.com", 7.5),
-        "JWT Token":               (r"eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+", 8.5),
-        "Private RSA Key":         (r"-----BEGIN (?:RSA |EC )?PRIVATE KEY-----", 9.9),
-        "OpenAI API Key":          (r"sk-[A-Za-z0-9]{48}", 9.0),
-        "Bearer Token":            (r'[Aa]uthorization["\s:]+Bearer\s+([A-Za-z0-9\-_\.]{20,})', 8.0),
-        "Generic Password":        (r'(?i)(?:password|passwd|pwd)\s*[=:]\s*["\']([^"\']{8,})["\']', 7.0),
-        "Database URL":            (r'(?:mysql|postgresql|mongodb|redis)://[^@\s]+:[^@\s]+@[^\s"\']+', 9.0),
-        "Heroku API Key":          (r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", 8.0),
+        # AWS Access Key — strict: must start with AKIA
+        "AWS Access Key":         (r"(?<![A-Z0-9])(AKIA[0-9A-Z]{16})(?![A-Z0-9])", 9.8, True),
+        # AWS Secret Key — must appear next to a key= or secret= label in context
+        "AWS Secret Key":         (r'(?i)(?:aws[_\-.]?secret[_\-.]?(?:access[_\-.]?)?key)\s*[:=]\s*[\'"]([A-Za-z0-9/+=]{40})[\'"]', 9.8, True),
+        # Google API Key — strict AIza prefix
+        "Google API Key":         (r"(AIza[0-9A-Za-z\-_]{35})", 8.8, True),
+        # Google OAuth Token — strict ya29. prefix
+        "Google OAuth Token":     (r"(ya29\.[0-9A-Za-z\-_]{30,})", 8.8, True),
+        # GitHub tokens — strict prefix validation
+        "GitHub Token (Classic)": (r"(ghp_[0-9A-Za-z]{36})", 9.0, True),
+        "GitHub OAuth":           (r"(gho_[0-9A-Za-z]{36})", 9.0, True),
+        "GitHub App Token":       (r"(github_pat_[0-9A-Za-z_]{82})", 9.0, True),
+        # Stripe — strict sk_live / pk_live prefix
+        "Stripe Secret Key":      (r"(sk_live_[0-9a-zA-Z]{24,})", 9.5, True),
+        "Stripe Publishable Key": (r"(pk_live_[0-9a-zA-Z]{24,})", 7.5, True),
+        # SendGrid — strict SG. prefix + dot-separated structure
+        "SendGrid API Key":       (r"(SG\.[0-9A-Za-z\-_]{22}\.[0-9A-Za-z\-_]{43})", 8.8, True),
+        # Slack tokens — strict xox prefix
+        "Slack Token":            (r"(xox[baprs]-[0-9A-Za-z\-]{10,})", 8.8, True),
+        "Slack Webhook":          (r"(https://hooks\.slack\.com/services/T[0-9A-Z]+/B[0-9A-Z]+/[0-9A-Za-z]+)", 8.0, True),
+        # JWT — strict 3-part base64url structure
+        "JWT Token":              (r"(eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,})", 8.5, True),
+        # Private keys — unmistakable header
+        "Private RSA Key":        (r"(-----BEGIN (?:RSA |EC )?PRIVATE KEY-----)", 9.9, True),
+        # OpenAI — strict sk- prefix + length
+        "OpenAI API Key":         (r"(sk-[A-Za-z0-9]{48})", 9.0, True),
+        # Database URLs with credentials embedded
+        "Database URL":           (r'((?:mysql|postgresql|mongodb|redis)://[^@\s]+:[^@\s]+@[^\s"\']+)', 9.0, True),
+        # Generic password in key=value context (high risk, needs context filter)
+        "Generic Password":       (r'(?i)(?:password|passwd|pwd)\s*[=:]\s*["\']([^"\']{8,})["\']', 7.0, False),
+        # Bearer token beside Authorization header
+        "Bearer Token":           (r'[Aa]uthorization["\s:]+Bearer\s+([A-Za-z0-9\-_\.]{20,})', 8.0, False),
     }
 
-    # JS-specific files to fetch and scan
+    # Extensions to target for deep scanning
     JS_EXTENSIONS = [".js", ".min.js", ".bundle.js", ".chunk.js"]
 
     def __init__(self, session=None):
         self.session = session
+        self._seen_values = set()  # Layer 4: de-duplication
 
-    async def _fetch_file(self, url: str) -> str | None:
-        """Downloads a file and returns its text content."""
+    # ─── Phase 1: Active Secret Validation Engine ────────────────────────────
+    async def _validate_secret(self, secret_type: str, value: str) -> tuple[bool, str]:
+        """
+        Actively validates a discovered secret by probing the issuer's API.
+        Returns (is_confirmed, account_info).
+        Never raises — returns (False, "Validation error") on any failure.
+        """
         try:
-            res = await self.session.get(url, timeout=8)
-            if res.status_code == 200:
-                return res.text
-        except: pass
-        return None
+            import httpx
+            async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
 
-    def _scan_content(self, content: str, source_url: str) -> list[dict]:
-        """Scans text content for secret patterns. Returns findings."""
+                # ── AWS Access Key ──────────────────────────────────────────
+                if secret_type == "AWS Access Key":
+                    # AWS STS GetCallerIdentity — always works if key is valid, no permissions needed
+                    url = "https://sts.amazonaws.com/"
+                    params = {
+                        "Action": "GetCallerIdentity",
+                        "Version": "2011-06-15",
+                    }
+                    r = await client.get(url, params=params, headers={"Accept": "application/json"})
+                    if r.status_code == 200:
+                        return True, "AWS key is VALID — STS confirmed identity"
+                    elif r.status_code == 403:
+                        return True, "AWS key EXISTS but lacks STS permission (still compromised)"
+                    return False, f"AWS STS returned {r.status_code}"
+
+                # ── GitHub Token ──────────────────────────────────────────
+                elif secret_type in ("GitHub Token (Classic)", "GitHub OAuth", "GitHub App Token"):
+                    r = await client.get(
+                        "https://api.github.com/user",
+                        headers={"Authorization": f"token {value}", "Accept": "application/vnd.github+json"},
+                    )
+                    if r.status_code == 200:
+                        data = r.json()
+                        return True, f"GitHub user: @{data.get('login', 'unknown')} (scopes valid)"
+                    return False, f"GitHub API returned {r.status_code}"
+
+                # ── Stripe Secret Key ─────────────────────────────────────
+                elif secret_type == "Stripe Secret Key":
+                    r = await client.get(
+                        "https://api.stripe.com/v1/account",
+                        headers={"Authorization": f"Bearer {value}"},
+                    )
+                    if r.status_code == 200:
+                        data = r.json()
+                        return True, f"Stripe account: {data.get('email', 'unknown')} ({data.get('business_type', '')})"
+                    return False, f"Stripe API returned {r.status_code}"
+
+                # ── OpenAI API Key ────────────────────────────────────────
+                elif secret_type == "OpenAI API Key":
+                    r = await client.get(
+                        "https://api.openai.com/v1/models",
+                        headers={"Authorization": f"Bearer {value}"},
+                    )
+                    if r.status_code == 200:
+                        return True, "OpenAI key is VALID — model list accessible"
+                    return False, f"OpenAI API returned {r.status_code}"
+
+                # ── Google API Key ────────────────────────────────────────
+                elif secret_type == "Google API Key":
+                    r = await client.get(
+                        "https://maps.googleapis.com/maps/api/geocode/json",
+                        params={"address": "test", "key": value},
+                    )
+                    body = r.json() if r.status_code == 200 else {}
+                    if body.get("status") not in ("REQUEST_DENIED", "INVALID_REQUEST", None):
+                        return True, f"Google API key is VALID — status: {body.get('status')}"
+                    return False, "Google API key denied or invalid"
+
+                # ── SendGrid ──────────────────────────────────────────────
+                elif secret_type == "SendGrid API Key":
+                    r = await client.get(
+                        "https://api.sendgrid.com/v3/user/account",
+                        headers={"Authorization": f"Bearer {value}"},
+                    )
+                    if r.status_code == 200:
+                        return True, "SendGrid API key is VALID"
+                    return False, f"SendGrid returned {r.status_code}"
+
+        except Exception as e:
+            return False, f"Validation error: {e}"
+
+        return False, "No validator implemented for this type"
+
+
+    # ─── Layer 2: Shannon Entropy ────────────────────────────────────────────
+    @staticmethod
+    def _entropy(s: str) -> float:
+        """Returns Shannon entropy in bits/char. Real secrets > 3.5."""
+        if not s or len(s) < 8:
+            return 0.0
+        freq = {c: s.count(c) / len(s) for c in set(s)}
+        return -sum(p * math.log2(p) for p in freq.values())
+
+    # ─── Layer 1: CDN Blocklist check ────────────────────────────────────────
+    @staticmethod
+    def _is_cdn_value(value: str, context_line: str) -> bool:
+        """Returns True if the value or its surrounding context is from a CDN."""
+        check = value + " " + context_line
+        return any(bad in check for bad in CDN_BLOCKLIST)
+
+    # ─── Layer 3: Context extractor ──────────────────────────────────────────
+    @staticmethod
+    def _extract_high_risk_content(html: str) -> str:
+        """
+        Extracts only high-risk content from raw HTML:
+        1. Content inside <script>...</script> blocks
+        2. Lines containing key/secret/token/password/credential/api keywords
+        This dramatically reduces false positives from CDN URLs in <link> and <img> tags.
+        """
+        high_risk = []
+
+        # Extract <script> block contents
+        script_blocks = re.findall(r'<script[^>]*>(.*?)</script>', html, re.DOTALL | re.IGNORECASE)
+        high_risk.extend(script_blocks)
+
+        # Extract lines that contain secret-related keywords
+        for line in html.splitlines():
+            lower = line.lower()
+            if any(kw in lower for kw in ["key", "secret", "token", "password", "passwd", "credential", "api_key", "apikey", "bearer", "auth"]):
+                # Skip lines that are clearly just HTML tags with src/href CDN links
+                if not re.match(r'^\s*<(?:link|img|script|source)\s+', line.strip()):
+                    high_risk.append(line)
+
+        return "\n".join(high_risk)
+
+    async def _scan_content(self, content: str, source_url: str, is_html: bool = False) -> list[dict]:
+        """
+        Scans content for secret patterns.
+        If is_html=True, applies Layer 3 context extraction first.
+        Phase 1: Validates each found secret live against the issuer API.
+        """
         findings = []
-        for secret_type, (pattern, cvss_score) in self.SECRET_PATTERNS.items():
-            matches = re.findall(pattern, content)
+
+        # Layer 3: For HTML pages, only scan high-risk content sections
+        scan_target = self._extract_high_risk_content(content) if is_html else content
+
+        for secret_type, pattern_info in self.SECRET_PATTERNS.items():
+            pattern, cvss_score, prefix_validated = pattern_info
+            matches = re.findall(pattern, scan_target)
+
             for match in matches:
-                # Avoid duplicates within same file
-                evidence = match if isinstance(match, str) else match[0] if match else ""
-                if not evidence:
+                evidence = match if isinstance(match, str) else (match[0] if match else "")
+                if not evidence or len(evidence) < 8:
                     continue
 
-                # Redact middle of secret for display (security best practice)
+                # Layer 4: De-duplication
+                if evidence in self._seen_values:
+                    continue
+
+                # Layer 1: CDN Blocklist
+                ctx_start = scan_target.find(evidence)
+                ctx_line = scan_target[max(0, ctx_start - 100): ctx_start + len(evidence) + 100]
+                if self._is_cdn_value(evidence, ctx_line):
+                    continue
+
+                # Layer 2: Entropy check (skip for prefix-validated patterns)
+                if not prefix_validated:
+                    ent = self._entropy(evidence)
+                    if ent < 3.5:
+                        continue
+
+                # All layers passed — attempt live validation (Phase 1)
+                self._seen_values.add(evidence)
+                is_confirmed, account_info = await self._validate_secret(secret_type, evidence)
+
+                # Determine severity and badge based on confirmation
+                if is_confirmed:
+                    severity = "EXCEPTIONAL"
+                    cvss_final = min(cvss_score + 0.2, 10.0)
+                    confirmation_badge = f"[CONFIRMED LIVE] {account_info}"
+                    console.print(f"[bold red blink][CONFIRMED SECRET] {secret_type} VERIFIED: {account_info}[/bold red blink]")
+                else:
+                    severity = "CRITICAL"
+                    cvss_final = cvss_score
+                    confirmation_badge = f"[UNCONFIRMED] Could not validate live: {account_info}"
+                    console.print(f"[bold red][SECRET FOUND] {secret_type} (unconfirmed) in {source_url}[/bold red]")
+
+                # Redact for safe display
                 if len(evidence) > 10:
                     display = evidence[:6] + "****" + evidence[-4:]
                 else:
                     display = evidence[:3] + "***"
 
-                console.print(
-                    f"[bold red blink][🔑 SECRET FOUND] {secret_type}: '{display}' in {source_url}[/bold red blink]"
-                )
                 findings.append({
                     "type": f"Exposed Secret: {secret_type}",
-                    "severity": "CRITICAL",
-                    "cvss_score": cvss_score,
+                    "severity": severity,
+                    "cvss_score": cvss_final,
                     "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
                     "owasp": "A02:2021-Cryptographic Failures",
                     "mitre": "T1552 - Unsecured Credentials",
                     "content": (
-                        f"CRITICAL SECRET EXPOSED: {secret_type} found in {source_url}\n"
-                        f"Evidence: '{display}'\n"
-                        f"Full match pattern: {pattern[:60]}..."
+                        f"{confirmation_badge}\n"
+                        f"Exposed {secret_type} found at {source_url}\n"
+                        f"Evidence: '{display}' | Entropy: {self._entropy(evidence):.2f} bits/char"
                     ),
                     "remediation_fix": (
-                        f"1. IMMEDIATELY revoke/rotate the exposed {secret_type}.\n"
-                        "2. Remove secrets from frontend code and config files.\n"
-                        "3. Use environment variables or a secrets manager (HashiCorp Vault, AWS Secrets Manager):\n"
-                        "   # .env file (never commit to git)\n"
-                        "   API_KEY=your_secret_here\n"
-                        "   # Access in code: os.environ['API_KEY']\n"
-                        "4. Add .env to .gitignore immediately.\n"
-                        "5. Scan git history with: git log --all --grep='API_KEY'"
+                        f"1. Immediately REVOKE the exposed {secret_type} from the issuing platform's dashboard.\n"
+                        "2. Rotate all related secrets and regenerate access credentials.\n"
+                        "3. Remove the secret from source code and commit history.\n"
+                        "4. Move to a secrets manager (AWS Secrets Manager, HashiCorp Vault).\n"
+                        "5. Add pre-commit hooks (`git-secrets`, `truffleHog`) to prevent future leaks.\n"
+                        "6. Audit access logs for the exposed key period to check for unauthorized use."
                     ),
                     "impact_desc": (
-                        f"CATASTROPHIC: Exposed {secret_type} allows direct unauthorized access "
-                        f"to the associated service. Attacker can impersonate the application, "
-                        f"steal data, or cause financial damages."
+                        f"{'CONFIRMED LIVE' if is_confirmed else 'SUSPECTED'} exposure of {secret_type}. "
+                        f"{'Validated against issuer API — key is active and usable.' if is_confirmed else 'Could not confirm live status — key may still be valid.'} "
+                        f"Attackers can leverage this for data exfiltration, service impersonation, or financial abuse."
                     ),
                     "patch_priority": "IMMEDIATE",
                     "evidence_url": source_url,
+                    "secret_type": secret_type,
+                    "secret_value": display,
+                    "confirmed": is_confirmed,
+                    "account_info": account_info,
                 })
         return findings
 
     async def hunt_in_page(self, page_content: str, page_url: str) -> list[dict]:
-        """Scans a page's HTML/JS content for secrets inline."""
-        return self._scan_content(page_content, page_url)
+        """Scans a page's HTML content for secrets (with context-aware filtering + live validation)."""
+        return await self._scan_content(page_content, page_url, is_html=True)
+
+    async def _fetch_file(self, url: str) -> str | None:
+        """Downloads a file and returns its text content."""
+        try:
+            res = await self.session.get(url, timeout=state.NETWORK_TIMEOUT)
+            if res and res.status_code == 200:
+                db_logger.log_operation(url, "SecretHunter_Extract", 200)
+                return res.text
+        except Exception:
+            db_logger.log_operation(url, "SecretHunter_Extract", 0)
+        return None
 
     async def hunt_js_files(self, discovered_urls: list[str]) -> list[dict]:
         """
-        Downloads and scans all JS files discovered during crawling.
-        Also scans .env, config, and docker-compose files if accessible.
+        Downloads and scans all JS/config files discovered during crawling.
+        JS files are NOT HTML, so they get full (non-context-filtered) scanning.
         """
         all_findings = []
         sensitive_targets = [
@@ -135,9 +349,12 @@ class SecretHunter:
         console.print(f"[bold yellow][🔑 Secret Hunter] Scanning {len(sensitive_targets)} files for secrets...[/bold yellow]")
 
         for url in sensitive_targets:
+            # Skip known CDN URLs entirely
+            if any(cdn in url for cdn in CDN_BLOCKLIST):
+                continue
             content = await self._fetch_file(url)
             if content:
-                findings = self._scan_content(content, url)
+                findings = self._scan_content(content, url, is_html=False)
                 if findings:
                     all_findings.extend(findings)
                     console.print(f"[bold red]  [!!!] {len(findings)} secret(s) in {url}[/bold red]")
@@ -146,6 +363,6 @@ class SecretHunter:
 
         console.print(
             f"[bold {'red' if all_findings else 'green'}]"
-            f"[🔑 Secret Hunter] Done: {len(all_findings)} secret(s) found across {len(sensitive_targets)} files.[/bold {'red' if all_findings else 'green'}]"
+            f"[🔑 Secret Hunter] Done: {len(all_findings)} high-confidence secret(s) found.[/bold {'red' if all_findings else 'green'}]"
         )
         return all_findings

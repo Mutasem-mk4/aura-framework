@@ -2,6 +2,8 @@ import asyncio
 import os
 import re
 from playwright.async_api import async_playwright
+from aura.core.storage import AuraStorage
+from aura.core import state
 from rich.console import Console
 
 console = Console()
@@ -101,8 +103,9 @@ class VisualEye:
                 browser = await p.chromium.launch(headless=True)
                 page = await browser.new_page()
                 await page.set_viewport_size({"width": 1280, "height": 720})
-                # v19.4: Raised timeout to 30s to support heavy SPAs
-                await page.goto(url, timeout=30000, wait_until="networkidle")
+                # v14.2: Adaptive timeout for slow proxies (Tor/Cloud)
+                effective_timeout = state.NETWORK_TIMEOUT * (3000 if (state.TOR_MODE or state.CLOUD_SWARM_MODE) else 1000)
+                await page.goto(url, timeout=effective_timeout, wait_until="networkidle")
                 await asyncio.sleep(1)
                 
                 # OCR Intelligence: analyze page body text directly
@@ -126,3 +129,64 @@ class VisualEye:
 
     def get_screenshot_path(self, filename):
         return os.path.join(self.output_dir, f"{filename}.png")
+
+    async def capture_finding_evidence(self, finding: dict, index: int = 0) -> dict:
+        """
+        Tier 3: Auto-captures a screenshot of the vulnerable URL for every confirmed finding.
+        Embeds the screenshot path into the finding dict as 'screenshot_path'.
+
+        This single feature raises acceptance rates significantly — triagers
+        can SEE the vulnerability without re-testing it manually.
+        """
+        url = finding.get("evidence_url") or finding.get("tampered_url") or finding.get("url")
+        if not url:
+            return finding
+
+        vuln_type = finding.get("type", "finding")
+        safe_name = re.sub(r"[^a-zA-Z0-9_-]", "_", vuln_type)[:40]
+        filename  = f"evidence_{safe_name}_{index}"
+
+        try:
+            result = await self.capture_screenshot(url, filename)
+            if result and result.get("path"):
+                finding["screenshot_path"] = result["path"]
+                console.print(
+                    f"[green][Evidence] Screenshot captured for '{vuln_type}': {result['path']}[/green]"
+                )
+        except Exception as e:
+            console.print(f"[dim red][Evidence] Screenshot failed for {url}: {e}[/dim red]")
+
+        return finding
+
+    async def capture_all_confirmed_findings(self, findings: list[dict]) -> list[dict]:
+        """
+        Tier 3: Screenshots every confirmed finding in the list.
+        Runs up to 3 screenshots in parallel to stay fast.
+        """
+        confirmed = [f for f in findings if f.get("confirmed") or f.get("severity") in ("CRITICAL", "EXCEPTIONAL")]
+        if not confirmed:
+            return findings
+
+        console.print(f"[bold cyan][Evidence] Capturing screenshots for {len(confirmed)} confirmed finding(s)...[/bold cyan]")
+
+        sem = asyncio.Semaphore(3)  # max 3 parallel browser instances
+        async def _capture(f, i):
+            async with sem:
+                return await self.capture_finding_evidence(f, i)
+
+        tasks = [_capture(f, i) for i, f in enumerate(confirmed)]
+        updated = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Merge updated confirmed findings back
+        confirmed_ids = {id(f) for f in confirmed}
+        result = []
+        confirmed_iter = iter([u for u in updated if isinstance(u, dict)])
+        for f in findings:
+            if id(f) in confirmed_ids:
+                try:
+                    result.append(next(confirmed_iter))
+                except StopIteration:
+                    result.append(f)
+            else:
+                result.append(f)
+        return result

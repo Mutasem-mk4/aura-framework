@@ -24,11 +24,16 @@ from aura.modules.secret_hunter import SecretHunter      # v5.0
 from aura.modules.power_stack import PowerStack          # v6.0
 from aura.modules.poc_engine import PoCEngine            # v6.0: Deterministic PoC
 from aura.modules.cloud_recon import AuraCloudRecon    # v15.0: Cloud Predator
-from aura.modules.logic_engine import LogicBlueprinter # v16.0 Omni-Sovereign
+from aura.modules.logic_engine import AILogicEngine # v16.0 Omni-Sovereign
 from aura.modules.synthesizer import ProtocolSynthesizer # v16.1 Omni-Sovereign
 from aura.modules.lateral_engine import LateralEngine # v18.0 Nebula Ghost
 from aura.modules.neural_forge import NeuralForge    # v19.0 The Singularity
 from aura.modules.ghost_ops import GhostOps        # v19.0 The Singularity
+from aura.modules.scope_checker import ScopeChecker  # v20.0 Bounty Scope Guard
+from aura.modules.cors_hunter import CorsHunter          # v21.0 CORS Live Tester
+from aura.modules.wayback_scanner import WaybackScanner   # v20.0 Phase 4: Historical JS Scanner
+from aura.modules.bypass_engine import BypassEngine       # v20.0 Phase 5: 403 Bypass Engine
+from aura.core.markdown_reporter import MarkdownReporter  # v20.0 Markdown Bounty Report
 from aura.core import state
 from aura.core.storage import AuraStorage
 from rich.console import Console
@@ -64,17 +69,65 @@ class NeuralOrchestrator:
         self.power_stack    = PowerStack(stealth=self.stealth)  # v6.0: Nuclei/TruffleHog/HTTPX/Nmap
         self.poc_engine     = PoCEngine(stealth=self.stealth)   # v6.0: Deterministic PoC
         self.cloud_recon    = AuraCloudRecon(self.db)           # v15.0: Cloud Discovery
-        self.logic_engine   = LogicBlueprinter(self.brain)      # v16.0 Omni-Sovereign
+        self.logic_engine   = AILogicEngine(self.session)      # v16.0 Omni-Sovereign
         self.synthesizer    = ProtocolSynthesizer(self.brain)   # v16.1 Omni-Sovereign
         self.lateral        = LateralEngine(self.brain)         # v18.0 Nebula Ghost
-        self.forge          = NeuralForge(self.brain)           # v19.0 The Singularity
+        self.forge          = NeuralForge()           # v19.0 The Singularity
         self.ghost_ops      = GhostOps(self)                    # v19.0 The Singularity
         self.dast_semaphore = asyncio.Semaphore(10)       # Velocity v7.4: Scaled from 5 to 10
         self.sing_semaphore = asyncio.Semaphore(5)        # Velocity v7.4: Scaled from 3 to 5
+        self.scope_checker  = ScopeChecker()              # v20.0: Bug Bounty Scope Guard
         self.plugins = []
         self._load_plugins()
         self.current_campaign = None
         self.broadcast_callback = broadcast_callback
+        
+        # Phase 15: Exploit Chaining Knowledge Base
+        self.knowledge_base = {
+            "redirects": [],  # Open Redirect URLs
+            "sinks": [],      # SSRF/LFI sink parameters
+            "leaks": [],      # Information leaks (internal IPs, paths)
+            "idor_vectors": [] # IDOR-vulnerable endpoints
+        }
+
+    async def _process_exploit_chain(self, domain, finding_type, content_obj):
+        """
+        Synthesizes high-impact exploits by chaining discovered vulnerabilities.
+        Example: Open Redirect + SSRF = SSRF Guard Bypass.
+        """
+        campaign_id = getattr(self, 'current_campaign', None)
+        
+        # 1. Store the finding in the knowledge base
+        if "redirect" in str(finding_type).lower():
+            self.knowledge_base["redirects"].append(content_obj.get("evidence_url"))
+        elif "ssrf" in str(finding_type).lower() or "lfi" in str(finding_type).lower():
+            self.knowledge_base["sinks"].append(content_obj.get("evidence_url"))
+        elif "idor" in str(finding_type).lower():
+            self.knowledge_base["idor_vectors"].append(content_obj.get("evidence_url"))
+            
+        # 2. Continuous Synthesis: Check for chainable combinations
+        # Scenario A: SSRF + Open Redirect = Bypassing internal network guards
+        if self.knowledge_base["redirects"] and self.knowledge_base["sinks"]:
+            redirect_url = self.knowledge_base["redirects"][0]
+            sink_url = self.knowledge_base["sinks"][0]
+            
+            chained_payload = f"{sink_url}?url={redirect_url}"
+            console.print(f"[bold red][⚓] EXPLOIT CHAIN DETECTED: Combining SSRF sink with Open Redirect for Network Bypass![/bold red]")
+            
+            chain_finding = {
+                "type": "Critical Chain: SSRF via Open Redirect Bypass",
+                "content": f"Aura synthesized a complex exploit chain by combining a discovered Open Redirect ({redirect_url}) "
+                           f"with an SSRF sink ({sink_url}). This allows bypassing internal SSRF protection filters.",
+                "evidence_url": chained_payload,
+                "severity": "CRITICAL",
+                "cvss_score": 10.0,
+                "impact_desc": "CRITICAL: The ability to chain these vulnerabilities allows an attacker to bypass security filters "
+                               "intended to block SSRF, granting access to the sensitive internal infrastructure."
+            }
+            self.db.add_finding(domain, chain_finding, chain_finding["type"], campaign_id=campaign_id)
+            return chain_finding
+            
+        return None
 
     async def broadcast(self, content, type="status", level="info", icon="info-circle", **kwargs):
         """Sends a structured message to the UI via the broadcast callback."""
@@ -111,8 +164,9 @@ class NeuralOrchestrator:
                 except Exception as e:
                     console.print(f"[red][!] Forge: Failed to load {file}: {e}[/red]")
 
-    async def execute_advanced_chain(self, domain, campaign_id=None):
+    async def execute_advanced_chain(self, domain, campaign_id=None, swarm_mode=False):
         """The Final Siege: Aura v14.0 [ABS SURFACE COVERAGE] — Absolute Systemic Domination."""
+        self.effective_fast_mode = state.FAST_MODE # v18.1 Fix: Use instance attribute to avoid scope shadowing
         self.current_campaign = campaign_id
         
         # 1. Scope Guard: Absolute Safety Check
@@ -122,8 +176,21 @@ class NeuralOrchestrator:
             return {"status": "blocked", "reason": "out_of_scope"}
 
         console.print(f"[bold red][!] INITIALIZING ZENITH PROTOCOL FOR: {domain}[/bold red]")
-        console.print(f"🔥 [bold red]Aura v14.0 [FINAL SIEGE][/bold red]: Engaging Absolute Surface Coverage for {domain}...")
+        console.print(f"[SIEGE] [bold red]Aura v14.0 [FINAL SIEGE][/bold red]: Engaging Absolute Surface Coverage for {domain}...")
         self.db.log_action("START_CHAIN", domain, "NeuralOrchestrator engaged (v14.0 Final Siege)", campaign_id)
+
+        # v20.0: Bug Bounty Scope Pre-Check
+        try:
+            scope_result = await self.scope_checker.check_scope(domain)
+            if scope_result.get("in_scope"):
+                console.print(f"[bold green][[SUCCESS]] SCOPE: {scope_result['warning']}[/bold green]")
+                console.print(f"[bold green]    Submit at: {scope_result.get('scope_url', '')}[/bold green]")
+            else:
+                console.print(f"[bold yellow][[WARN]] {scope_result['warning']}[/bold yellow]")
+            self.db.log_action("SCOPE_CHECK", domain, scope_result.get("warning", ""), campaign_id)
+        except Exception as _se:
+            console.print(f"[dim yellow][!] Scope check skipped: {_se}[/dim yellow]")
+
         # 1. Pre-Flight Ghost Recon: Check for WAF and Liveness
         console.print("[cyan][*] Phase 0: Stealth Pre-Flight Recon (Liveness & WAFSense)...[/cyan]")
         is_live = False
@@ -131,59 +198,135 @@ class NeuralOrchestrator:
         
         try:
             # Ghost v4 Protocol Agnostic Probe
-            resp = await self.session.get(f"https://{domain}", timeout=10)
+            resp = await self.session.get(f"https://{domain}", timeout=30)
             target_url = f"https://{domain}"
             is_live = True
-        except:
+            
+            if resp:
+                 console.print(f"[dim yellow][DEBUG] Initial probe status: {resp.status_code}[/dim yellow]")
+                 console.print(f"[dim yellow][DEBUG] Initial probe server: {resp.headers.get('server', '')}[/dim yellow]")
+
+            # Phase 16.5: Autonomous WAF Bypass Gate
+            if resp and resp.status_code in [403, 400] and "cloudflare" in resp.headers.get("server", "").lower():
+                console.print(f"[bold red][!] WAF Detection Gate: Cloudflare blockage confirmed on {domain}.[/bold red]")
+                console.print("[cyan][*] Triggering Autonomous Origin Extraction...[/cyan]")
+                await self.broadcast("Cloudflare WAF Detected. Hunting for Origin IP...", type="status", icon="shield")
+                
+                origin_ips = await self.stealth.hunt_origin_ip(domain)
+                if origin_ips:
+                    best_ip = origin_ips[0]
+                    console.print(f"[bold green][[SUCCESS]] Origin IP Extraction Successful: {best_ip}[/bold green]")
+                    console.print(f"[cyan][*] Dynamically routing attacks to {best_ip} and spoofing Host header.[/cyan]")
+                    
+                    # Store original domain for Host header
+                    state.CUSTOM_HEADERS["Host"] = domain
+                    # Rewrite the domain and target URL to use the raw IP for subsequent attacks
+                    original_domain = domain
+                    domain = best_ip
+                    target_url = f"https://{best_ip}"
+                    
+                    # Verify the bypass
+                    resp_bypass = await self.session.get(f"https://{best_ip}", timeout=30, verify=False)
+                    if resp_bypass and resp_bypass.status_code in [403, 400]:
+                         # Fallback to HTTP if HTTPS fails on raw IP
+                         target_url = f"http://{best_ip}"
+                         resp_bypass = await self.session.get(target_url, timeout=30, verify=False)
+                         console.print("[cyan][*] Protocol downgraded to HTTP for Origin IP.[/cyan]")
+                    
+                    if resp_bypass and resp_bypass.status_code < 400:
+                         console.print("[bold green][[SUCCESS]] Firewall Bypass Verified. Continuing attack sequence...[/bold green]")
+                    else:
+                         console.print(f"[yellow][!] Bypass verified but received sub-optimal status code. Proceeding anyway.[/yellow]")
+                         
+        except Exception as e:
             try:
-                resp = await self.session.get(f"http://{domain}", timeout=10)
+                resp = await self.session.get(f"http://{domain}", timeout=30)
                 target_url = f"http://{domain}"
                 is_live = True
-            except Exception as e:
-                console.print(f"[yellow][!] Pre-Flight Connection Failed for {domain}: {e}[/yellow]")
+
+                # Phase 16.5: Autonomous WAF Bypass Gate (HTTP fallback)
+                if resp and resp.status_code in [403, 400] and "cloudflare" in resp.headers.get("server", "").lower():
+                    console.print(f"[bold red][!] WAF Detection Gate: Cloudflare blockage confirmed on {domain}.[/bold red]")
+                    console.print("[cyan][*] Triggering Autonomous Origin Extraction...[/cyan]")
+                    await self.broadcast("Cloudflare WAF Detected. Hunting for Origin IP...", type="status", icon="shield")
+                    
+                    origin_ips = await self.stealth.hunt_origin_ip(domain)
+                    if origin_ips:
+                        best_ip = origin_ips[0]
+                        console.print(f"[bold green][[SUCCESS]] Origin IP Extraction Successful: {best_ip}[/bold green]")
+                        console.print(f"[cyan][*] Dynamically routing attacks to {best_ip} and spoofing Host header.[/cyan]")
+                        
+                        state.CUSTOM_HEADERS["Host"] = domain
+                        original_domain = domain
+                        domain = best_ip
+                        target_url = f"http://{best_ip}"
+                        
+                        resp_bypass = await self.session.get(target_url, timeout=30, verify=False)
+                        if resp_bypass and resp_bypass.status_code < 400:
+                             console.print("[bold green][[SUCCESS]] Firewall Bypass Verified. Continuing attack sequence...[/bold green]")
+                        else:
+                             console.print(f"[yellow][!] Bypass verified but received sub-optimal status code. Proceeding anyway.[/yellow]")
+            except Exception as inner_e:
+                console.print(f"[yellow][!] Pre-Flight Connection Failed for {domain}: {inner_e}[/yellow]")
                 self.db.save_target({"target": domain, "type": "Domain", "status": "DOWN"})
                 return {"status": "ERROR", "reason": "connection_failed"}
+        
+        # Use recon_domain for OSINT that requires a hostname rather than raw IP
+        recon_domain = original_domain if 'original_domain' in locals() else domain
         
         # 1.5 Global Threat Intelligence (OSINT)
         console.print("[cyan][*] Phase 0.5: Gathering Global Threat Intelligence...[/cyan]")
         intel_data = {}
         is_api_blind = True  # Assume blind until at least one API responds
         
-        # Query Shodan (requires IP)
+        # Query all OSINT sources IN PARALLEL (major speed-up)
+        async def _shodan(): 
+            try:
+                ip = await asyncio.to_thread(socket.gethostbyname, recon_domain)
+                return "shodan", ip, await self.intel.query_shodan(ip)
+            except: return "shodan", None, None
+        async def _vt():    return "virustotal", None, await self.intel.query_virustotal(recon_domain)
+        async def _otx():   return "otx",        None, await self.intel.query_otx(recon_domain)
+        async def _st():    return "securitytrails", None, await self.intel.query_securitytrails(recon_domain)
+        async def _censys(ip):
+            if ip: return "censys", None, await self.intel.query_censys(ip)
+            return "censys", None, None
+        async def _gn(ip):
+            if ip: return "greynoise", None, await self.intel.query_greynoise(ip)
+            return "greynoise", None, None
+
         import socket
         target_ip = None
-        try:
-            target_ip = await asyncio.to_thread(socket.gethostbyname, domain)
-            shodan_res = await self.intel.query_shodan(target_ip)
-            if shodan_res: intel_data["shodan"] = shodan_res
-        except:
-            console.print("[dim yellow][!] Could not resolve IP for Shodan query.[/dim yellow]")
-            
-        # Query VirusTotal & OTX
-        vt_res = await self.intel.query_virustotal(domain)
-        if vt_res: intel_data["virustotal"] = vt_res
+        # Pre-resolve IP quickly so we can pass it to Censys/GreyNoise
+        try: target_ip = await asyncio.to_thread(socket.gethostbyname, recon_domain)
+        except: pass
+
+        results_intel = await asyncio.gather(
+            _shodan(), _vt(), _otx(), _st(), _censys(target_ip), _gn(target_ip),
+            return_exceptions=True
+        )
+        for r in results_intel:
+            if isinstance(r, Exception) or r is None: continue
+            key, maybe_ip, data = r
+            if maybe_ip: target_ip = maybe_ip  # capture IP from shodan call
+            if data: intel_data[key] = data
         
-        otx_res = await self.intel.query_otx(domain)
-        if otx_res: intel_data["otx"] = otx_res
-
-        # Query Censys, GreyNoise & AbuseIPDB
-        if target_ip:
-            censys_res = await self.intel.query_censys(target_ip)
-            if censys_res: intel_data["censys"] = censys_res
-            
-            gn_res = await self.intel.query_greynoise(target_ip)
-            if gn_res: intel_data["greynoise"] = gn_res
-
-            abuse_res = await self.intel.query_abuseipdb(target_ip)
-            if abuse_res: intel_data["abuseipdb"] = abuse_res
+        # SecurityTrails subdomains → DB
+        st_data = intel_data.get("securitytrails")
+        if st_data:
+            for sub in st_data.get("subdomains", []):
+                self.db.save_target({"target": f"{sub}.{recon_domain}", "type": "Subdomain", "status": "Discovered"})
         
         if intel_data:
+            is_api_blind = False
             await self.broadcast(f"Intel Gathered: {', '.join(intel_data.keys())}", type="intel", level="info", icon="satellite", data=intel_data)
-            self.db.log_action("INTEL_GATHERED", domain, f"Sources: {', '.join(intel_data.keys())}", campaign_id)
+            self.db.log_action("INTEL_GATHERED", recon_domain, f"Sources: {', '.join(intel_data.keys())}", campaign_id)
+        else:
+            console.print("[yellow][!] No intelligence gathered from primary OSINT sources. Aura is operating 'Blind'.[/yellow]")
         
         # v15.0 / v19.4: Cloud Asset Discovery (Phase 0.7) - Full async
         try:
-            await self.cloud_recon.hunt(domain)
+            await self.cloud_recon.hunt(recon_domain)
         except Exception as e:
             console.print(f"[dim red][!] Cloud Predator failed gracefully: {e}[/dim red]")
         
@@ -192,8 +335,8 @@ class NeuralOrchestrator:
 
         # v5.0: RECON PIPELINE (Subfinder → HTTPX → Nmap)
         console.print("[bold cyan][*] Phase 0.6: v5.0 Recon Pipeline (Subfinder→HTTPX→Nmap)...[/bold cyan]")
-        recon_data = await self.recon_pipeline.run(domain, target_ip)
-        self.db.log_action("RECON_PIPELINE", domain, 
+        recon_data = await self.recon_pipeline.run(recon_domain, target_ip)
+        self.db.log_action("RECON_PIPELINE", recon_domain, 
             f"Subdomains: {len(recon_data.get('subdomains', []))}, "
             f"HTTP: {len(recon_data.get('http_services', []))}, "
             f"Ports: {len(recon_data.get('open_ports', []))}",
@@ -201,7 +344,7 @@ class NeuralOrchestrator:
         await self.broadcast("Recon Pipeline complete.", type="recon", icon="radar", data=recon_data)
         
         # 2. Recon & Vision + Tech Analysis (Ghost v4 Intel)
-        results = await self.scanner.discover_subdomains(domain)
+        results = await self.scanner.discover_subdomains(recon_domain)
         for res in results:
             # Fix: scanner.discover_subdomains returns a list of DICTS now, not strings
             if isinstance(res, dict):
@@ -215,7 +358,7 @@ class NeuralOrchestrator:
         console.print("[bold cyan][*] Phase 2.0: v6.0 PowerStack — Nuclei CVE/Template Scan...[/bold cyan]")
         nuclei_findings = await self.power_stack.nuclei_scan(target_url)
         for nf in nuclei_findings:
-            self.db.add_finding(domain, nf['content'], nf['type'], campaign_id=campaign_id)
+            self.db.add_finding(recon_domain, nf['content'], nf['type'], campaign_id=campaign_id)
             findings.append(nf)
             vulns.append(nf)
         
@@ -224,11 +367,11 @@ class NeuralOrchestrator:
             open_ports = await self.scanner.scan_ports(target_ip)
             if open_ports:
                 for p in open_ports:
-                    url = f"http://{domain}:{p}" if p not in [80, 443] else f"http://{domain}"
-                    if p == 443: url = f"https://{domain}"
+                    url = f"http://{recon_domain}:{p}" if p not in [80, 443] else f"http://{recon_domain}"
+                    if p == 443: url = f"https://{recon_domain}"
                     if url not in discovered_urls:
                         discovered_urls.append(url)
-                self.db.log_action("PORT_SCAN", domain, f"Open Ports: {open_ports}", campaign_id)
+                self.db.log_action("PORT_SCAN", recon_domain, f"Open Ports: {open_ports}", campaign_id)
                 
                 # v16.1 Omni-Sovereign: Protocol Synthesis on binary ports
                 for p in open_ports:
@@ -240,15 +383,15 @@ class NeuralOrchestrator:
                 if grpc_urls:
                     console.print(f"[bold magenta][📡] gRPC Services Found: {len(grpc_urls)} endpoint(s). Logging as attack surface.[/bold magenta]")
                     for gu in grpc_urls:
-                        self.db.add_finding(domain, f"gRPC Endpoint Exposed: {gu}", "gRPC Exposure", campaign_id=campaign_id)
+                        self.db.add_finding(recon_domain, f"gRPC Endpoint Exposed: {gu}", "gRPC Exposure", campaign_id=campaign_id)
                         findings.append({"type": "gRPC Exposure", "content": f"gRPC Endpoint Exposed: {gu}", "severity": "MEDIUM"})
                 
                 # v3.0: OSINT Resiliency — Banner Grabbing when API keys are missing
                 if is_api_blind:
-                    console.print(f"[bold cyan][🔍] v3.0 OSINT Failover: API keys missing. Running Banner Grabbing on {domain}...[/bold cyan]")
+                    console.print(f"[bold cyan][🔍] v3.0 OSINT Failover: API keys missing. Running Banner Grabbing on {recon_domain}...[/bold cyan]")
                     banner_findings = await self.banner_grabber.run_fingerprinting(target_ip, open_ports)
                     for bf in banner_findings:
-                        self.db.add_finding(domain, bf['content'], bf['type'], campaign_id=campaign_id)
+                        self.db.add_finding(recon_domain, bf['content'], bf['type'], campaign_id=campaign_id)
                         findings.append(bf)
                         if bf.get('severity') == 'CRITICAL':
                             vulns.append(bf)
@@ -270,8 +413,8 @@ class NeuralOrchestrator:
                 f_content = f"Hidden Path Discovered: {full_path_url}"
                 f_type = "Web Server Misconfiguration" if is_systemic else "Information Disclosure"
                 
-                self.db.add_finding(domain, f_content, f_type, campaign_id=campaign_id)
-                self.db.update_finding_metadata(domain, f_content, severity)
+                self.db.add_finding(recon_domain, f_content, f_type, campaign_id=campaign_id)
+                self.db.update_finding_metadata(recon_domain, f_content, severity)
                 findings.append({"type": f_type, "content": f_content, "severity": severity})
                 if severity == "CRITICAL":
                     vulns.append({
@@ -290,7 +433,7 @@ class NeuralOrchestrator:
         self.secret_hunter.session = self.session
         secret_findings = await self.secret_hunter.hunt_js_files(discovered_urls)
         for sf in secret_findings:
-            self.db.add_finding(domain, sf['content'], sf['type'], campaign_id=campaign_id)
+            self.db.add_finding(recon_domain, sf['content'], sf['type'], campaign_id=campaign_id)
             findings.append(sf)
             vulns.append(sf)  # All secrets are CRITICAL
 
@@ -305,7 +448,7 @@ class NeuralOrchestrator:
         for sm_url in sitemap_urls:
             if sm_url not in discovered_urls:
                 discovered_urls.append(sm_url)
-        self.db.log_action("SITEMAP_PARSE", domain, f"Extracted {len(sitemap_urls)} paths from sitemap/robots", campaign_id)
+        self.db.log_action("SITEMAP_PARSE", recon_domain, f"Extracted {len(sitemap_urls)} paths from sitemap/robots", campaign_id)
         
         # v10.0 Sovereign: Optimized Discovery Flow
         # Use a shared visited set across all discovery modules to prevent infinite loops
@@ -314,7 +457,10 @@ class NeuralOrchestrator:
         #  Phase 2.3b: Recursive Spider (Depth 5) - Fixed Concurrency
         console.print("[bold cyan][*] Phase 2.3b: v10.0 Sovereign Recursive Spider...[/bold cyan]")
         await self.broadcast("Deploying Sovereign Spider — crawling deep surface...", type="status", icon="spider")
-        spidered_urls, discovered_forms = await self.scanner.recursive_spider(target_url, max_depth=3)
+        
+        # v14.2: Fast Mode Scaling (Depth 1 instead of 2). v19.6: Swarm Mode forces Depth 1 too.
+        spider_depth = 1 if (self.effective_fast_mode or swarm_mode) else 2
+        spidered_urls, discovered_forms = await self.scanner.recursive_spider(target_url, max_depth=spider_depth, swarm_mode=swarm_mode)
         for sp_url in spidered_urls:
             if sp_url not in discovered_urls:
                 discovered_urls.append(sp_url)
@@ -332,30 +478,31 @@ class NeuralOrchestrator:
             await self.logic_engine.blueprint_target(discovered_urls)
             logic_vectors = self.logic_engine.identify_state_skipping_vectors()
             for lv in logic_vectors:
-                self.db.add_finding(domain, lv, "Business Logic Violation", campaign_id=campaign_id)
+                self.db.add_finding(recon_domain, lv, "Business Logic Violation", campaign_id=campaign_id)
                 findings.append({"type": "Business Logic Violation", "content": lv, "severity": "HIGH"})
-                console.print(f"[bold red][🕵️] BI-LOGIC EXPLOIT IDENTIFIED: {lv}[/bold red]")
+                console.print(f"[bold red][[LOGIC]] BI-LOGIC EXPLOIT IDENTIFIED: {lv}[/bold red]")
                 
         # v13.0 [STEALTH PREDATOR]: 50+ Path Auditing Mandate Unstoppable
-        if len(discovered_urls) < 50:
+        # v14.2: Skip Stealth Predator in Fast Mode unless escalated
+        if len(discovered_urls) < 50 and not self.effective_fast_mode:
             console.print(f"🦖 [bold red]PREDATOR MANDATE[/bold red]: Only {len(discovered_urls)} paths found. Requirement: 50+. Activating Deep Wordlist Fuzzing...")
             await self.broadcast("MANDATE: Insufficient paths. Deploying Stealth Predator Fuzzer...", type="status", icon="hammer")
             
             # Use all HTTP services found during recon (including Port 8080) as roots
             roots = list(set([h["url"] for h in recon_data.get("http_services", []) if h.get("url")]))
             if not roots:
-                 roots = [f"http://{domain}", f"https://{domain}"]
+                 roots = [f"http://{recon_domain}", f"https://{recon_domain}"]
 
             for root in roots:
-                fuzzer_hits = await self.scanner.force_fuzz(root)
+                fuzzer_hits = await self.scanner.force_fuzz(root, swarm_mode=swarm_mode)
                 for fh in fuzzer_hits:
                     if fh not in discovered_urls:
                         discovered_urls.append(fh)
                         visited_paths.add(fh)
             
-            console.print(f"[bold green][✔] Stealth Predator forced total discovery to {len(discovered_urls)} audit paths.[/bold green]")
+            console.print(f"[bold green][[SUCCESS]] Stealth Predator forced total discovery to {len(discovered_urls)} audit paths.[/bold green]")
             
-        self.db.log_action("SPIDER_CRAWL", domain, f"Total discovered URLs (v13.0 Predator): {len(discovered_urls)}", campaign_id)
+        self.db.log_action("SPIDER_CRAWL", recon_domain, f"Total discovered URLs (v13.0 Predator): {len(discovered_urls)}", campaign_id)
         
         #  Phase 2.3c: JS/CSS Link Extraction
         console.print("[bold cyan][*] Phase 2.3c: v7.2 JS/CSS Endpoint Extraction...[/bold cyan]")
@@ -364,7 +511,7 @@ class NeuralOrchestrator:
         for ep in js_endpoints:
             if ep not in discovered_urls:
                 discovered_urls.append(ep)
-        self.db.log_action("JS_CSS_EXTRACT", domain, f"Extracted {len(js_endpoints)} hidden endpoints from JS/CSS", campaign_id)
+        self.db.log_action("JS_CSS_EXTRACT", recon_domain, f"Extracted {len(js_endpoints)} hidden endpoints from JS/CSS", campaign_id)
         
         #  Phase 2.3d: Shodan Port-based Web Discovery
         if intel_data.get("shodan") and intel_data["shodan"].get("ports"):
@@ -372,18 +519,18 @@ class NeuralOrchestrator:
             shodan_ports = intel_data["shodan"]["ports"]
             web_ports = [p for p in shodan_ports if p not in [22, 25, 53, 110, 143]]
             for port in web_ports:
-                port_url = f"http://{domain}:{port}" if port != 443 else f"https://{domain}"
+                port_url = f"http://{recon_domain}:{port}" if port != 443 else f"https://{recon_domain}"
                 if port_url not in discovered_urls:
                     try:
-                        res = await self.session.get(port_url, timeout=5)
+                        res = await self.session.get(port_url, timeout=state.NETWORK_TIMEOUT)
                         if res.status_code < 500:
                             discovered_urls.append(port_url)
                             console.print(f"[green][+] Shodan Port {port}: {port_url} is alive.[/green]")
                     except:
                         pass
-            self.db.log_action("SHODAN_PORTS", domain, f"Probed {len(web_ports)} non-standard ports", campaign_id)
+            self.db.log_action("SHODAN_PORTS", recon_domain, f"Probed {len(web_ports)} non-standard ports", campaign_id)
         
-        console.print(f"[bold green][✔] v7.2 TOTAL DISCOVERY: {len(discovered_urls)} unique URLs ready for DAST.[/bold green]")
+        console.print(f"[bold green][[SUCCESS]] v7.2 TOTAL DISCOVERY: {len(discovered_urls)} unique URLs ready for DAST.[/bold green]")
         await self.broadcast(f"Discovery Complete: {len(discovered_urls)} URLs, {len(discovered_forms)} Forms", type="status", level="success", icon="check-circle")
 
         # v6.0: PowerStack — HTTPX liveness filter on discovered URLs
@@ -399,13 +546,16 @@ class NeuralOrchestrator:
                 import aiohttp, uuid, random as _random
                 async def _probe_urls(urls):
                     reachable = []
-                    async with aiohttp.ClientSession() as sess:
-                        for u in urls:
+                    sem = asyncio.Semaphore(50)  # 50 concurrent probes
+                    async def _check(u):
+                        async with sem:
                             try:
-                                async with sess.get(u, timeout=aiohttp.ClientTimeout(total=5), ssl=False, allow_redirects=True) as r:
+                                async with sess.get(u, timeout=aiohttp.ClientTimeout(total=3), ssl=False, allow_redirects=True) as r:
                                     if r.status < 500:
                                         reachable.append(u)
                             except: pass
+                    async with aiohttp.ClientSession() as sess:
+                        await asyncio.gather(*[_check(u) for u in urls], return_exceptions=True)
                     return reachable
                 
                 # v19.4: Detect catch-all BEFORE accepting all 200s as real
@@ -469,13 +619,13 @@ class NeuralOrchestrator:
         if vision_data:
             ocr = vision_data.get("ocr", {})
             if ocr.get("is_dead"):
-                console.print(f"[bold red][🔴] SCAN HALTED: Target appears to be a dead/parked page. Reason: {ocr.get('reason')}[/bold red]")
+                console.print(f"[bold red][[DEAD]] SCAN HALTED: Target appears to be a dead/parked page. Reason: {ocr.get('reason')}[/bold red]")
                 console.print(f"[yellow][?] Aura v15.1 Advice: This domain has no live application. Run 'aura zenith' on a live target.[/yellow]")
                 await self.broadcast(f"Target INACCESSIBLE: {ocr.get('reason')}", type="alert", level="error", icon="ban")
                 return {"status": "INACCESSIBLE", "reason": ocr.get("reason")}
             
             if ocr.get("is_vulnerable_site") and ocr.get("findings"):
-                console.print(f"[bold red][👁️] OCR Intel: {len(ocr['findings'])} vulnerability indicator(s) confirmed visually![/bold red]")
+                console.print(f"[bold red][[VISION]] OCR Intel: {len(ocr['findings'])} vulnerability indicator(s) confirmed visually![/bold red]")
                 for ocr_f in ocr["findings"]:
                     self.db.add_finding(domain, ocr_f["content"], ocr_f["type"], campaign_id=campaign_id)
                     findings.extend(ocr["findings"])
@@ -485,20 +635,63 @@ class NeuralOrchestrator:
         console.print("[cyan][*] Phase 2.5: Bounty Hunter engagement (Secret Probing)...[/cyan]")
         await self.broadcast("Scanning for exposed secrets and keys...", type="status", icon="key")
         secrets = await self.bounty.scan_for_secrets(domain)
+        
+        # v14.2: Smart Hunter Escalation Pattern
+        # If a FATAL/CRITICAL secret is found, we escalate to FULL SIEGE even if FAST_MODE is on.
+        has_escalation_signal = False
+        
         if secrets:
             for s in secrets:
-                severity = "CRITICAL" if s["method"] == "regex" else "HIGH"
-                content = f"Exposed {s['type']} found at {s['location']}"
-                if s["method"] == "entropy":
-                    content += f" (Score: {s.get('score')})"
+                # v14.1 Fix: Use .get() to prevent KeyError if some fields are missing
+                severity = "CRITICAL" if s.get("method") == "regex" else "HIGH"
+                if severity == "CRITICAL": has_escalation_signal = True # Signal: Critical Secret Found
                 
-                self.db.add_finding(domain, content, s["type"], campaign_id=campaign_id)
-                semantic_severity = self.brain.calculate_impact(s["type"], content)
+                # Redact middle of secret for display
+                evidence = s.get('value', 'N/A')
+                display = evidence[:6] + "****" + evidence[-4:] if len(evidence) > 10 else evidence[:3] + "***"
+                
+                content_obj = {
+                    "content": f"Exposed {s.get('type', 'Secret')} found at {s.get('location', url)}",
+                    "evidence_url": s.get('location', url),
+                    "secret_type": s.get('type', 'Generic'),
+                    "secret_value": display,
+                    "impact_desc": (
+                        f"CRITICAL BUSINESS IMPACT: Exposed {s.get('type', 'Secret')} allows direct unauthorized access "
+                        f"to the associated service. Attackers can leverage this to impersonate the application, "
+                        f"exfiltrate sensitive customer data, or maliciously consume financial/cloud quotas, "
+                        f"leading to severe reputational damage and financial loss."
+                    ),
+                    "cvss_score": s.get("cvss_score", 9.8 if severity == "CRITICAL" else 7.5),
+                    "cvss_vector": s.get("cvss_vector", "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H"),
+                    "owasp": "A02:2021-Cryptographic Failures",
+                    "mitre": "T1552 - Unsecured Credentials",
+                    "remediation_fix": s.get("remediation", f"1. Revoke the exposed {s.get('type')}.\n2. Remove it from plain text.\n3. Move to a secrets manager (Vault, AWS Secrets Manager)."),
+                    "patch_priority": "IMMEDIATE",
+                    "bounty_estimate": s.get("bounty_estimate", "$100-$500"),
+                    "platform_recommendation": s.get("platform", "HackerOne or direct vendor disclosure."),
+                }
+
+                s_type = s.get("type", "Secret")
+                if s.get("method") == "entropy":
+                    content_obj["content"] += f" (Score: {s.get('score')})"
+                
+                self.db.add_finding(domain, content_obj, "Exposed Secret: " + s_type, campaign_id=campaign_id)
+                semantic_severity = self.brain.calculate_impact(s_type, str(content_obj.get("content", "")))
                 effective_severity = severity if severity == "CRITICAL" else semantic_severity
-                self.db.update_finding_metadata(domain, content, effective_severity) 
+                self.db.update_finding_metadata(domain, content_obj, effective_severity) 
                 
-                findings.append({"type": s["type"], "content": content, "severity": effective_severity})
-                vulns.append({"type": s["type"], "content": content, "severity": effective_severity})
+                findings.append({"type": s_type, "content": content_obj, "severity": effective_severity})
+                vulns.append({"type": s_type, "content": content_obj, "severity": effective_severity})
+
+        # v14.2: Dynamic Stance Escalation Logic
+        if state.FAST_MODE and has_escalation_signal:
+            console.print(f"[bold red][⚡] SMART HUNTER ESCALATION: High-value signal detected on {domain}. Escalating to Deep Audit Mode![/bold red]")
+            await self.broadcast("CRITICAL FINDING: Escalating to Deep Audit mode for maximum impact.", type="status", icon="exclamation-triangle")
+            # We don't disable global FAST_MODE, we just locally override the depth for this target.
+            self.effective_fast_mode = False
+        else:
+            self.effective_fast_mode = state.FAST_MODE
+
                 
         # 3. CVE Matching & Leak Probing (Ghost v4 Intel)
         cves = self.vuln_intel.get_cves_for_stack(tech_stack)
@@ -513,6 +706,14 @@ class NeuralOrchestrator:
              console.print(f"[bold red][!] Intelligence Alert: Found {len(leaks)} leaked credentials for domain.[/bold red]")
              for leak in leaks:
                  self.db.add_finding(domain, f"Leak-Match: {leak['email']} ({leak['leak']})", "Credential-Leak", campaign_id=campaign_id)
+
+        # Phase 15: 0-Day Radar (GitHub API)
+        if not self.effective_fast_mode and tech_stack:
+            zero_days = await self.intel.query_github_0days(tech_stack)
+            for zd in zero_days:
+                content = f"0-Day PoC Alert: {zd['tech']}\nRepo: {zd['repo']}\nDesc: {zd['description']}"
+                self.db.add_finding(domain, content, "0-Day Intelligence", campaign_id=campaign_id)
+                vulns.append({"type": "0-Day Intelligence", "content": content, "severity": "CRITICAL"})
 
         # v7.3 Law 1: Remove arbitrary intel_score. Risk calculation is deferred to Step 6 (CVSS strictly)
 
@@ -544,6 +745,35 @@ class NeuralOrchestrator:
         # We pass the discovery 'stats' as a proxy for the state machine for now
         await self.forge.synthesize_0day_vectors(context["discovery_stats"], tech_stack)
         
+        # Step 2.5 (Phase 6): Universal Bounty Maximizer - CORS Misconfiguration Hunt
+        await self.broadcast("Activating CORS Misconfiguration Hunter on API endpoints...", type="status", icon="zap")
+        cors_hunter = CorsHunter(session=self.session)
+        cors_findings = await cors_hunter.scan_domain(domain, discovered_urls)
+        if cors_findings:
+            console.print(f"[bold red][!!!] ZENITH ALERT: Discovered {len(cors_findings)} CORS vulnerabilities![/bold red]")
+            for c in cors_findings:
+                vulns.append(c)
+                self.db.add_finding(domain, c["content"], c["type"], campaign_id=campaign_id)
+                
+        # Phase 15: AI Logic Engine (Business Logic & IDOR Hunter)
+        if discovered_urls and not self.effective_fast_mode:
+            await self.broadcast("Activating AI Logic Engine for Business Logic & IDOR Hunting...", type="status", icon="brain")
+            from aura.modules.logic_engine import AILogicEngine
+            logic_engine = AILogicEngine(session=self.session)
+            logic_findings = await logic_engine.analyze(discovered_urls)
+            
+            if logic_findings:
+                for lf in logic_findings:
+                    content_obj = {
+                        "content": f"Critical {lf.get('type')} discovered at {lf.get('url')} via {lf.get('method')}",
+                        "evidence_url": lf.get("url"),
+                        "severity": lf.get("severity"),
+                        "remediation_fix": "1. Implement strict server-side authorization checks.\n2. Do NOT trust client-supplied IDs or amounts.",
+                        "impact_desc": f"An attacker can exploit this {lf.get('type')} to manipulate business logic, potentially resulting in unauthorized data access or financial loss."
+                    }
+                    self.db.add_finding(domain, content_obj, lf.get("type"), campaign_id=campaign_id)
+                    vulns.append(lf)
+        
         # Step 3: Deep AI Audit — v7.2: Expanded DAST coverage (15 entry points, depth 3)
         await self.broadcast(f"Unleashing Nexus Deep Crawler on {len(discovered_urls)} entry points...", type="status", icon="link")
         
@@ -551,34 +781,49 @@ class NeuralOrchestrator:
         
         dast_tasks = []
         # v7.2: Expanded from 5 to 15 primary entry points, depth 3 for deep audit
-        for d_url in discovered_urls[:15]: 
+        # v14.2: Fast Mode Scaling (5 entry points, depth 1)
+        max_entry_points = 5 if self.effective_fast_mode else 15
+        dast_depth = 1 if self.effective_fast_mode else 3
+        
+        for d_url in discovered_urls[:max_entry_points]: 
             async def _d(u):
                 async with self.dast_semaphore:
-                    return await self.dast.scan_target(u, depth=3, visited=visited_global)
+                    return await self.dast.scan_target(u, depth=dast_depth, visited=visited_global)
             dast_tasks.append(_d(d_url))
             
         if dast_tasks:
             dast_results = await asyncio.gather(*dast_tasks)
             for r in dast_results:
-                if r: vulns.extend(r)
+                if r: 
+                    vulns.extend(r)
+                    # Phase 15: Exploit Chaining on DAST results
+                    for finding in r:
+                        await self._process_exploit_chain(domain, finding.get("type", ""), finding)
+        
+        # Phase 15: Exploit Chaining for Logic findings
+        if logic_findings:
+            for lf in logic_findings:
+                await self._process_exploit_chain(domain, lf.get("type", ""), lf)
 
         
         # Step 3.5: Singularity Autonomous CoT Attack (Phase 18)
-        await self.broadcast("Unleashing Aura Singularity: Initiating Autonomous CoT & XHR Interception...", type="status", icon="volcano")
-        
-        singularity_tasks = []
-        for d_url in discovered_urls[:5]: # Velocity v7.4: Scaled from 3 to 5
-             async def _s(u):
-                 async with self.sing_semaphore:
-                     return await self.singularity.execute_singularity(u)
-             singularity_tasks.append(_s(d_url))
-             
-        if singularity_tasks:
-            sing_results = await asyncio.gather(*singularity_tasks)
-            for res in sing_results:
-                if res:
-                    vulns.extend(res)
-                    console.print(f"[bold red][🌋] SINGULARITY HIT: {len(res)} deep logic flaws detected on entry point.[/bold red]")
+        # v14.2: Skip Singularity in Fast Mode unless escalated
+        if not self.effective_fast_mode:
+            await self.broadcast("Unleashing Aura Singularity: Initiating Autonomous CoT & XHR Interception...", type="status", icon="volcano")
+            
+            singularity_tasks = []
+            for d_url in discovered_urls[:5]: # Velocity v7.4: Scaled from 3 to 5
+                 async def _s(u):
+                     async with self.sing_semaphore:
+                         return await self.singularity.execute_singularity(u)
+                 singularity_tasks.append(_s(d_url))
+                 
+            if singularity_tasks:
+                sing_results = await asyncio.gather(*singularity_tasks)
+                for res in sing_results:
+                    if res:
+                        vulns.extend(res)
+                        console.print(f"[bold red][[BOOM]] SINGULARITY HIT: {len(res)} deep logic flaws detected on entry point.[/bold red]")
 
         # Step 4: Strategic Exploit (v12.1 Fully-Persistent)
         if state.is_halted(): return {"status": "ABORTED"}
@@ -666,41 +911,202 @@ class NeuralOrchestrator:
                     v["cvss_score"] = 9.8
                     v["severity"] = "CRITICAL"
                 
-                cvss_scores.append(float(v.get("cvss_score", 0.0)))
+                cvss_scores.append(float(v.get("cvss_score") or 0.0))
             
-            # v13.0 [STEALTH PREDATOR]: Score & Stance Lock
-            final_risk = 10.0 # Strict LOCK for vulnerable targets
-            final_priority = "CRITICAL"
+        # v17.0: Shadow-Scripting — Autonomous Weaponization
+        if vulns:
+            console.print(f"[bold red][[SWORD]] Shadow-Scripting: Weaponizing {len(vulns)} vulnerability findings...[/bold red]")
+            exploit_dir = os.path.join(os.getcwd(), "aura_exploits")
+            if not os.path.exists(exploit_dir): os.makedirs(exploit_dir)
             
-            console.print(f"🚨 [bold red]PREDATOR ALERT[/bold red] Mission Success: Absolute Risk 10.0 (Locked) | Priority: {final_priority}")
-            
-            self.db.save_target({"value": domain, "risk_score": final_risk, "priority": final_priority})
-            console.print(f"[bold cyan][!] CVSS 3.1 Predator Stance: {final_risk}/10.0 ({final_priority})[/bold cyan]")
-            
-            # v17.0: Shadow-Scripting — Autonomous Weaponization
-            if vulns:
-                console.print(f"[bold red][⚔️] Shadow-Scripting: Weaponizing {len(vulns)} vulnerability findings...[/bold red]")
-                exploit_dir = os.path.join(os.getcwd(), "aura_exploits")
-                if not os.path.exists(exploit_dir): os.makedirs(exploit_dir)
+            for i, v in enumerate(vulns):
+                v_type = v.get("type") or v.get("finding_type")
+                v_content = v.get("content")
+                script = self.brain.generate_exploit_script(v_type, v_content, target_url)
                 
-                for i, v in enumerate(vulns):
-                    v_type = v.get("type") or v.get("finding_type")
-                    v_content = v.get("content")
-                    script = self.brain.generate_exploit_script(v_type, v_content, target_url)
-                    
-                    filename = f"exploit_{domain.replace('.', '_')}_{i}.py"
-                    filepath = os.path.join(exploit_dir, filename)
-                    with open(filepath, "w", encoding="utf-8") as f:
-                        f.write(script)
-                    console.print(f"[bold green][✔] Weaponized: {filename} (Shadow-Script Generated)[/bold green]")
+                filename = f"exploit_{domain.replace('.', '_')}_{i}.py"
+                filepath = os.path.join(exploit_dir, filename)
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write(script)
+                console.print(f"[bold green][[SUCCESS]] Weaponized: {filename} (Shadow-Script Generated)[/bold green]")
 
-        console.print("[bold green][✔] NeuralOrchestrator: Mission complete.[/bold green]")
+        # v20.0 Phase 4: Wayback Machine Historical JS Scanner
+        console.print("[cyan][*] Phase 4: Running Wayback Machine Historical JS Scanner...[/cyan]")
+        try:
+            wayback = WaybackScanner(session=session)
+            wayback_findings = await wayback.scan_target(recon_domain)
+            if wayback_findings:
+                all_findings.extend(wayback_findings)
+                for wf in wayback_findings:
+                    self.db.save_finding(recon_domain, wf)
+                console.print(f"[bold red][[WAYBACK]] {len(wayback_findings)} historical secret(s) found![/bold red]")
+        except Exception as e:
+            console.print(f"[dim red][Wayback] Skipped: {e}[/dim red]")
+
+        # v20.0 Phase 5: 403 Bypass Engine
+        console.print("[cyan][*] Phase 5: Running 403 Bypass Engine on blocked endpoints...[/cyan]")
+        try:
+            bypass = BypassEngine(session=session)
+            # Collect 403 URLs from previous scan operations in the database
+            forbidden_urls = [
+                row[0] for row in self.db.conn.execute(
+                    "SELECT url FROM operations WHERE status_code = 403 AND target = ? ORDER BY id DESC LIMIT 50",
+                    (recon_domain,)
+                ).fetchall()
+            ] if hasattr(self.db, 'conn') else []
+            bypass_findings = await bypass.scan_403_list(forbidden_urls)
+            if bypass_findings:
+                all_findings.extend(bypass_findings)
+                for bf in bypass_findings:
+                    self.db.save_finding(recon_domain, bf)
+                console.print(f"[bold red][[BYPASS]] {len(bypass_findings)} 403 bypass(es) confirmed![/bold red]")
+        except Exception as e:
+            console.print(f"[dim red][Bypass] Skipped: {e}[/dim red]")
+
+        # v20.0 Phase 6: GraphQL Introspection Probe
+        console.print("[cyan][*] Phase 6: Probing for GraphQL Introspection...[/cyan]")
+        try:
+            dast_probe = AuraDAST(stealth=self.stealth)
+            dast_probe.session = session
+            gql_findings = await dast_probe.probe_graphql_introspection(target_url)
+            if gql_findings:
+                all_findings.extend(gql_findings)
+                for gf in gql_findings:
+                    self.db.save_finding(recon_domain, gf)
+                console.print(f"[bold yellow][[GraphQL]] {len(gql_findings)} introspection endpoint(s) found![/bold yellow]")
+        except Exception as e:
+            console.print(f"[dim red][GraphQL] Skipped: {e}[/dim red]")
+
+        # v22.0 Phase 7: SSRF Hunter (Tier 2 — Highest ROI)
+        console.print("[cyan][*] Phase 7: Running SSRF Hunter...[/cyan]")
+        try:
+            from aura.modules.ssrf_hunter import SSRFHunter
+            ssrf = SSRFHunter(session=session)
+            # Collect all discovered URLs from operations log
+            discovered_urls = [
+                row[0] for row in self.db.conn.execute(
+                    "SELECT url FROM operations WHERE target = ? AND url IS NOT NULL ORDER BY id DESC LIMIT 100",
+                    (recon_domain,)
+                ).fetchall()
+            ] if hasattr(self.db, 'conn') else []
+            ssrf_findings = await ssrf.scan_urls(discovered_urls or [target_url])
+            if ssrf_findings:
+                all_findings.extend(ssrf_findings)
+                for sf in ssrf_findings:
+                    self.db.save_finding(recon_domain, sf)
+                console.print(f"[bold red][[SSRF]] {len(ssrf_findings)} SSRF finding(s) discovered![/bold red]")
+        except Exception as e:
+            console.print(f"[dim red][SSRF] Skipped: {e}[/dim red]")
+
+        # v22.0 Phase 8: IDOR Hunter on discovered URLs
+        console.print("[cyan][*] Phase 8: Running IDOR Hunter on discovered endpoints...[/cyan]")
+        try:
+            from aura.modules.idor_hunter import IDORHunter
+            idor = IDORHunter(session=session)
+            disc_urls = [
+                row[0] for row in self.db.conn.execute(
+                    "SELECT url FROM operations WHERE target = ? AND url IS NOT NULL ORDER BY id DESC LIMIT 100",
+                    (recon_domain,)
+                ).fetchall()
+            ] if hasattr(self.db, 'conn') else [target_url]
+            idor_findings = await idor.scan_urls(disc_urls or [target_url])
+            if idor_findings:
+                all_findings.extend(idor_findings)
+                for idf in idor_findings:
+                    self.db.save_finding(recon_domain, idf)
+                console.print(f"[bold red][[IDOR]] {len(idor_findings)} IDOR(s) confirmed![/bold red]")
+        except Exception as e:
+            console.print(f"[dim red][IDOR] Skipped: {e}[/dim red]")
+
+        # v22.0 Phase 9: OAuth Flaw Detector
+        console.print("[cyan][*] Phase 9: Running OAuth Flaw Detector...[/cyan]")
+        try:
+            from aura.modules.oauth_hunter import OAuthHunter
+            oauth = OAuthHunter(session=session)
+            oauth_findings = await oauth.scan_target(target_url)
+            if oauth_findings:
+                all_findings.extend(oauth_findings)
+                for of in oauth_findings:
+                    self.db.save_finding(recon_domain, of)
+                console.print(f"[bold red][[OAuth]] {len(oauth_findings)} OAuth flaw(s) found![/bold red]")
+        except Exception as e:
+            console.print(f"[dim red][OAuth] Skipped: {e}[/dim red]")
+
+        # v22.0 Phase 10: JWT Attack Engine on API endpoints
+        console.print("[cyan][*] Phase 10: Running JWT Attack Engine...[/cyan]")
+        try:
+            dast_jwt = AuraDAST(stealth=self.stealth)
+            dast_jwt.session = session
+            jwt_findings = await dast_jwt.probe_jwt_attacks(target_url)
+            if jwt_findings:
+                all_findings.extend(jwt_findings)
+                for jf in jwt_findings:
+                    self.db.save_finding(recon_domain, jf)
+                console.print(f"[bold red][[JWT]] {len(jwt_findings)} JWT weakness(es) confirmed![/bold red]")
+        except Exception as e:
+            console.print(f"[dim red][JWT] Skipped: {e}[/dim red]")
+
+        # v22.0 Phase 11: Mass Assignment Detector
+        console.print("[cyan][*] Phase 11: Running Mass Assignment Detector...[/cyan]")
+        try:
+            dast_ma = AuraDAST(stealth=self.stealth)
+            dast_ma.session = session
+            ma_findings = await dast_ma.probe_mass_assignment(target_url)
+            if ma_findings:
+                all_findings.extend(ma_findings)
+                for mf in ma_findings:
+                    self.db.save_finding(recon_domain, mf)
+                console.print(f"[bold red][[MassAssign]] {len(ma_findings)} Mass Assignment weakness(es) confirmed![/bold red]")
+        except Exception as e:
+            console.print(f"[dim red][MassAssign] Skipped: {e}[/dim red]")
+
+        # v22.0 Phase 12: CVSS Auto-Enrichment — ensures every finding has accurate score
+        console.print("[cyan][*] Phase 12: Enriching all findings with accurate CVSS 3.1 scores...[/cyan]")
+        try:
+            from aura.core.cvss_engine import CVSSEngine
+            all_findings = CVSSEngine.enrich_all(all_findings)
+            critical = [f for f in all_findings if f.get("severity") in ("CRITICAL", "EXCEPTIONAL")]
+            console.print(f"[bold yellow][[CVSS]] {len(all_findings)} finding(s) enriched. {len(critical)} CRITICAL/EXCEPTIONAL.[/bold yellow]")
+        except Exception as e:
+            console.print(f"[dim red][CVSS] Skipped: {e}[/dim red]")
+
+        # v22.0 Phase 13: Auto-Screenshot Evidence for all confirmed findings
+        console.print("[cyan][*] Phase 13: Capturing screenshot evidence for confirmed findings...[/cyan]")
+        try:
+            from aura.modules.vision import VisualEye
+            eye = VisualEye(output_dir="screenshots")
+            confirmed_w_url = [
+                f for f in all_findings
+                if (f.get("confirmed") or f.get("severity") in ("CRITICAL", "EXCEPTIONAL"))
+                and (f.get("evidence_url") or f.get("url"))
+            ]
+            if confirmed_w_url:
+                all_findings = await eye.capture_all_confirmed_findings(all_findings)
+                console.print(f"[bold green][[Evidence]] Screenshots captured for {len(confirmed_w_url)} finding(s)![/bold green]")
+            else:
+                console.print("[dim][Evidence] No confirmed findings with URLs to screenshot.[/dim]")
+        except Exception as e:
+            console.print(f"[dim red][Evidence] Skipped: {e}[/dim red]")
+
+        # v22.0: Generate Bug Bounty Markdown Report
+        console.print("[cyan][*] Compiling HackerOne/Bugcrowd Markdown Report...[/cyan]")
+
+
+        md_reporter = MarkdownReporter(self.db.db_path)
+        md_path = md_reporter.generate_report()
+        if md_path:
+            console.print(f"[bold green][[SUCCESS]] Bounty Report Ready: {md_path}[/bold green]")
+
+        # v14.2: Mark target as COMPLETED to support resumption
+        self.db.save_target({"target": recon_domain, "status": "COMPLETED"})
+        console.print(f"[bold green][[SUCCESS]] Mission Successful: {recon_domain} is fully audited.[/bold green]")
+
+        console.print("[bold green][[SUCCESS]] NeuralOrchestrator: Mission complete.[/bold green]")
         self.db.log_action("MISSION_COMPLETE", domain, "NeuralOrchestrator chain finished", campaign_id)
+        
         return {
             "status": "COMPLETE",
-            "plan": plan_raw, 
-            "findings": vulns, 
-            "waf": self.stealth.active_waf, 
-            "techs": tech_stack
+            "findings": len(all_findings),
+            "waf": self.stealth.active_waf,
+            "techs": tech_stack if 'tech_stack' in locals() else {}
         }
-

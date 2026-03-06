@@ -44,38 +44,81 @@ class ReconPipeline:
     # ─── Stage 1: Subdomain Discovery ────────────────────────────────────────
 
     async def stage1_subfinder(self, domain: str) -> list[str]:
-        """Discovers live subdomains using subfinder CLI or DNS brute-force."""
-        if self._has_subfinder:
-            console.print(f"[cyan][🌐 Recon] Stage 1: Subfinder → {domain}[/cyan]")
-            try:
-                result = await asyncio.create_subprocess_exec(
-                    "subfinder", "-d", domain, "-silent",
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.DEVNULL
-                )
-                stdout, _ = await asyncio.wait_for(result.communicate(), timeout=60)
-                subs = [line.strip() for line in stdout.decode().splitlines() if line.strip()]
-                console.print(f"[green][+] Subfinder: {len(subs)} subdomains found.[/green]")
-                return subs
-            except Exception as e:
-                console.print(f"[yellow][!] Subfinder failed: {e}. Falling back to DNS brute-force.[/yellow]")
+        """Discovers live subdomains using Native OSINT Engines (HackerTarget, OTX, crt.sh) + Resolving."""
+        console.print(f"[cyan][🌐 Recon] Stage 1 (Native OSINT): Gathering subdomains for {domain}...[/cyan]")
+        subdomains = set([domain])
 
-        # Fallback: DNS brute-force
-        console.print(f"[cyan][🌐 Recon] Stage 1 (DNS Fallback): Brute-forcing {domain}...[/cyan]")
+        # Always include the basic fallback list
+        for sub in self.SUBDOMAINS_WORDLIST:
+            subdomains.add(f"{sub}.{domain}")
+
+        async def fetch_otx(d):
+            try:
+                import aiohttp
+                async with aiohttp.ClientSession() as s:
+                    async with s.get(f"https://otx.alienvault.com/api/v1/indicators/domain/{d}/passive_dns", timeout=15) as r:
+                        if r.status == 200:
+                            data = await r.json()
+                            for active in data.get('passive_dns', []):
+                                sub = active.get('hostname', '')
+                                if sub.endswith(d): subdomains.add(sub.lower())
+            except: pass
+
+        async def fetch_hackertarget(d):
+            try:
+                import aiohttp
+                async with aiohttp.ClientSession() as s:
+                    async with s.get(f"https://api.hackertarget.com/hostsearch/?q={d}", timeout=15) as r:
+                        if r.status == 200:
+                            text = await r.text()
+                            for line in text.splitlines():
+                                sub = line.split(',')[0]
+                                if sub.endswith(d): subdomains.add(sub.lower())
+            except: pass
+
+        async def fetch_crtsh(d):
+            try:
+                import aiohttp
+                async with aiohttp.ClientSession() as s:
+                    async with s.get(f"https://crt.sh/?q=%25.{d}&output=json", timeout=20) as r:
+                        if r.status == 200:
+                            try:
+                                data = await r.json()
+                            except:
+                                text = await r.text()
+                                data = json.loads(text)
+                            for item in data:
+                                name = item.get('name_value', '')
+                                for sub in name.split('\\n'):
+                                    sub = sub.strip().lstrip('*.')
+                                    if sub.endswith(d): subdomains.add(sub.lower())
+            except: pass
+
+        # Run OSINT sources concurrently
+        await asyncio.gather(fetch_otx(domain), fetch_hackertarget(domain), fetch_crtsh(domain))
+
+        console.print(f"[yellow][↻] OSINT Aggregated: {len(subdomains)} unique potential subdomains. Resolving...[/yellow]")
+
         found = []
         loop = asyncio.get_event_loop()
 
+        # Batch resolve to filter out dead subdomains
         async def resolve(sub):
-            fqdn = f"{sub}.{domain}"
             try:
-                ip = await loop.run_in_executor(None, socket.gethostbyname, fqdn)
+                ip = await loop.run_in_executor(None, socket.gethostbyname, sub)
                 if ip:
-                    found.append(fqdn)
-                    console.print(f"[green]  [+] {fqdn} → {ip}[/green]")
+                    found.append(sub)
             except: pass
 
-        await asyncio.gather(*[resolve(sub) for sub in self.SUBDOMAINS_WORDLIST])
-        console.print(f"[green][+] DNS Brute-force: {len(found)} subdomains.[/green]")
+        # Limit concurrency for resolving to avoid overwhelming the DNS resolver
+        sem = asyncio.Semaphore(100)
+        async def sem_resolve(sub):
+            async with sem:
+                await resolve(sub)
+
+        await asyncio.gather(*[sem_resolve(sub) for sub in subdomains])
+
+        console.print(f"[bold green][+] Stage 1 Complete: {len(found)} LIVE subdomains discovered natively.[/bold green]")
         return found
 
     # ─── Stage 2: HTTP Probing ────────────────────────────────────────────────

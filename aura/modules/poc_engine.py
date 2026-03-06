@@ -13,6 +13,7 @@ import re
 import os
 import shutil
 from aura.core.stealth import AuraSession, StealthEngine
+from aura.core import state
 from rich.console import Console
 
 console = Console()
@@ -77,7 +78,7 @@ class PoCEngine:
         ]
         for payload, pattern in payloads:
             try:
-                resp = await self.session.get(url, params={param: payload}, timeout=10)
+                resp = await self.session.get(url, params={param: payload}, timeout=state.NETWORK_TIMEOUT)
                 match = pattern.search(resp.text)
                 if match:
                     banner = match.group(1).strip()
@@ -108,13 +109,13 @@ class PoCEngine:
             # 1. Get baseline
             import time
             t1 = time.monotonic()
-            await self.session.get(url, params={param: "1"}, timeout=10)
+            await self.session.get(url, params={param: "1"}, timeout=state.NETWORK_TIMEOUT)
             baseline = time.monotonic() - t1
             
             for payload in payloads:
                 t_start = time.monotonic()
                 try:
-                    await self.session.get(url, params={param: f"1{payload}"}, timeout=15)
+                    await self.session.get(url, params={param: f"1{payload}"}, timeout=state.NETWORK_TIMEOUT)
                     elapsed = time.monotonic() - t_start
                     
                     if elapsed > (baseline + 5):
@@ -145,7 +146,7 @@ class PoCEngine:
         
         try:
             # We use a simple GET first for speed, then could escalate to Playwright
-            resp = await self.session.get(url, params={"aura_xss": payload}, timeout=10)
+            resp = await self.session.get(url, params={"aura_xss": payload}, timeout=state.NETWORK_TIMEOUT)
             if payload in resp.text:
                 console.print(f"[bold red][✔ PoC-XSS CONFIRMED] Nonce {nonce} reflected in response body.[/bold red]")
                 return {
@@ -167,7 +168,7 @@ class PoCEngine:
         """
         console.print(f"[bold yellow][🔬 PoC-LFI] Reading sensitive file: {base_url}{path}[/bold yellow]")
         try:
-            resp = await self.session.get(f"{base_url}{path}", timeout=10)
+            resp = await self.session.get(f"{base_url}{path}", timeout=state.NETWORK_TIMEOUT)
             if resp.status_code == 200 and len(resp.text) > 10:
                 lines = [l.strip() for l in resp.text.splitlines() if l.strip()][:3]
                 snippet = "\n".join(lines)
@@ -196,7 +197,7 @@ class PoCEngine:
         """
         console.print(f"[bold magenta][🔬 PoC-Auth] Checking access to {protected_url}...[/bold magenta]")
         try:
-            resp = await self.session.get(protected_url, cookies=session_cookies or {}, timeout=10)
+            resp = await self.session.get(protected_url, cookies=session_cookies or {}, timeout=state.NETWORK_TIMEOUT)
             if resp.status_code == 200:
                 # Attempt screenshot via VisualEye
                 try:

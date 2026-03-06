@@ -8,6 +8,7 @@ from urllib.parse import urlparse, urljoin
 from rich.console import Console
 from aura.modules.threat_intel import ThreatIntel
 from aura.core.stealth import StealthEngine, AuraSession
+from aura.core import state
 
 console = Console()
 
@@ -16,9 +17,23 @@ class AuraScanner:
     JS/CSS Link Extraction, Sitemap/Robots Mastery, and Professional DirBusting."""
     
     BLIND_SIEGE_LIST = [
-        "admin/login.asp", "admin/db", "account/transfer", "feedback/send", "search?query=test",
-        "manager/html", "docs/config", "cgi-bin/test.sh", "server-status", "logs/access.log",
-        "api/v1/user", "api/v1/debug", "backup/db.sql", ".git/config", ".env"
+        # Admin / Auth
+        "admin/login.asp", "admin/db", "manager/html", "server-status", "auth/login", "v1/admin",
+        # Config / Env / Secrets
+        ".env", ".env.backup", ".env.dev", ".env.prod", ".env.local", ".git/config", "config.json",
+        "docker-compose.yml", "secrets.yml", "Credentials.xml", "web.config", "application.yml",
+        # Backups / Dumps
+        "backup/db.sql", "dump.sql", "database.sqlite", "backup.zip", "data.sql", "admin.bak",
+        "archive.tar.gz", "old.zip", "wp-config.php.bak", "db_backup.sql", "db.sql",
+        # API / Swagger / GraphQL
+        "api/v1/user", "api/v1/debug", "api/v2/user", "swagger.json", "api/swagger.json",
+        "v1/swagger.json", "swagger-ui.html", "openapi.json", "graphql", "graphiql", "api/graphql",
+        "v1/api-docs", "v2/api-docs", "api-docs/swagger.json",
+        # Logs / Debug
+        "logs/access.log", "error.log", "debug.log", "phpinfo.php", "status", "health", "actuator/env",
+        "actuator/health", "debug/default/view", "server/status",
+        # Common Bypasses
+        "account/transfer", "feedback/send", "search?query=test", "docs/config", "cgi-bin/test.sh"
     ]
 
     def __init__(self, stealth: StealthEngine = None):
@@ -63,7 +78,7 @@ class AuraScanner:
                 for res in addr_info:
                     family, socktype, proto, canonname, sockaddr = res
                     try:
-                        _, writer = await asyncio.wait_for(asyncio.open_connection(sockaddr[0], port, family=family), timeout=2.0)
+                        _, writer = await asyncio.wait_for(asyncio.open_connection(sockaddr[0], port, family=family), timeout=state.NETWORK_TIMEOUT)
                         open_ports.append(port)
                         console.print(f"[green][+] Port {port} is OPEN[/green]")
                         writer.close()
@@ -89,7 +104,7 @@ class AuraScanner:
             for path in grpc_paths:
                 try:
                     url = urljoin(base_url, path)
-                    async with session.post(url, headers={"content-type": "application/grpc"}, timeout=3) as r:
+                    async with session.post(url, headers={"content-type": "application/grpc"}, timeout=state.NETWORK_TIMEOUT) as r:
                         if "grpc-status" in r.headers or r.status in [200, 415]:
                             found_grpc.append(url)
                             console.print(f"[bold green][+] gRPC Service Detected: {url}[/bold green]")
@@ -102,14 +117,13 @@ class AuraScanner:
     async def parse_sitemap_robots(self, base_url):
         """Mandatory: Parses sitemap.xml and robots.txt to extract ALL hidden paths."""
         base_url = base_url.rstrip('/')
-        all_paths = []
-        
+        all_paths = set() # Use set for O(1) deduplication
         
         async def fetch_robots():
             console.print(f"[cyan][🗺️] v7.2 Instinct: Parsing robots.txt for {base_url}...[/cyan]")
             try:
-                res = await self.stealth_session.get(f"{base_url}/robots.txt", timeout=5)
-                if res.status_code == 200 and "disallow" in res.text.lower():
+                res = await self.stealth_session.get(f"{base_url}/robots.txt", timeout=state.NETWORK_TIMEOUT)
+                if res and res.status_code == 200 and "disallow" in res.text.lower():
                     lines = res.text.splitlines()
                     for line in lines:
                         line = line.strip()
@@ -117,55 +131,68 @@ class AuraScanner:
                             path = line.split(":", 1)[1].strip()
                             if path and path != "/" and "*" not in path:
                                 full = urljoin(base_url + "/", path.lstrip("/"))
-                                if full not in all_paths:
-                                    all_paths.append(full)
-                                    console.print(f"[green][+] robots.txt: {full}[/green]")
+                                all_paths.add(full)
+                                console.print(f"[green][+] robots.txt: {full}[/green]")
                         elif line.lower().startswith("sitemap:"):
                             sitemap_url = line.split(":", 1)[1].strip()
                             if sitemap_url.startswith("//"):
                                 sitemap_url = "http:" + sitemap_url
                             sm_paths = await self._parse_sitemap_url(sitemap_url)
-                            for p in sm_paths:
-                                if p not in all_paths: all_paths.append(p)
+                            for p in sm_paths: all_paths.add(p)
             except Exception as e:
                 console.print(f"[dim yellow][!] robots.txt fetch failed: {e}[/dim yellow]")
 
         async def fetch_sitemap():
             console.print(f"[cyan][🗺️] v7.2 Instinct: Parsing sitemap.xml for {base_url}...[/cyan]")
             sm_paths = await self._parse_sitemap_url(f"{base_url}/sitemap.xml")
-            for p in sm_paths:
-                if p not in all_paths: all_paths.append(p)
+            for p in sm_paths: all_paths.add(p)
 
         # v7.4 Velocity Focus: Run map parsers concurrently
         await asyncio.gather(fetch_robots(), fetch_sitemap())
         
         console.print(f"[bold green][+] Sitemap/Robots Total: {len(all_paths)} paths extracted.[/bold green]")
-        return all_paths
+        return list(all_paths)
     
-    async def _parse_sitemap_url(self, sitemap_url):
-        """Recursively parses a sitemap URL (supports sitemap index files)."""
+    async def _parse_sitemap_url(self, sitemap_url, depth=0, max_depth=3, max_paths=1000, current_count=None):
+        """Recursively parses a sitemap URL with concurrency and safety limits."""
+        if current_count is None: current_count = [0]
         paths = []
+        
+        if depth > max_depth or current_count[0] >= max_paths:
+            return paths
+
         try:
-            res = await self.stealth_session.get(sitemap_url, timeout=8)
-            if res.status_code != 200:
+            res = await self.stealth_session.get(sitemap_url, timeout=state.NETWORK_TIMEOUT)
+            if not res or res.status_code != 200:
                 return paths
             
             text = res.text
-            # Extract <loc> tags (standard sitemap format)
             locs = re.findall(r"<loc>\s*(.*?)\s*</loc>", text, re.IGNORECASE)
+            
+            xml_locs = []
             for loc in locs:
                 loc = loc.strip()
                 if loc.endswith(".xml"):
-                    # It's a sitemap index — recurse
-                    sub_paths = await self._parse_sitemap_url(loc)
-                    paths.extend(sub_paths)
+                    xml_locs.append(loc)
                 else:
                     if loc not in paths:
                         paths.append(loc)
-                        console.print(f"[green][+] sitemap: {loc}[/green]")
+                        current_count[0] += 1
+                        if current_count[0] % 50 == 0: # Print periodic updates for massive sitemaps
+                            console.print(f"[green][+] sitemap: Discovered {current_count[0]} paths...[/green]")
+                        if current_count[0] >= max_paths:
+                            break
+            
+            # Recurse concurrently if depth allows
+            if xml_locs and depth < max_depth and current_count[0] < max_paths:
+                tasks = [self._parse_sitemap_url(x, depth + 1, max_depth, max_paths, current_count) for x in xml_locs[:10]] # Cap branching to 10
+                results = await asyncio.gather(*tasks)
+                for r in results:
+                    paths.extend(r)
+                    
         except Exception as e:
             console.print(f"[dim yellow][!] Sitemap parse failed for {sitemap_url}: {e}[/dim yellow]")
-        return paths
+        return list(set(paths))
 
     # ──────────────────────────────────────────────
     # v7.2: JS/CSS Link Extractor
@@ -182,7 +209,8 @@ class AuraScanner:
         # If no HTML provided, fetch it
         if not html_content:
             try:
-                res = await self.stealth_session.get(base_url, timeout=8)
+                res = await self.stealth_session.get(base_url, timeout=state.NETWORK_TIMEOUT)
+                if not res: return all_endpoints
                 html_content = res.text
             except:
                 return all_endpoints
@@ -221,7 +249,8 @@ class AuraScanner:
         async def fetch_and_extract(res_url):
             async with js_semaphore:
                 try:
-                    res = await self.stealth_session.get(res_url, timeout=5)
+                    res = await self.stealth_session.get(res_url, timeout=state.NETWORK_TIMEOUT)
+                    if not res: return []
                     content = res.text
                     extracted = []
                     for pattern in ENDPOINT_PATTERNS:
@@ -505,10 +534,11 @@ class AuraScanner:
             "task", "worker", "queue", "topic", "stream", "event", "message", "notification"
         ]
 
-    async def force_fuzz(self, base_url):
+    async def force_fuzz(self, base_url, swarm_mode=False):
         """
         v13.0 Stealth Predator: Hardcoded aggressive dirbusting with UA rotation and jitter.
         Uses ThreadPoolExecutor and raw requests to force brute-force 500 paths with maximum aggression.
+        v19.6 Swarm Mode: Dynamically reduces payload and disables jitter when scanning mass targets.
         """
         import requests
         from concurrent.futures import ThreadPoolExecutor
@@ -532,19 +562,25 @@ class AuraScanner:
         base_url = base_url.rstrip('/')
         
         discovered_urls = []
-        words = self._get_top_500_words()[:500] 
+        
+        # v19.6 Swarm Mode Scaling
+        if swarm_mode:
+            console.print(f"[dim yellow][!] Swarm Mode Active: Reducing Predator payload volume...[/dim yellow]")
+            words = self._get_top_500_words()[:150]
+        else:
+            words = self._get_top_500_words()[:500] 
         
         # v19.4: Catch-all detection — probe 2 random nonexistent paths
         baseline_200 = False
         b_len = 0
         b_len2 = 0
         try:
-            r1 = requests.get(f"{base_url}/rnd_{uuid.uuid4().hex[:8]}", verify=False, timeout=4, allow_redirects=False)
-            r2 = requests.get(f"{base_url}/rnd_{uuid.uuid4().hex[:8]}", verify=False, timeout=4, allow_redirects=False)
-            b_len = len(r1.text)
-            b_len2 = len(r2.text)
+            r1 = await self.stealth_session.get(f"{base_url}/rnd_{uuid.uuid4().hex[:8]}", allow_redirects=False, timeout=state.NETWORK_TIMEOUT)
+            r2 = await self.stealth_session.get(f"{base_url}/rnd_{uuid.uuid4().hex[:8]}", allow_redirects=False, timeout=state.NETWORK_TIMEOUT)
+            b_len = len(r1.text) if r1 else 0
+            b_len2 = len(r2.text) if r2 else 0
             # If BOTH random paths return 200, server is a catch-all (SPA/Angular/React routing)
-            if r1.status_code == 200 and r2.status_code == 200:
+            if r1 and r2 and r1.status_code == 200 and r2.status_code == 200:
                 baseline_200 = True
                 console.print(f"[dim yellow][!] Catch-All Detected: Server returns 200 for all paths. Filtering 200s — only 301/302/403 accepted as real hits.[/dim yellow]")
         except:
@@ -561,21 +597,21 @@ class AuraScanner:
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0"
         ]
 
-        def raw_check(directory):
+        async def raw_check(directory):
             url = f"{base_url}/{directory}"
             try:
-                time.sleep(random.uniform(0.1, 0.4))
+                if not swarm_mode:
+                    await asyncio.sleep(random.uniform(0.1, 0.4)) # Only jitter if not in a massive swarm
                 headers = {'User-Agent': random.choice(user_agents)}
-                res = requests.get(url, verify=False, timeout=5, allow_redirects=False, headers=headers)
+                res = await self.stealth_session.get(url, timeout=state.NETWORK_TIMEOUT, allow_redirects=False, headers=headers)
 
-                # v19.4: If server is catch-all, only report non-200 findings (redirects, forbidden)
                 if baseline_200:
-                    if res.status_code in [301, 302]:
+                    if res and res.status_code in [301, 302]:
                         console.print(f"[green][+] Predator Hit: {url} (Redirect {res.status_code})[/green]")
                         try: db_logger.log_operation(url, "StealthPredator", res.status_code)
                         except: pass
                         return url
-                    elif res.status_code == 403:
+                    elif res and res.status_code == 403:
                         console.print(f"[green][+] Predator Hit: {url} (403 Forbidden — exists)[/green]")
                         try: db_logger.log_operation(url, "StealthPredator", 403)
                         except: pass
@@ -583,15 +619,15 @@ class AuraScanner:
                     return None  # Skip 200 on catch-all servers
 
                 # Normal mode: filter if content length matches baseline (same page served)
-                if b_len > 0 and abs(len(res.text) - b_len) < 200 and abs(len(res.text) - b_len2) < 200:
+                if res and b_len > 0 and abs(len(res.text) - b_len) < 200 and abs(len(res.text) - b_len2) < 200:
                     return None
 
-                if res.status_code == 200:
+                if res and res.status_code == 200:
                     console.print(f"[green][+] Predator Hit: {url} (200 OK)[/green]")
                     try: db_logger.log_operation(url, "StealthPredator", 200)
                     except: pass
                     return url
-                elif res.status_code in [301, 302]:
+                elif res and res.status_code in [301, 302]:
                     console.print(f"[green][+] Predator Hit: {url} (Redirect {res.status_code})[/green]")
                     try: db_logger.log_operation(url, "StealthPredator", res.status_code)
                     except: pass
@@ -600,9 +636,14 @@ class AuraScanner:
                 pass
             return None
 
-        # v19.5 Performance: Increased max_workers from 15 to 40 for faster force fuzzing
-        with ThreadPoolExecutor(max_workers=40) as executor:
-            results = list(executor.map(raw_check, words))
+        # v19.5 Performance: Native Asyncio concurrency for force fuzzing
+        semaphore = asyncio.Semaphore(40)
+        async def sem_check(w):
+            async with semaphore:
+                return await raw_check(w)
+        
+        tasks = [sem_check(w) for w in words]
+        results = await asyncio.gather(*tasks)
 
         for r in results:
             if r: discovered_urls.append(r)
@@ -621,18 +662,27 @@ class AuraScanner:
         base_url = base_url.rstrip('/')
         hits = []
 
-        console.print(f"🔥 [bold red]FINAL SIEGE[/bold red]: Deploying Blind Path Injection on {base_url}...")
+        console.print(f"[bold red][FINAL SIEGE][/bold red]: Deploying Blind Path Injection on {base_url}...")
 
-        # v19.4: Detect catch-all servers before blasting paths
+        # v19.6 Siege Fix: Fast-Fail for dead hosts
         siege_baseline_200 = False
+        host_is_dead = False
         try:
-            _r1 = requests.get(f"{base_url}/rnd_{uuid.uuid4().hex[:8]}", verify=False, timeout=4, allow_redirects=False)
-            _r2 = requests.get(f"{base_url}/rnd_{uuid.uuid4().hex[:8]}", verify=False, timeout=4, allow_redirects=False)
-            if _r1.status_code == 200 and _r2.status_code == 200:
+            _r1 = await self.stealth_session.get(f"{base_url}/rnd_{uuid.uuid4().hex[:8]}", allow_redirects=False, timeout=10, max_attempts=1)
+            _r2 = await self.stealth_session.get(f"{base_url}/rnd_{uuid.uuid4().hex[:8]}", allow_redirects=False, timeout=10, max_attempts=1)
+            
+            if _r1 is None and _r2 is None:
+                host_is_dead = True
+                console.print(f"[bold red][X] FAST-FAIL: Target {base_url} is completely unresponsive/dead. Aborting Siege to save time.[/bold red]")
+                return [] # Fast abort
+
+            if _r1 and _r2 and _r1.status_code == 200 and _r2.status_code == 200:
                 siege_baseline_200 = True
                 console.print(f"[dim yellow][!] Siege Catch-All: SPA detected. Only 301/302/403 accepted as Siege Hits.[/dim yellow]")
-        except:
-            pass
+        except Exception as e:
+            host_is_dead = True
+            console.print(f"[bold red][X] FAST-FAIL: Connection to {base_url} failed ({e}). Aborting Siege.[/bold red]")
+            return []
 
         user_agents = [
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
@@ -642,11 +692,13 @@ class AuraScanner:
         from aura.core.storage import AuraStorage
         db_logger = AuraStorage()
 
-        def siege_check(path):
+        async def siege_check(path):
             url = f"{base_url}/{path}"
+            # v19.6 Siege Fix: Force 1 attempt if FAST_MODE is active to prevent death loops
+            req_attempts = 1 if state.FAST_MODE else 3
             try:
                 headers = {'User-Agent': random.choice(user_agents)}
-                res = requests.get(url, verify=False, timeout=5, allow_redirects=False, headers=headers)
+                res = await self.stealth_session.get(url, timeout=state.NETWORK_TIMEOUT, allow_redirects=False, headers=headers, max_attempts=req_attempts)
                 
                 # Audit log EVERY attempt (v14.0 mandate)
                 db_logger.log_operation(url, "BlindSiege", res.status_code)
@@ -664,9 +716,14 @@ class AuraScanner:
                 db_logger.log_operation(url, "BlindSiege", 999)
             return None
 
-        # v19.5 Performance: Concurrent execution for Blind Siege (previously sequential causing delays)
-        with ThreadPoolExecutor(max_workers=20) as executor:
-            results = list(executor.map(siege_check, self.BLIND_SIEGE_LIST))
+        # v19.5 Performance: Native Asyncio concurrency for Blind Siege
+        semaphore = asyncio.Semaphore(20)
+        async def sem_siege(p):
+            async with semaphore:
+                return await siege_check(p)
+                
+        tasks = [sem_siege(p) for p in self.BLIND_SIEGE_LIST]
+        results = await asyncio.gather(*tasks)
             
         for r in results:
             if r: hits.append(r)
@@ -676,7 +733,7 @@ class AuraScanner:
     # ──────────────────────────────────────────────
     # v7.2: Recursive Spider (Depth 5) - v7.4 Velocity Focus
     # ──────────────────────────────────────────────
-    async def recursive_spider(self, base_url, max_depth=5, visited=None):
+    async def recursive_spider(self, base_url, max_depth=5, visited=None, swarm_mode=False):
         """
         v7.4 Velocity: Highly concurrent recursive link spider.
         Crawls from root, follows all links up to max_depth asynchronously.
@@ -696,7 +753,10 @@ class AuraScanner:
         
         # Start with depth 0
         current_level_urls = [base_url]
-        spider_semaphore = asyncio.Semaphore(15) # Velocity v7.4 concurrency cap
+        
+        # v19.6 Swarm Mode Scaling: Increase concurrency for massive scopes
+        semaphore_limit = 15 if swarm_mode else 3
+        spider_semaphore = asyncio.Semaphore(semaphore_limit)  # [WAF-Friendly] 3 for stealth, 15 for swarm speed
         
         console.print(f"[bold magenta][🕷️] v7.4 Velocity Spider: Starting concurrent deep crawl on {base_url} (depth {max_depth})...[/bold magenta]")
         
@@ -705,6 +765,8 @@ class AuraScanner:
                 break
             
             console.print(f"[dim][🕷️] Spidering (depth {depth}): Processing {len(current_level_urls)} URLs concurrently...[/dim]")
+            # Cap per-depth to prevent explosion on large sites
+            current_level_urls = current_level_urls[:100]
             next_level_urls = []
             
             async def crawl_single(curl):
@@ -713,7 +775,7 @@ class AuraScanner:
                 
                 async with spider_semaphore:
                     try:
-                        res = await self.stealth_session.get(curl, timeout=8)
+                        res = await self.stealth_session.get(curl, timeout=state.NETWORK_TIMEOUT) # [WAF-Friendly] Centralized Timeout Guard
                         if res.status_code != 200: return [], []
                         html = res.text
                     except: return [], []

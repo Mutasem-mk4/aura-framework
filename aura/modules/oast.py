@@ -1,5 +1,7 @@
 import requests
 import time
+from aura.core.stealth import AuraSession, StealthEngine
+from aura.core import state
 from rich.console import Console
 
 console = Console()
@@ -15,7 +17,7 @@ class OastCatcher:
         """Initializes the OAST endpoint by generating a unique Webhook.site URL."""
         console.print("[magenta][*] Phase 26: Initializing God Mode OAST Server (Blind Exploitation)...[/magenta]")
         try:
-            res = self.session.post("https://webhook.site/token", json={}, headers={"Accept": "application/json"}, timeout=5)
+            res = self.session.post("https://webhook.site/token", json={}, headers={"Accept": "application/json"}, timeout=state.NETWORK_TIMEOUT)
             if res.status_code in [200, 201]:
                 self.uuid = res.json().get("uuid")
                 # Strip out https:// to make it a raw domain for versatility, but here we keep full URL.
@@ -30,7 +32,7 @@ class OastCatcher:
         """Polls the OAST server for out-of-band interactions (RCE/SSRF confirmations)."""
         if not self.uuid: return []
         try:
-            res = self.session.get(f"https://webhook.site/token/{self.uuid}/requests", headers={"Accept": "application/json"}, timeout=5).json()
+            res = self.session.get(f"https://webhook.site/token/{self.uuid}/requests", headers={"Accept": "application/json"}, timeout=state.NETWORK_TIMEOUT).json()
             interactions = []
             if "data" in res:
                 for req in res["data"]:
