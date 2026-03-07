@@ -16,7 +16,9 @@ class ZenithReporter:
             self.brain = AuraBrain()
         else:
             self.brain = brain
-        self.report_dir = "reports"
+        # v22.6: Use __file__ to anchor to project root (not os.getcwd())
+        _pkg_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        self.report_dir = os.path.join(_pkg_root, "reports")
         if not os.path.exists(self.report_dir):
             os.makedirs(self.report_dir)
 
@@ -69,7 +71,12 @@ class ZenithReporter:
         """Generates reports for all findings in a mission."""
         report_paths = []
         for f in findings:
-            if f.get("severity") in ["CRITICAL", "HIGH", "MEDIUM", "PREDICTIVE"]:
+            # v22.6 P2 Fix: Only generate AI reports for real confirmed findings
+            # (must have an evidence_url meaning a real HTTP response was received)
+            has_evidence = bool(f.get("evidence_url") or f.get("url") or f.get("location"))
+            is_confirmed = f.get("confirmed", False)
+            sev_ok = f.get("severity") in ["CRITICAL", "HIGH", "MEDIUM"]
+            if sev_ok and (is_confirmed or has_evidence):
                 path = await self.generate_final_report(target, f, tech_stack=tech_stack)
                 report_paths.append(path)
         return report_paths

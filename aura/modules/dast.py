@@ -1185,11 +1185,12 @@ class AuraDAST:
                                 discovered_urls.append(urljoin(url, p.strip()))
                 except: pass
 
+
         url_findings = await self._fuzz_url_parameters(url)
         if url_findings:
             findings.extend(url_findings)
 
-        discovered_urls = []
+        discovered_urls = []  # v22.6: moved BEFORE Phase 32 to prevent NameError on robots.txt Disallow
 
         async def _run_scan(context):
             scan_findings = []

@@ -46,8 +46,8 @@ class AuraCloudRecon:
                     async with session.get(url, timeout=aiohttp.ClientTimeout(total=7)) as r:
                         if r.status == 200:
                             self._log_cloud_asset(domain, url, "AWS S3 Bucket", "Publicly Accessible (200 OK)")
-                        elif r.status == 403:
-                            console.print(f"[dim yellow][!] CLOUD ASSET: [AWS S3] {url} | Exists (403 Private)[/dim yellow]")
+                        # v22.6: Suppress 403 Private — these are unrelated public AWS buckets
+                        # that happen to share a name prefix with the target
                 except Exception:
                     pass
 
@@ -60,8 +60,7 @@ class AuraCloudRecon:
                     async with session.get(url, timeout=aiohttp.ClientTimeout(total=7)) as r:
                         if r.status == 200:
                             self._log_cloud_asset(domain, url, "GCP Bucket", "Publicly Accessible (200 OK)")
-                        elif r.status == 403:
-                            console.print(f"[dim yellow][!] CLOUD ASSET: [GCP] {url} | Exists (403 Private)[/dim yellow]")
+                        # v22.6: Suppress 403 Private — unrelated GCP buckets with same prefix
                 except Exception:
                     pass
 
