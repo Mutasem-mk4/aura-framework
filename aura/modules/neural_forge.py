@@ -19,7 +19,9 @@ class NeuralForge:
             self._case_randomize,
             self._null_byte_inject,
             self._html_entity_encode,
-            self._tab_separation
+            self._tab_separation,
+            self._comment_nesting,
+            self._junk_data
         ]
 
     # --- Mutation Strategies ---
@@ -49,6 +51,16 @@ class NeuralForge:
 
     def _tab_separation(self, payload: str) -> str:
         return payload.replace(" ", "%09")
+
+    def _comment_nesting(self, payload: str) -> str:
+        # Nest SQL comments or similar
+        return payload.replace(" ", "/**/")
+
+    def _junk_data(self, payload: str) -> str:
+        # Append junk data to bypass some length-based filters
+        import random as _rnd
+        junk = f"&ignore={_rnd.getrandbits(32)}"
+        return payload + junk
 
     # --- Main Engine ---
     def forge_payloads(self, base_payload: str, max_variations: int = 20) -> list[str]:
@@ -108,3 +120,20 @@ class NeuralForge:
             all_payloads.extend(self.forge_payloads(bp, max_variations=5))
             
         return list(set(all_payloads))
+
+    def apply_strategy(self, payload: str, strategy: str) -> str:
+        """Applies a specific mutation strategy based on AI/Heuristic advice."""
+        strategy = strategy.lower()
+        if "double" in strategy:
+            return self._double_url_encode(payload)
+        if "unicode" in strategy:
+            return self._unicode_escape(payload)
+        if "hex" in strategy:
+            return self._hex_encode(payload)
+        if "null" in strategy:
+            return self._null_byte_inject(payload)
+        if "comment" in strategy:
+            return self._comment_nesting(payload)
+        if "junk" in strategy:
+            return self._junk_data(payload)
+        return self._url_encode(payload)

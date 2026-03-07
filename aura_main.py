@@ -10,7 +10,7 @@ console = Console()
 async def run_mission(target):
     orchestrator = NeuralOrchestrator()
     console.print(f"[bold cyan]🚀 Initializing Omni-Sovereign Mission on: {target}[/bold cyan]")
-    await orchestrator.run_offensive_campaign(target)
+    await orchestrator.execute_advanced_chain(target)
 
 def main():
     parser = argparse.ArgumentParser(description="AURA Omni-Sovereign v16.1")

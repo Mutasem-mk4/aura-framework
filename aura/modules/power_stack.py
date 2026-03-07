@@ -23,8 +23,21 @@ class PowerStack:
     """v6.0: Orchestrates Nuclei, TruffleHog, HTTPX & Nmap as a unified offensive stack."""
 
     def __init__(self, stealth: StealthEngine = None):
+        import os
         self.stealth = stealth or StealthEngine()
         self.session  = AuraSession(self.stealth)
+        
+        def find_tool(name):
+            path = shutil.which(name)
+            if path: return path
+            go_path = os.path.expanduser(f"~/go/bin/{name}.exe")
+            if os.path.exists(go_path): return go_path
+            return None
+            
+        self.nuclei_path = find_tool("nuclei")
+        self.httpx_path = find_tool("httpx")
+        self.trufflehog_path = find_tool("trufflehog")
+        self.nmap_path = find_tool("nmap")
 
     # ── 1. NUCLEI ─────────────────────────────────────────────────────────
     async def nuclei_scan(self, target_url: str) -> list:
@@ -33,11 +46,11 @@ class PowerStack:
         Falls back to AuraPatternEngine if nuclei is not installed.
         """
         findings = []
-        if shutil.which("nuclei"):
+        if self.nuclei_path:
             console.print(f"[bold cyan][⚡ Nuclei] Scanning {target_url} with CVE templates...[/bold cyan]")
             try:
                 proc = await asyncio.create_subprocess_exec(
-                    "nuclei", "-u", target_url,
+                    self.nuclei_path, "-u", target_url,
                     "-t", "cves,exposures,technologies",
                     "-severity", "medium,high,critical",
                     "-json", "-silent", "-timeout", "20",
@@ -76,11 +89,11 @@ class PowerStack:
         Falls back to SecretHunter if not installed.
         """
         findings = []
-        if shutil.which("trufflehog"):
+        if self.trufflehog_path:
             console.print(f"[bold yellow][🔑 TruffleHog] Scanning {target_url} for secrets...[/bold yellow]")
             try:
                 proc = await asyncio.create_subprocess_exec(
-                    "trufflehog", "filesystem", "--directory", ".",
+                    self.trufflehog_path, "filesystem", "--directory", ".",
                     "--json", "--no-update",
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.DEVNULL
@@ -119,11 +132,11 @@ class PowerStack:
         Falls back to TCP banner grabbing if not installed.
         """
         findings = []
-        if shutil.which("nmap"):
+        if self.nmap_path:
             console.print(f"[bold blue][🔍 Nmap -sV] Service fingerprinting {target_ip}...[/bold blue]")
             try:
                 proc = await asyncio.create_subprocess_exec(
-                    "nmap", "-sV", "--version-intensity", "5",
+                    self.nmap_path, "-sV", "--version-intensity", "5",
                     "-p", "21,22,23,25,53,80,110,143,443,445,3306,5432,6379,8080,8443,27017",
                     "-oX", "-", target_ip,
                     stdout=asyncio.subprocess.PIPE,
@@ -174,12 +187,12 @@ class PowerStack:
         if not urls:
             return []
 
-        if shutil.which("httpx"):
+        if self.httpx_path:
             console.print(f"[bold green][🌐 HTTPX] Verifying liveness of {len(urls)} discovered URLs...[/bold green]")
             try:
                 input_data = "\n".join(urls).encode()
                 proc = await asyncio.create_subprocess_exec(
-                    "httpx", "-sc", "-silent", "-t", "10", # Added 10s timeout per request
+                    self.httpx_path, "-sc", "-silent", "-t", "10", # Added 10s timeout per request
                     stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.DEVNULL
@@ -207,7 +220,7 @@ class PowerStack:
         # Fallback: aiohttp HEAD probe with retries and longer timeouts
         console.print(f"[dim cyan][*] aiohttp probing {len(urls)} URLs for liveness...[/dim cyan]")
         
-        probe_semaphore = asyncio.Semaphore(10) # [WAF-Friendly] Prevent Cloudflare DDoS bans during mass liveness check
+        probe_semaphore = asyncio.Semaphore(25) # [WAF-Friendly] Increased concurrency for faster liveness check
         
         async def probe(url: str, retries=2) -> str | None:
             async with probe_semaphore:

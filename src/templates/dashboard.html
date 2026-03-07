@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aura CommandCenter [v19.5]</title>
+    <!-- Tailwind CSS (via CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-deep: #050505;
+            --bg-panel: #0a0a0c;
+            --border-glow: #1f1f2e;
+            --text-main: #e2e8f0;
+            --text-dim: #64748b;
+            --accent-red: #ff3366;
+            --accent-cyan: #00f0ff;
+            --accent-purple: #b500ff;
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(255, 51, 102, 0.03), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(0, 240, 255, 0.03), transparent 25%);
+            overflow-x: hidden;
+        }
+
+        .cyber-panel {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-glow);
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cyber-panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 51, 102, 0.5), transparent);
+        }
+
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Status Blinker */
+        .status-dot {
+            height: 10px; width: 10px;
+            background-color: #10b981;
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 10px #10b981;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        /* Glitch Text Effect for Title */
+        .glitch-wrapper { position: relative; display: inline-block; }
+        .glitch {
+            color: white; font-weight: 800; font-size: 2rem;
+            position: relative; padding: 0 5px;
+        }
+        .glitch::before, .glitch::after {
+            content: "AURA COMMAND"; position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%; opacity: 0.8;
+        }
+        .glitch::before { left: 2px; text-shadow: -2px 0 var(--accent-red); clip: rect(24px, 550px, 90px, 0); animation: glitch-anim 3s infinite linear alternate-reverse; }
+        .glitch::after { left: -2px; text-shadow: -2px 0 var(--accent-cyan); clip: rect(85px, 550px, 140px, 0); animation: glitch-anim 2s infinite linear alternate-reverse; }
+
+        @keyframes glitch-anim {
+            0% { clip: rect(10px, 9999px, 86px, 0); }
+            5% { clip: rect(52px, 9999px, 5px, 0); }
+            10% { clip: rect(75px, 9999px, 98px, 0); }
+            15% { clip: rect(31px, 9999px, 13px, 0); }
+            /* Simplified for length */
+            100% { clip: rect(44px, 9999px, 90px, 0); }
+        }
+
+        .stat-value { font-size: 2.5rem; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
+        
+        .sev-critical { color: var(--accent-red); text-shadow: 0 0 10px rgba(255, 51, 102, 0.5); }
+        .sev-high { color: #f97316; }
+        .sev-medium { color: #eab308; }
+        .sev-info { color: var(--accent-cyan); }
+
+        tbody tr { border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s; }
+        tbody tr:hover { background: rgba(255,255,255,0.02); }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-deep); }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-red); }
+
+    </style>
+</head>
+<body class="p-4 md:p-8 h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="flex justify-between items-center mb-8 border-b border-[#1f1f2e] pb-4">
+        <div class="flex items-center gap-4">
+            <div class="glitch-wrapper">
+                <div class="glitch">AURA COMMAND</div>
+            </div>
+            <span class="text-xs font-mono bg-[#1f1f2e] text-slate-300 px-2 py-1 rounded border border-[#333]">v19.5 TURBINE</span>
+        </div>
+        <div class="flex items-center gap-3 font-mono text-sm">
+            <span class="status-dot"></span>
+            <span class="text-emerald-400">ENGINE ONLINE</span>
+        </div>
+    </header>
+
+    <!-- Main Grid -->
+    <main class="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-grow overflow-hidden">
+        
+        <!-- Left Sidebar: Stats -->
+        <div class="flex flex-col gap-6 lg:col-span-1">
+            <div class="cyber-panel p-6">
+                <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-4"><i class="fa-solid fa-crosshairs mr-2"></i>Targets</h3>
+                <div class="stat-value text-white" id="stat-targets">0</div>
+            </div>
+            
+            <div class="cyber-panel p-6 border-l-4 border-l-[var(--accent-red)]">
+                <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-4"><i class="fa-solid fa-skull mr-2"></i>Critical Impact</h3>
+                <div class="stat-value sev-critical" id="stat-critical">0</div>
+            </div>
+            
+            <div class="cyber-panel p-6 border-l-4 border-l-orange-500">
+                <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-4"><i class="fa-solid fa-triangle-exclamation mr-2"></i>High Impact</h3>
+                <div class="stat-value sev-high" id="stat-high">0</div>
+            </div>
+
+            <div class="cyber-panel p-6">
+                <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-4"><i class="fa-solid fa-radar mr-2"></i>Total Findings</h3>
+                <div class="stat-value text-blue-400" id="stat-findings">0</div>
+            </div>
+        </div>
+
+        <!-- Center: Operations Feed -->
+        <div class="cyber-panel lg:col-span-1 flex flex-col h-full opacity-90">
+            <div class="bg-black/50 p-4 border-b border-[#1f1f2e] flex justify-between items-center">
+                <h3 class="font-mono text-sm tracking-wider"><i class="fa-solid fa-terminal mr-2 text-[var(--accent-cyan)]"></i>LIVE OPERATIONS</h3>
+                <span class="text-xs text-slate-500" id="stat-ops">0 total</span>
+            </div>
+            <div class="p-4 flex-grow overflow-y-auto font-mono text-xs" id="ops-container">
+                <!-- Ops rows injected here via JS -->
+                <div class="text-slate-500 italic mt-4 text-center">Awaiting data stream...</div>
+            </div>
+        </div>
+
+        <!-- Right: Threat findings Table -->
+        <div class="cyber-panel lg:col-span-2 flex flex-col h-full">
+            <div class="bg-black/50 p-4 border-b border-[#1f1f2e]">
+                <h3 class="font-mono text-sm tracking-wider"><i class="fa-solid fa-bug mr-2 text-[var(--accent-red)]"></i>VERIFIED THREATS</h3>
+            </div>
+            <div class="overflow-y-auto flex-grow">
+                <table class="w-full text-left text-sm whitespace-nowrap">
+                    <thead class="text-xs uppercase bg-[#0f0f13] text-slate-400 font-mono sticky top-0">
+                        <tr>
+                            <th scope="col" class="px-6 py-4">Severity</th>
+                            <th scope="col" class="px-6 py-4">Vulnerability Type</th>
+                            <th scope="col" class="px-6 py-4">Target</th>
+                            <th scope="col" class="px-6 py-4">Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="findings-container" class="font-mono">
+                        <!-- Findings injected here via JS -->
+                         <tr><td colspan="4" class="px-6 py-8 text-center text-slate-500 italic">No threats verified yet.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // WebSocket Connection
+        const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+        
+        function connectWebSocket() {
+            const socket = new WebSocket(wsUrl);
+
+            socket.onopen = function(e) {
+                console.log("[WS] Connected to Aura Data Stream");
+            };
+
+            socket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                updateDashboard(data);
+            };
+
+            socket.onclose = function(event) {
+                console.log("[WS] Disconnected. Reconnecting in 3s...");
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+
+        function getSeverityBadge(sev) {
+            const base = "px-2 py-1 rounded text-xs border ";
+            switch(sev.toUpperCase()) {
+                case 'CRITICAL': return `<span class="${base} bg-red-950/50 border-red-500/50 text-red-400"><i class="fa-solid fa-skull mr-1"></i> CRITICAL</span>`;
+                case 'HIGH': return `<span class="${base} bg-orange-950/50 border-orange-500/50 text-orange-400">HIGH</span>`;
+                case 'MEDIUM': return `<span class="${base} bg-yellow-950/50 border-yellow-500/50 text-yellow-500">MEDIUM</span>`;
+                default: return `<span class="${base} bg-blue-950/50 border-blue-500/50 text-blue-400">INFO</span>`;
+            }
+        }
+
+        function updateDashboard(data) {
+            // Update Stats
+            document.getElementById('stat-targets').innerText = data.stats.targets;
+            document.getElementById('stat-findings').innerText = data.stats.findings;
+            document.getElementById('stat-critical').innerText = data.stats.critical;
+            document.getElementById('stat-high').innerText = data.stats.high;
+            document.getElementById('stat-ops').innerText = `${data.stats.operations} ops tracked`;
+
+            // Update Findings Table
+            const findingsContainer = document.getElementById('findings-container');
+            if (data.findings && data.findings.length > 0) {
+                let html = '';
+                data.findings.forEach(f => {
+                    // Extract domain to keep table clean
+                    let displayTarget = f.target;
+                    try { displayTarget = new URL(f.target).hostname; } catch(e){}
+                    if(displayTarget.length > 30) displayTarget = displayTarget.substring(0,30)+'...';
+
+                    html += `
+                        <tr class="hover:bg-white/[0.02]">
+                            <td class="px-6 py-3">${getSeverityBadge(f.severity)}</td>
+                            <td class="px-6 py-3 text-slate-200 truncate max-w-[200px]">${f.type}</td>
+                            <td class="px-6 py-3 text-slate-400 truncate max-w-[200px] hover:text-white cursor-help" title="${f.target}">${displayTarget}</td>
+                            <td class="px-6 py-3 text-slate-500 text-xs">${f.time.split('.')[0]}</td>
+                        </tr>
+                    `;
+                });
+                findingsContainer.innerHTML = html;
+            }
+
+            // Update Operations Feed
+            const opsContainer = document.getElementById('ops-container');
+            if (data.operations && data.operations.length > 0) {
+                let opsHtml = '';
+                data.operations.forEach(op => {
+                    let moduleColor = "text-emerald-400";
+                    if(op.module.includes("AuraDAST") || op.module.includes("Phase")) moduleColor = "text-purple-400";
+                    if(op.module.includes("Stealth")) moduleColor = "text-cyan-400";
+
+                    opsHtml += `
+                        <div class="mb-3 border-l-2 border-[#333] pl-3 py-1 hover:border-[var(--accent-cyan)] transition-colors">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="${moduleColor} font-bold">[${op.module}]</span>
+                                <span class="text-slate-600">${op.time.split(' ')[1].split('.')[0]}</span>
+                            </div>
+                            <div class="text-slate-400 flex items-center gap-2 truncate text-[11px]">
+                                <span class="text-slate-500">❯</span> ${op.details}
+                            </div>
+                        </div>
+                    `;
+                });
+                opsContainer.innerHTML = opsHtml;
+            }
+        }
+
+        // Init
+        connectWebSocket();
+    </script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+{
+    "mappings": [
+        {
+            "tech": "nginx",
+            "wordlist": "nginx_wordlist.txt",
+            "source": "https://wordlists-cdn.assetnote.io/data/automated/httparchive_directories_1m_2023_12_28.txt"
+        },
+        {
+            "tech": "apache",
+            "wordlist": "apache_wordlist.txt",
+            "source": "https://wordlists-cdn.assetnote.io/data/automated/httparchive_directories_1m_2023_12_28.txt"
+        },
+        {
+            "tech": "k8s",
+            "wordlist": "k8s_wordlist.txt",
+            "source": "https://wordlists-cdn.assetnote.io/data/automated/k8s_wordlist.txt"
+        },
+        {
+            "tech": "aws",
+            "wordlist": "aws_wordlist.txt",
+            "source": "https://wordlists-cdn.assetnote.io/data/automated/aws_wordlist.txt"
+        },
+        {
+            "tech": "php",
+            "wordlist": "php_wordlist.txt",
+            "source": "https://wordlists-cdn.assetnote.io/data/automated/httparchive_php_2023_12_28.txt"
+        },
+        {
+            "tech": "asp.net",
+            "wordlist": "aspx_wordlist.txt",
+            "source": "https://wordlists-cdn.assetnote.io/data/automated/httparchive_aspx_2023_12_28.txt"
+        },
+        {
+            "tech": "api",
+            "wordlist": "api_wordlist.txt",
+            "source": "https://wordlists-cdn.assetnote.io/data/automated/api_wordlist.txt"
+        }
+    ]
+}

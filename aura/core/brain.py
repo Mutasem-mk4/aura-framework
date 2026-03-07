@@ -89,7 +89,6 @@ class AuraBrain:
         )
         try:
             raw = self._call_ai(prompt)
-            import json
             plan = json.loads(raw)
             self.tactical_memory.append(f"Planned: {plan.get('target_vector')}")
             return plan
@@ -146,8 +145,7 @@ class AuraBrain:
             import re
             raw = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', raw)
             try:
-                import json as _json
-                _json.loads(raw)   # validate
+                json.loads(raw)   # validate
             except Exception:
                 return "[]"
             return raw
@@ -170,11 +168,29 @@ class AuraBrain:
         try:
             raw = self._call_ai(prompt, use_cache=True)
             if not raw: return {"vulnerable": False}
-            import json
-            return json.loads(raw)
-        except Exception as e:
-            logger.error(f"AuraBrain Behavior: {e}")
+            
+            # Use smart extraction
+            return self._clean_json(raw)
+        except Exception:
+            # Suppress logs for cleaner CLI
             return {"vulnerable": False}
+
+    def _clean_json(self, text):
+        """Helper to extract and parse JSON from AI responses."""
+        import re
+        # Try finding dictionary
+        match = re.search(r'(\{.*\})', text, re.DOTALL)
+        if match:
+            try: return json.loads(match.group(1))
+            except: pass
+        # Try finding array
+        match = re.search(r'(\[.*\])', text, re.DOTALL)
+        if match:
+            try: return json.loads(match.group(1))
+            except: pass
+        # Try raw
+        try: return json.loads(text.strip())
+        except: return {"vulnerable": False}
 
     def analyze_parameter_semantics(self, parameters: dict) -> list:
         """Phase 27: Analyzes parameter keys and values to suggest business logic attacks."""
@@ -193,11 +209,12 @@ class AuraBrain:
                 contents=prompt,
                 config={'system_instruction': self.SYSTEM_PROMPT}
             )
-            import json
-            raw = response.text.strip().replace("```json", "").replace("```", "")
-            return json.loads(raw)
-        except Exception as e:
-            logger.error(f"AuraBrain Semantics: {e}")
+            raw = response.text.strip()
+            import re
+            
+            parsed = self._clean_json(raw)
+            return parsed if isinstance(parsed, list) else []
+        except Exception:
             return []
 
     def analyze_business_logic(self, request_data: dict, response_data: dict) -> list:
@@ -221,9 +238,7 @@ class AuraBrain:
                 contents=prompt,
                 config={'system_instruction': self.SYSTEM_PROMPT}
             )
-            import json
-            raw = response.text.strip().replace("```json", "").replace("```", "")
-            return json.loads(raw)
+            return self._clean_json(raw)
         except Exception as e:
             logger.error(f"AuraBrain Logic Audit: {e}")
             return []
@@ -242,26 +257,54 @@ class AuraBrain:
         except:
             return "Use polymorphism and fragmented payloads."
 
-    def self_heal_mutation(self, original_payload: str, response_code: int, response_body: str, attempt: int) -> str:
-        """v16.0 Omni-Sovereign: Self-Healing Exploit Loop. Mutates payload based on rejection feedback."""
+    async def self_heal_mutation(self, original_payload: str, response_code: int, response_body: str, response_headers: dict, attempt: int, waf_type: str = None) -> str:
+        """
+        v19.0 The Singularity: Adaptive Synthesis Feedback Loop.
+        Analyzes the WAF rejection and triggers NeuralForge/AI to create a bypass.
+        """
         if not self.enabled: return original_payload
         
+        # Analyze headers for specific WAF signatures or rate limit indicators
+        block_analysis = self.analyze_waf_block(response_code, response_headers, response_body)
+        
         prompt = (
-            f"As AURA-Zenith, your previous payload was BLOCKED.\n"
+            f"As AURA-Zenith Singularity, your previous payload was BLOCKED by a WAF ({waf_type or 'Unknown'}).\n"
             f"Original Payload: {original_payload}\n"
             f"Response Code: {response_code}\n"
-            f"Response Snippet: {response_body[:500]}\n"
+            f"Block Analysis: {block_analysis}\n"
             f"Mutation Attempt: {attempt}\n\n"
-            "Anaylze the rejection reason. Is it a signature match? A rate limit? A structural filter?\n"
-            "Generate a MUTATED version of the payload that bypasses this filter. "
-            "Use advanced techniques: Junk data injection, non-standard encoding, case-variation, or logical splitting.\n"
+            "Analyze the rejection reason. Use your internal knowledge of Cloudflare/Akamai/AWS WAF signatures. "
+            "Generate a 'Singularity' mutated payload that bypasses this filter. "
+            "Think step-by-step: Should you use double encoding? Comment nesting? Null byte truncation? Non-standard HTTP headers?\n"
             "Respond ONLY with the new raw payload string."
         )
         try:
-            return self._call_ai(prompt)
-        except:
-            # Fallback to simple polymorphism
-            return original_payload + "/*" + str(random.randint(100,999)) + "*/"
+            # v19.0: We use _call_ai for CoT mutation logic
+            mutated = await asyncio.to_thread(self._call_ai, prompt)
+            if mutated:
+                logger.info(f"Singularity Mutation Success: {original_payload} -> {mutated}")
+                return mutated
+        except Exception as e:
+            logger.error(f"Singularity Mutation Failed: {e}")
+            
+        # Fallback to simple polymorphism
+        return original_payload + "/*" + str(random.randint(100,999)) + "*/"
+
+    def analyze_waf_block(self, status: int, headers: dict, body: str) -> str:
+        """Heuristic analysis of WAF response to determine blocking reason."""
+        low_body = body.lower()
+        if "captcha" in low_body or "challenge" in low_body:
+            return "WAF Javascript Challenge/Captcha detected."
+        if status == 429 or "rate limit" in low_body:
+            return "Dynamic Rate Limiting triggered."
+        if "sql" in low_body or "injection" in low_body:
+            return "Signature match: Injection attempt detected."
+        
+        # Check for WAF-specific headers
+        if "cf-ray" in headers: return "Cloudflare Firewall active."
+        if "x-akamai" in str(headers).lower(): return "Akamai WAF active."
+        
+        return "Generic security policy violation."
 
     def generate_exploit_script(self, finding_type: str, finding_content: str, target_url: str) -> str:
         """
@@ -387,3 +430,56 @@ class AuraBrain:
             return self._call_ai(prompt)
         except:
             return "fallback_payload_simple"
+    def predict_implied_vulns(self, context: dict, existing_findings: list) -> list:
+        """
+        v22.0: Oracle Synthesis - Predictive Vulnerability Engine.
+        Analyzes existing findings and architectural patterns to predict 'Implied' vulnerabilities.
+        """
+        if not self.enabled: return []
+        
+        prompt = (
+            f"As AURA-Zenith Oracle, analyze these confirmed findings and environmental context:\n"
+            f"Context: {context}\n"
+            f"Existing Findings: {json.dumps(existing_findings[:10])}\n\n"
+            "By identifying patterns in inconsistent naming, technology versions, and server headers, "
+            "predict 1-3 'Implied' vulnerabilities that are likely to exist but haven't been scanned yet. "
+            "Think laterally: if there is an IDOR in /api/v1, is it implied in /api/beta? "
+            "If SSRF is confirmed, is an internal metadata leak implied?\n"
+            "Respond ONLY in JSON array: [{'predicted_type': 'str', 'implied_url': 'str', 'confidence': 'str', 'reasoning': 'str'}]"
+        )
+        try:
+            raw = self._call_ai(prompt, use_cache=True)
+            if not raw: return []
+            parsed = self._clean_json(raw)
+            return parsed if isinstance(parsed, list) else []
+        except Exception as e:
+            logger.error(f"AuraBrain IDOR Logic JSON Reason: {e}")
+            return []
+    def synthesize_detection_plugin(self, tech_info: str, target_desc: str) -> str:
+        """
+        v24.0 Sovereign Hegemony: Autonomous Plugin Synthesis.
+        Generates custom Python detection logic for unknown technologies or specific CVEs.
+        """
+        if not self.enabled: return ""
+        
+        prompt = (
+            f"As AURA-Zenith AI, synthesize a HIGH-STAKES Python 3 function to detect a vulnerability in this specific target:\n"
+            f"Tech Stack/Context: {tech_info}\n"
+            f"Target Details: {target_desc}\n\n"
+            "Requirements:\n"
+            "1. Function name MUST be 'detect_vulnerability(session, url)'.\n"
+            "2. Use 'await session.get(url)' or 'await session.post(url)'.\n"
+            "3. Return a dictionary with 'vulnerable': bool, 'details': str if found.\n"
+            "4. DO NOT use external libraries besides typing, json, re, asyncio.\n"
+            "5. Respond ONLY with the Python code block, no markdown formatting if possible, "
+            "but if you use backticks I will strip them. Code must be ready to execute via exec()."
+        )
+        try:
+            raw = self._call_ai(prompt, use_cache=False)
+            if not raw: return ""
+            # Clean backticks if present
+            clean_code = raw.replace("```python", "").replace("```", "").strip()
+            return clean_code
+        except Exception as e:
+            logger.error(f"Plugin Synthesis Error: {e}")
+            return ""

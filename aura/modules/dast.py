@@ -86,7 +86,7 @@ class AuraDAST:
         "Default":                 {"score": 5.0, "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:N"},
     }
 
-    def __init__(self, brain=None, stealth=None, workflow=None):
+    def __init__(self, brain=None, stealth=None, workflow=None, ghost_ops=None):
         self.brain = brain or AuraBrain()
         self.storage = AuraStorage() # Added storage to fix AttributeError
         self.oast = OastCatcher()
@@ -97,8 +97,9 @@ class AuraDAST:
         self.guardian = AuraAuditGuardian(self.brain)
         self.vision = VisualEye()
         self.page_signatures = set() # Track content signatures to prevent redundant audits
-        self.browser_semaphore = asyncio.Semaphore(5) # Velocity v14.4: Limit parallel pages
+        self.browser_semaphore = asyncio.Semaphore(10) # Velocity v19.5: Increased parallel pages
         self.biz_logic = BusinessLogicAuditor(self.brain, self.session) # Ghost v5: IDOR/Auth
+        self.ghost_ops = ghost_ops
 
     def _get_polymorphic_payload(self, vuln_type):
         """v15 Neural Forge: Mutates standard payloads to bypass WAFs."""
@@ -449,8 +450,8 @@ class AuraDAST:
         is_sensitive = any(x in url.lower() for x in ["admin", "manager", "login", "auth", ".asp", ".aspx", "cgi-bin"])
         agg_factor = 3 if is_sensitive else 1
         
-        # v7.4 Velocity Focus: Concurrency Semaphore for payloads
-        param_semaphore = asyncio.Semaphore(15) 
+        # v19.5 Performance: Increased Concurrency Semaphore for payloads
+        param_semaphore = asyncio.Semaphore(30) 
         
         async def fuzz_single_param(param, values):
             single_param_findings = []
@@ -514,6 +515,10 @@ class AuraDAST:
                         payload_list = self.PAYLOADS[vuln_type]
                         console.print(f"[bold red][☠️] INJECTION OVERDRIVE: Blasting {len(payload_list)} {vuln_type} payloads at '{param}'...[/bold red]")
                         
+                        # v19.0 Ghost-Ops: Tactical Diversion
+                        if self.ghost_ops:
+                            asyncio.create_task(self.ghost_ops.launch_diversion(url))
+
                         for payload in payload_list:
                             test_query = parsed_url.query.replace(f"{param}={values[0]}", f"{param}={urllib.parse.quote(payload)}")
                             test_url = parsed_url._replace(query=test_query).geturl()
@@ -1079,8 +1084,13 @@ class AuraDAST:
         if visited is None: visited = set()
         if depth < 0 or url in visited: return []
         
-        visited.add(url)
+        # v22.5 DNS Pre-flight Guard: skip entirely if host is known dead
         if not url.startswith("http"): url = f"http://{url}"
+        _h = __import__("urllib.parse").urlparse(url).netloc
+        if state.is_dns_failed(_h):
+            return []
+        
+        visited.add(url)
         
         # Phase 28: Port Safety Check
         try:
@@ -1103,30 +1113,47 @@ class AuraDAST:
 
         # Phase 28: Active WAF Fingerprinting & Connectivity Probe
         console.print(f"[cyan][⚙] Phase 28: Probing connectivity and WAF for {url}...[/cyan]")
+        
+        # v19.5 PERFORMANCE: WAF Cache
+        parsed_url = urllib.parse.urlparse(url)
+        domain = parsed_url.netloc
+        if not hasattr(self, "waf_cache"): self.waf_cache = {}
+        
         try:
-            # Probe 1: Passive/Connectivity check
-            res_pass = await self.session.get(url, timeout=state.NETWORK_TIMEOUT)
-            if res_pass is None:
-                console.print(f"[bold red][!] Passive Probe Failed for {url}. WAF or network block suspected.[/bold red]")
-                return []
-
-            waf = self.stealth.detect_waf(res_pass.headers, res_pass.text)
-            
-            # Probe 2: Trigger check (if passive failed)
-            if not waf:
-                res_trig = await self.session.get(f"{url}?aura_probe=1&sqli=' OR 1=1--&xss=<script>alert(1)</script>", timeout=state.NETWORK_TIMEOUT)
-                if res_trig:
-                    waf = self.stealth.detect_waf(res_trig.headers, res_trig.text)
-                    if res_trig.status_code in [403, 406, 429]:
-                        waf = waf or "Generic/Heuristic"
-            
-            if waf:
-                self.stealth.active_waf = waf
-                console.print(f"[bold magenta][🛡️] WAF DETECTED: {waf}[/bold magenta]")
-                evasion_advice = self.brain.suggest_waf_evasion(waf)
-                console.print(f"[magenta][🧠] AI Evasion Strategy: {evasion_advice}[/magenta]")
+            if domain in self.waf_cache:
+                waf = self.waf_cache[domain]
+                if waf and waf != "None":
+                    self.stealth.active_waf = waf
+                    console.print(f"[dim magenta][🛡️] WAF Cached: {waf}[/dim magenta]")
+                else:
+                    console.print(f"[dim green][+] Aura: No WAF (Cached)[/dim green]")
             else:
-                console.print(f"[dim green][+] Aura: No WAF detected or connectivity OK.[/dim green]")
+                # Probe 1: Passive/Connectivity check
+                res_pass = await self.session.get(url, timeout=state.NETWORK_TIMEOUT)
+                if res_pass is None:
+                    console.print(f"[bold red][!] Passive Probe Failed for {url}. WAF or network block suspected.[/bold red]")
+                    return []
+
+                waf = self.stealth.detect_waf(res_pass.headers, res_pass.text)
+                
+                # Probe 2: Trigger check (if passive failed)
+                if not waf:
+                    res_trig = await self.session.get(f"{url}?aura_probe=1&sqli=' OR 1=1--&xss=<script>alert(1)</script>", timeout=state.NETWORK_TIMEOUT)
+                    if res_trig:
+                        waf = self.stealth.detect_waf(res_trig.headers, res_trig.text)
+                        if res_trig.status_code in [403, 406, 429]:
+                            waf = waf or "Generic/Heuristic"
+                
+                # Cache it
+                self.waf_cache[domain] = waf if waf else "None"
+                
+                if waf:
+                    self.stealth.active_waf = waf
+                    console.print(f"[bold magenta][🛡️] WAF DETECTED: {waf}[/bold magenta]")
+                    evasion_advice = self.brain.suggest_waf_evasion(waf)
+                    console.print(f"[magenta][🧠] AI Evasion Strategy: {evasion_advice}[/magenta]")
+                else:
+                    console.print(f"[dim green][+] Aura: No WAF detected or connectivity OK.[/dim green]")
         except Exception as e:
             console.print(f"[bold red][!] Connectivity Failure for {url}: {e}[/bold red]")
             return []

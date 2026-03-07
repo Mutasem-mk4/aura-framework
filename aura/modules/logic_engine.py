@@ -12,6 +12,7 @@ class AILogicEngine:
     """
     def __init__(self, session):
         self.session = session
+        self.sessions = [session] # v21.0: Store multiple sessions for Pincer attacks
         self.vulnerabilities = []
         
         # Heuristics for parameters that are likely to be vulnerable to IDOR or Logic flaws
@@ -57,7 +58,22 @@ class AILogicEngine:
                             try:
                                 resp = await self.session.request("GET", target_url, timeout=10)
                                 if resp and resp.status_code in [200, 201]:
-                                    # If the response length is significantly different, we might have hit a valid, different record
+                                    # v21.0 Pincer Move: Verify against a DIFFERENT session
+                                    if len(self.sessions) > 1:
+                                        pincer_session = self.sessions[1]
+                                        pincer_resp = await pincer_session.request("GET", target_url, timeout=10)
+                                        # If both sessions can access the same ID, it's a confirmed BOLA/IDOR
+                                        if pincer_resp and pincer_resp.status_code == 200:
+                                            console.print(f"[bold red][🔥 PINCER HIT] Confirmed Cross-Session IDOR at {target_url}[/bold red]")
+                                            self.vulnerabilities.append({
+                                                "type": "Confirmed BOLA (Broken Object Level Authorization)",
+                                                "url": target_url,
+                                                "severity": "CRITICAL",
+                                                "method": f"Pincer Cross-Session Validation: {param}={test_id}"
+                                            })
+                                            continue
+
+                                    # Baseline length-based detection (Fallback)
                                     if abs(len(resp.text) - original_response_len) > 50:
                                          console.print(f"[bold red][VULNERABILITY] Potential IDOR detected at {target_url}[/bold red]")
                                          self.vulnerabilities.append({

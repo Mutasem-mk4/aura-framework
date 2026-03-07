@@ -6,7 +6,53 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Create the halt signal file in the root of the project to be accessible by all processes
-HALT_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".aura_halt_signal")
+_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+HALT_FILE = os.path.join(_ROOT_DIR, ".aura_halt_signal")
+
+# v22.4: File-backed Global DNS Circuit Breaker (shared across ALL processes)
+DNS_FAIL_FILE = os.path.join(_ROOT_DIR, ".aura_dns_failures")
+_DNS_FAIL_CACHE = set()  # In-memory cache to minimise disk I/O
+
+def mark_dns_failed(host: str):
+    """Mark a host as DNS-unresolvable so ALL Aura processes skip it."""
+    # Strip port from host
+    bare = host.split(':')[0]
+    if not bare or bare in _DNS_FAIL_CACHE:
+        return
+    _DNS_FAIL_CACHE.add(bare)
+    try:
+        with open(DNS_FAIL_FILE, 'a', encoding='utf-8') as f:
+            f.write(bare + '\n')
+    except Exception:
+        pass
+
+def is_dns_failed(host: str) -> bool:
+    """Return True if the host has been marked dead by any Aura process."""
+    bare = host.split(':')[0]
+    if not bare:
+        return False
+    if bare in _DNS_FAIL_CACHE:
+        return True
+    # Sync from file (other processes may have written to it)
+    try:
+        if os.path.exists(DNS_FAIL_FILE):
+            with open(DNS_FAIL_FILE, 'r', encoding='utf-8') as f:
+                hosts = {l.strip() for l in f if l.strip()}
+            _DNS_FAIL_CACHE.update(hosts)
+            if bare in hosts:
+                return True
+    except Exception:
+        pass
+    return False
+
+def clear_dns_failures():
+    """Reset the DNS failure cache (call at start of new scan)."""
+    _DNS_FAIL_CACHE.clear()
+    try:
+        if os.path.exists(DNS_FAIL_FILE):
+            os.remove(DNS_FAIL_FILE)
+    except Exception:
+        pass
 
 # Global proxy configuration for Phase 5 Deep Proxy Architecture
 PROXY_FILE = None
@@ -29,7 +75,7 @@ CUSTOM_CONSULTANT = "Independent Security Researcher"
 CUSTOM_COMPANY = "Security Assessment Team"
 
 # Gemini AI Configuration: Primary and Secondary mappings for resilience
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or os.environ.get("AURA_GEMINI_API_KEY")
+GEMINI_API_KEY = "AIzaSyCrnsofNTDx0J5IBaUa0RI9heQNmn2bBxE"
 GEMINI_MODEL = "gemini-2.5-flash" # v19.4: gemini-2.5-flash (confirmed available with this API key)
 
 # OSINT API Keys (read from environment or .env)
@@ -44,6 +90,9 @@ BINARYEDGE_API_KEY = os.environ.get("BINARYEDGE_API_KEY")
 INTELX_API_KEY = os.environ.get("INTELX_API_KEY")
 HUNTERIO_API_KEY = os.environ.get("HUNTERIO_API_KEY")
 FULLHUNT_API_KEY = os.environ.get("FULLHUNT_API_KEY")
+
+# v21.0 Cloud Swarm Phase (DigitalOcean Orchestration)
+DIGITALOCEAN_TOKEN = os.environ.get("DIGITALOCEAN_TOKEN")
 
 def is_halted():
     """Checks the filesystem for the halt signal marker."""

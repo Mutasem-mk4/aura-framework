@@ -37,9 +37,24 @@ class ReconPipeline:
 
     def __init__(self, session=None):
         self.session = session
-        self._has_subfinder = shutil.which("subfinder") is not None
-        self._has_httpx = shutil.which("httpx") is not None
-        self._has_nmap = shutil.which("nmap") is not None
+        import os
+        
+        def find_tool(name):
+            path = shutil.which(name)
+            if path: return path
+            go_path = os.path.expanduser(f"~/go/bin/{name}.exe")
+            if os.path.exists(go_path): return go_path
+            return None
+
+        self.subfinder_path = find_tool("subfinder")
+        self.httpx_path = find_tool("httpx")
+        self.nmap_path = find_tool("nmap")
+        self.katana_path = find_tool("katana")
+        
+        self._has_subfinder = self.subfinder_path is not None
+        self._has_httpx = self.httpx_path is not None
+        self._has_nmap = self.nmap_path is not None
+        self._has_katana = self.katana_path is not None
 
     # ─── Stage 1: Subdomain Discovery ────────────────────────────────────────
 
@@ -130,7 +145,7 @@ class ReconPipeline:
             try:
                 input_hosts = "\n".join(hosts)
                 proc = await asyncio.create_subprocess_exec(
-                    "httpx", "-silent", "-json", "-title", "-tech-detect", "-status-code", "-k",
+                    self.httpx_path, "-silent", "-json", "-title", "-tech-detect", "-status-code", "-k",
                     stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.DEVNULL
@@ -203,7 +218,7 @@ class ReconPipeline:
             try:
                 port_str = ",".join(str(p) for p in ports)
                 result = await asyncio.create_subprocess_exec(
-                    "nmap", "-sV", "--open", "-p", port_str, ip,
+                    self.nmap_path, "-sV", "--open", "-p", port_str, ip,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.DEVNULL
                 )
@@ -244,6 +259,45 @@ class ReconPipeline:
                 console.print(f"[green]  [+] {ip}:{r['port']} open → {r['version'][:60]}[/green]")
         return services
 
+    # ─── Stage 4: Katana Deep Crawling (v21.0 Go-Arsenal) ─────────────────────
+
+    async def stage4_katana(self, target_urls: list[str]) -> list[str]:
+        """Runs ProjectDiscovery's Katana crawler for high-speed endpoint discovery."""
+        if not self._has_katana or not target_urls:
+            return []
+
+        console.print(f"[cyan][🌐 Recon] Stage 4: Katana → Deep crawling {len(target_urls)} HTTP services...[/cyan]")
+        discovered_endpoints = set()
+        
+        try:
+            # We pass the URLs through stdin to katana
+            input_hosts = "\n".join(target_urls)
+            # -jc: json output, -kf: known files, -d: depth 3
+            proc = await asyncio.create_subprocess_exec(
+                self.katana_path, "-silent", "-jc", "-kf", "all", "-d", "3",
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL
+            )
+            
+            stdout, _ = await asyncio.wait_for(
+                proc.communicate(input=input_hosts.encode()), timeout=180
+            )
+            
+            for line in stdout.decode().splitlines():
+                try:
+                    data = json.loads(line)
+                    req_url = data.get("request", {}).get("endpoint")
+                    if req_url:
+                        discovered_endpoints.add(req_url)
+                except: pass
+                
+            console.print(f"[bold red][🔥] Katana Complete: Discovered {len(discovered_endpoints)} deep endpoints/files![/bold red]")
+            return list(discovered_endpoints)
+        except Exception as e:
+            console.print(f"[yellow][!] Katana execution failed: {e}[/yellow]")
+            return []
+
     # ─── Full Pipeline ────────────────────────────────────────────────────────
 
     async def run(self, domain: str, target_ip: str = None) -> dict:
@@ -252,6 +306,13 @@ class ReconPipeline:
         Returns a structured dict for the 'Reconnaissance' section of the report.
         """
         console.print(f"\n[bold cyan][🌐 RECON PIPELINE] Starting 3-stage pipeline for {domain}...[/bold cyan]")
+
+        # v22.1: Pre-flight DNS Check
+        try:
+            await asyncio.get_event_loop().run_in_executor(None, socket.gethostbyname, domain)
+        except socket.gaierror:
+            console.print(f"[bold red][!] DNS ERROR: Could not resolve {domain}. Target appears offline or DNS is blocked.[/bold red]")
+            # We continue, as OSINT might still work, but we log the failure.
 
         # Stage 1
         subdomains = await self.stage1_subfinder(domain)
@@ -268,18 +329,24 @@ class ReconPipeline:
         except: pass
         nmap_data = await self.stage3_nmap(ip)
 
+        # Stage 4: Katana Deep Crawl
+        active_http_urls = [h.get("url") for h in http_data if h.get("url")]
+        deep_links = await self.stage4_katana(active_http_urls)
+
         result = {
             "subdomains": subdomains,
             "http_services": http_data,
             "open_ports": nmap_data,
+            "deep_links": deep_links,
             "tech_stack": list({t for h in http_data for t in h.get("tech", []) if t}),
             "tool_chain": (
                 f"{'Subfinder' if self._has_subfinder else 'DNS-Brute'} → "
                 f"{'HTTPX' if self._has_httpx else 'Python-HTTP'} → "
-                f"{'Nmap' if self._has_nmap else 'TCP-Scan'}"
+                f"{'Nmap' if self._has_nmap else 'TCP-Scan'} → "
+                f"{'Katana' if self._has_katana else 'Spider-Skipped'}"
             )
         }
 
         console.print(f"[bold green][✔ RECON PIPELINE] Complete: {len(subdomains)} subdomains, "
-                      f"{len(http_data)} HTTP services, {len(nmap_data)} open ports.[/bold green]")
+                      f"{len(http_data)} HTTP services, {len(nmap_data)} open ports, {len(deep_links)} deep links.[/bold green]")
         return result

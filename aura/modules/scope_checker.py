@@ -5,6 +5,7 @@ Queries HackerOne and Bugcrowd public APIs.
 """
 import httpx
 import re
+from typing import List
 from aura.core import state
 
 class ScopeChecker:
@@ -17,11 +18,60 @@ class ScopeChecker:
         "monzo.com": {"platform": "Intigriti", "url": "https://app.intigriti.com/programs/monzobank/monzopublicbugbountyprogram"},
         "aikido.dev": {"platform": "Intigriti", "url": "https://app.intigriti.com/programs/aikido/aikidoruntime/detail"},
         "intel.com": {"platform": "Intigriti", "url": "https://app.intigriti.com/programs/intel/intel"},
-        "amd.com": {"platform": "Intigriti", "url": "https://app.intigriti.com/programs/amd/amd-psbbp"}
+        "amd.com": {"platform": "Intigriti", "url": "https://app.intigriti.com/programs/amd/amd-psbbp"},
+        "captureourflag.com": {"platform": "Intigriti", "url": "https://app.intigriti.com/programs/captureourflag/captureourflag"},
+        "polyglot.ninja": {"platform": "Intigriti", "url": "https://app.intigriti.com/programs/captureourflag/captureourflag"}
     }
 
     HACKERONE_API = "https://api.hackerone.com/v1/hackers/programs"
     BUGCROWD_API  = "https://bugcrowd.com/programs.json"
+
+    def __init__(self, in_scope_rules: List[str] = None, out_of_scope_rules: List[str] = None):
+        self.in_scope = in_scope_rules or []
+        self.out_of_scope = out_of_scope_rules or []
+
+    def load_rules(self, in_scope: List[str], out_of_scope: List[str]):
+        """Dynamically loads rules for a specific engagement."""
+        self.in_scope = in_scope
+        self.out_of_scope = out_of_scope
+
+    def _match_pattern(self, target: str, pattern: str) -> bool:
+        """Helper to match wildcard patterns like *.example.com"""
+        regex_pattern = "^" + re.escape(pattern).replace("\\*", ".*") + "$"
+        return bool(re.match(regex_pattern, target))
+
+    def is_in_scope(self, target: str) -> bool:
+        """
+        v17.0 Zero-Rejection Engine: Strict Scope Guard.
+        Validates if the target domain/subdomain is strictly in scope.
+        Returns False if it hits an out-of-scope rule.
+        """
+        from rich.console import Console
+        console = Console()
+        
+        if not target:
+            return False
+            
+        clean_target = target.replace("https://", "").replace("http://", "").split("/")[0]
+
+        # 1. Check Out-of-Scope First (Deny list overrides everything)
+        for oos_rule in self.out_of_scope:
+            if self._match_pattern(clean_target, oos_rule):
+                console.print(f"[bold red][SCOPE GUARD] TARGET REJECTED: {clean_target} matches OUT-OF-SCOPE rule ({oos_rule}).[/bold red]")
+                return False
+
+        # If no explicit in-scope rules exist, assume it's open
+        if not self.in_scope:
+            return True
+
+        # 2. Check In-Scope explicitly
+        for in_rule in self.in_scope:
+            if self._match_pattern(clean_target, in_rule):
+                return True
+
+        # 3. Default deny if strict in-scope is defined but no match
+        console.print(f"[bold yellow][SCOPE GUARD] TARGET SKIPPED: {clean_target} does not match any IN-SCOPE rules.[/bold yellow]")
+        return False
 
     async def check_scope(self, domain: str) -> dict:
         """

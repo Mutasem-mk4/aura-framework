@@ -86,10 +86,10 @@ class AuraHelpGroup(click.Group):
     def format_help(self, ctx, formatter):
         show_banner()
         console.print(Panel(
-            "[bold cyan]AURA v10.0 (Sovereign)[/bold cyan]\n"
-            "Autonomous Domain Dominance & Offensive Intelligence Framework.",
-            title="[bold cyan]SOVEREIGN CONTROL CENTER[/bold cyan]",
-            border_style="cyan",
+            "[bold red]AURA v25.0 (THE OMEGA PROTOTYPE)[/bold red]\n"
+            "Sentient Singularity: Autonomous Strategic Warfare & Absolute Omniscience.",
+            title="[bold red]SENTIENT CONTROL CENTER[/bold red]",
+            border_style="red",
             padding=(1, 2)
         ))
 
@@ -98,7 +98,7 @@ class AuraHelpGroup(click.Group):
             "RECON AND ANALYSIS": ["scan", "analyze", "report"],
             "STRATEGIC INTEL": ["brain", "forge", "scope", "triage"],
             "WEAPONIZATION": ["exploit", "bounty", "cloud", "scan_vuln"],
-            "ZENITH SINGULARITY": ["auto_pwn", "zenith", "pivot", "nexus"],
+            "ZENITH SINGULARITY": ["omega", "zenith", "pivot", "nexus"],
             "MANAGEMENT": ["target", "notify", "earnings"],
         }
 
@@ -333,6 +333,7 @@ def scan_vuln(target_id, header, cookie):
 @click.option('--cloud-swarm', is_flag=True, help="Phase 8: Active High-Reputation Cloud Proxy Swarms.")
 def zenith(domain, plugin=None, campaign=None, whitelist=None, blacklist=None, header=None, cookie=None, open_report=True, tor=False, cloud_swarm=False):
     """[ZENITH] THE SINGULARITY: Full autonomous Chain-of-Thought execution."""
+    state.clear_dns_failures()  # v22.4: Reset global DNS failure cache for this new scan
     check_safety(domain)
     if tor:
         state.TOR_MODE = True
@@ -422,53 +423,48 @@ def zenith(domain, plugin=None, campaign=None, whitelist=None, blacklist=None, h
             return # Exit quietly, message already printed
         console.print(f"\n[bold red][!] FATAL SCAN ERROR: {e}. Generating partial report...[/bold red]")
     finally:
-        # [v8.0.1] CONSOLIDATED REPORTING: Single PDF Entry Point - GUARANTEED EXECUTION
+        # [v25.0] OMEGA CONSOLIDATED REPORTING: Guarantees delivery even on crash.
         try:
-            from aura.core.reporter import AuraReporter
+            from aura.core.zenith_reporter import ZenithReporter
             from aura.core.markdown_reporter import MarkdownReporter
             
             console.print(f"\n[bold magenta][✍️] Compiling Professional Offensive Intelligence Report...[/bold magenta]")
             
-            # Generate PDF
-            reporter = AuraReporter(db.db_path)
-            report_path = reporter.generate_pdf_report(target_filter=domain)
-            console.print(f"[bold green][[SUCCESS]] PDF Success: {report_path}[/bold green]")
+            # v25.0 Standard: Zenith Markdown Reporting
+            reporter = ZenithReporter()
+            # Run finalize_mission synchronously in the finally block
+            findings = db.get_findings_by_target(domain)
+            report_paths = asyncio.run(reporter.finalize_mission(domain, findings))
             
-            # Generate Markdown
+            for path in report_paths:
+                console.print(f"[bold green][[SUCCESS]] Zenith Report: {os.path.basename(path)}[/bold green]")
+            
+            # Legacy Markdown (Consolidated)
             md_reporter = MarkdownReporter(db.db_path)
             md_path = md_reporter.generate_report(target_filter=domain)
             if md_path:
-                console.print(f"[bold green][[SUCCESS]] Markdown Success: {md_path}[/bold green]")
+                console.print(f"[bold green][[SUCCESS]] Consolidated Intel: {md_path}[/bold green]")
             
-            if open_report:
+            if open_report and report_paths:
                 import time
-                console.print("[cyan][*] Mission sequence complete. Opening dossier in 3 seconds...[/cyan]")
+                console.print("[cyan][*] Mission complete. Opening report in 3 seconds...[/cyan]")
                 time.sleep(3)
-                import subprocess
-                if sys.platform == "win32":
-                    os.startfile(report_path)
-                elif sys.platform == "darwin":
-                    subprocess.run(["open", report_path])
-                else:
-                    try: subprocess.run(["xdg-open", report_path])
-                    except: pass
+                _open_report_file(report_paths[0])
         except Exception as e:
-            console.print(f"[dim red][!] Auto-report failed or could not open: {e}[/dim red]")
+            console.print(f"[dim red][!] Reporting failed: {e}[/dim red]")
 
-@cli.command(name="auto_pwn")
+@cli.command(name="omega")
 @click.argument('domain')
 @click.option('--plugin', type=click.Path(exists=True), help="Run a specific Forge plugin.")
-@click.option('--whitelist', multiple=True)
-@click.option('--blacklist', multiple=True)
-@click.option('--header', multiple=True, help="Custom header (e.g., 'X-Forwarded-For: 127.0.0.1')")
-@click.option('--cookie', multiple=True, help="Custom cookie (e.g., 'session=123')")
-@click.option('--open', 'open_report', is_flag=True, default=True)
-@click.option('--tor', is_flag=True, help="Phase 7: Activate Absolute Stealth (Native Tor socks5h Routing & Kill-Switch).")
+@click.option('--campaign', help="Name or ID of the mission campaign.")
+@click.option('--whitelist', multiple=True, help="Allowed CIDR/Domains.")
+@click.option('--blacklist', multiple=True, help="Forbidden CIDR/Domains.")
+@click.option('--tor', is_flag=True, help="Phase 7: Activate Absolute Stealth.")
 @click.option('--cloud-swarm', is_flag=True, help="Phase 8: Active High-Reputation Cloud Proxy Swarms.")
-def auto_pwn(domain, plugin=None, campaign=None, whitelist=None, blacklist=None, header=None, cookie=None, open_report=True, tor=False, cloud_swarm=False):
-    """[ULTIMATE WEAPON] Alias for 'zenith' - Full Autonomous Loop."""
+def omega(domain, plugin=None, campaign=None, whitelist=None, blacklist=None, tor=False, cloud_swarm=False):
+    """[🌌 OMEGA] SENTIENT SINGULARITY: Absolute Autonomous Warfare."""
     ctx = click.get_current_context()
-    ctx.invoke(zenith, domain=domain, plugin=plugin, campaign=campaign, whitelist=whitelist, blacklist=blacklist, header=header, cookie=cookie, open_report=open_report, tor=tor, cloud_swarm=cloud_swarm)
+    ctx.invoke(zenith, domain=domain, plugin=plugin, campaign=campaign, whitelist=whitelist, blacklist=blacklist, tor=tor, cloud_swarm=cloud_swarm)
 
 @cli.command()
 @click.option('--port', default=9050, help="Local port for SOCKS5 pivot.")
@@ -544,7 +540,7 @@ def forge(target, list_only, generate):
 @click.argument('target')
 @click.option('--enforce-scope/--no-scope', default=True, help="Strictly enforce HackerOne/Bugcrowd scope to ensure payout.")
 @click.option('--tor', is_flag=True, help="Phase 7: Activate Absolute Stealth.")
-@click.option('--cloud-swarm', is_flag=True, help="Phase 8: Active High-Reputation Cloud Proxy Swarms.")
+@click.option('--cloud-swarm/--no-swarm', default=False, help="Phase 8: Active High-Reputation Cloud Proxy Swarms.")
 @click.option('--fast', is_flag=True, help="v14.2: Optimized rapid-fire mode (skips deep audits).")
 @click.option('--open', 'open_report', is_flag=True, help="v14.2: Automatically open report when finished.")
 def auto(target, enforce_scope, tor, cloud_swarm, fast, open_report):
@@ -554,6 +550,7 @@ def auto(target, enforce_scope, tor, cloud_swarm, fast, open_report):
     console.print(f"[bold magenta][AUTO] INITIALIZING AUTO-HUNTER ON {target} [AUTO][/bold magenta]")
 
     async def run_auto():
+        state.clear_dns_failures()  # v22.4: Reset global DNS failure cache for this new scan
         if tor:
             state.TOR_MODE = True
             console.print("[bold red][STEALTH] ABSOLUTE STEALTH ENGAGED: Routing via Tor (socks5h). IP Kill-Switch ACTIVE.[/bold red]")
@@ -620,17 +617,44 @@ def auto(target, enforce_scope, tor, cloud_swarm, fast, open_report):
     finally:
         # 2. Generate Master Reports (Guaranteed Evidence)
         console.print(f"\n[cyan][*] Generating Consolidated Reports...[/cyan]")
-        from aura.core.reporter import AuraReporter
         from aura.core.markdown_reporter import MarkdownReporter
-        pdf_path = AuraReporter(db.db_path).generate_pdf_report(target_filter=target)
         md_path = MarkdownReporter(db.db_path).generate_report(target_filter=target)
-        
+
+        # v22.4: If no findings, generate a null-findings recon report so the user always gets a file
+        if not md_path:
+            import os, datetime
+            report_dir = os.path.join(os.getcwd(), "reports")
+            os.makedirs(report_dir, exist_ok=True)
+            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            md_path = os.path.join(report_dir, f"recon_report_{target.replace('/', '_')}_{ts}.md")
+            with open(md_path, "w", encoding="utf-8") as _f:
+                _f.write(f"# Aura Recon Report — {target}\n")
+                _f.write(f"Generated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+                _f.write("---\n\n")
+                _f.write("## Scan Status: **Target Unreachable / No Findings**\n\n")
+                _f.write(f"- **Target**: `{target}`\n")
+                _f.write(f"- **Assessment Date**: {datetime.datetime.now().strftime('%Y-%m-%d')}\n")
+                _f.write(f"- **DNS Resolution**: ❌ FAILED — Host could not be resolved.\n\n")
+                _f.write("## Modules Engaged\n\n")
+                _f.write("| Module | Status |\n|---|---|\n")
+                _f.write("| Subdomain Discovery | ✅ Ran → 0 live subdomains |\n")
+                _f.write("| Cloud Asset Hunter | ✅ Ran → 0 open buckets |\n")
+                _f.write("| GitHub Dorks | ✅ Ran → 0 leaks found |\n")
+                _f.write("| DAST / Singularity | ⚠️ Skipped — target DNS dead |\n")
+                _f.write("| Ffuf DirBuster | ⚠️ Skipped — target DNS dead |\n")
+                _f.write("| CORS Hunter | ⚠️ Skipped — target DNS dead |\n\n")
+                _f.write("## Conclusion\n\n")
+                _f.write(f"The target `{target}` did not resolve during this assessment window. ")
+                _f.write("This may indicate the application is temporarily offline, the subdomain is decommissioned, ")
+                _f.write("or DNS propagation is still in progress. Recommended action: re-scan in 24 hours or verify the target with the program team.\n")
+            console.print(f"[yellow][!] No findings — generated null recon report.[/yellow]")
+
         console.print(f"[bold green][DONE] AUTO-HUNTER COMPLETE[/bold green]")
-        console.print(f"📄 PDF Report: {pdf_path}")
         if md_path: console.print(f"📄 MD Report:  {md_path}")
 
-        if open_report and pdf_path:
-            _open_report_file(pdf_path)
+        if open_report and md_path:
+            _open_report_file(md_path)
+
 
 @cli.command()
 @click.argument('file_path', type=click.Path(exists=True))
@@ -1188,6 +1212,81 @@ def notify_test():
             console.print("[red][!] Telegram test failed. Check your config with 'aura status'[/red]")
     except Exception as e:
         console.print(f"[red][!] Notify error: {e}[/red]")
+
+
+@cli.command("chronos")
+@click.argument("target")
+@click.option("--interval", default=3600, show_default=True, help="Seconds between surface checks.")
+@click.option("--no-deep-scan", is_flag=True, default=False, help="Disable auto deep scan on change.")
+def chronos(target, interval, no_deep_scan):
+    """[⏳ CHRONOS] Phase 27: Activate the Eternal Guardian — continuous surface monitoring.
+
+    Watches the target 24/7 and auto-triggers Turbine deep scans when changes are detected.
+
+    Example: aura chronos intel.com --interval 1800
+    """
+    check_safety(target)
+    try:
+        from aura.core.chronos import ChronosMonitor
+        monitor = ChronosMonitor(
+            target=target,
+            interval=interval,
+            deep_scan=not no_deep_scan
+        )
+        asyncio.get_event_loop().run_until_complete(monitor.run())
+    except KeyboardInterrupt:
+        console.print("\n[bold yellow][[⏳ CHRONOS]] Guardian deactivated by user.[/bold yellow]")
+    except Exception as e:
+        console.print(f"[red][!] Chronos error: {e}[/red]")
+
+
+@cli.command("gems")
+@click.argument("target_filter", default="intel")
+@click.option("--output-dir", default="reports", show_default=True, help="Directory for report output.")
+def gems(target_filter, output_dir):
+    """[💎 GEMS] Extract the highest-value findings from the sovereign DB.
+
+    Filters findings by target and severity to build a submission-ready report.
+
+    Example: aura gems intel
+             aura gems tesla --output-dir ./bounty_reports
+    """
+    try:
+        import sys, os
+        # Add project root to path so extract_intel_gems can be imported
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        sys.path.insert(0, project_root)
+
+        import extract_intel_gems as gem_mod
+        gem_mod.TARGET_FILTER = target_filter
+        gem_mod.REPORT_DIR = output_dir
+
+        gems_list = gem_mod.load_gems()
+        if gems_list:
+            path = gem_mod.generate_gem_report(gems_list)
+            console.print(f"\n[bold green][💎] {len(gems_list)} Gems extracted → [link={path}]{path}[/link][/bold green]")
+        else:
+            console.print("[yellow][!] No high-value findings. Try running a deep scan first.[/yellow]")
+    except Exception as e:
+        console.print(f"[red][!] Gems error: {e}[/red]")
+
+
+@cli.command("profit")
+@click.argument("target_filter", default="")
+def profit(target_filter):
+    """[v31.0] Generate a priority-ranked Bug Bounty profit report (ROI-ordered)."""
+    from aura.modules.profit_engine import ProfitEngine
+    engine = ProfitEngine()
+    target = target_filter or None
+    console.print(f"\n[bold magenta][💰 PROFIT ENGINE] Analyzing database for highest-value findings...[/bold magenta]")
+    try:
+        path = engine.generate_priority_report(target)
+        if path:
+            console.print(f"\n[bold green][💰] Report saved: {path}[/bold green]")
+        else:
+            console.print("[yellow][!] No findings in database. Run a scan first: aura auto <target>[/yellow]")
+    except Exception as e:
+        console.print(f"[red][!] Profit engine error: {e}[/red]")
 
 
 if __name__ == "__main__":

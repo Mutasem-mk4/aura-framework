@@ -31,7 +31,17 @@ class CorsHunter:
         findings = []
         if not self.session:
             return findings
-            
+        
+        # v22.5 normalize URL before probe
+        if not url.startswith(("http://", "https://")):
+            url = "https://" + url
+        
+        # Fast-fail if host is known dead
+        from urllib.parse import urlparse as _up
+        _h = _up(url).netloc
+        if state.is_dns_failed(_h):
+            return findings
+        
         console.print(f"[cyan][⚙] CORS Hunter: Probing {url} for Access-Control misconfigurations...[/cyan]")
         
         parsed = urllib.parse.urlparse(url)
@@ -99,6 +109,15 @@ class CorsHunter:
         Phase 6 Bootstrapper: Scans the root target and a subset of discovered API endpoints.
         """
         all_findings = []
+        
+        # v22.5 Global DNS Circuit Breaker: skip dead targets immediately
+        from urllib.parse import urlparse as _up
+        # Normalize target_url to have scheme for urlparse to work
+        _norm = target_url if target_url.startswith(("http://","https://")) else "https://" + target_url
+        _host = _up(_norm).netloc
+        if state.is_dns_failed(_host):
+            return all_findings
+        
         urls_to_test = [target_url]
         
         # Find likely API endpoints from the discovered links to test

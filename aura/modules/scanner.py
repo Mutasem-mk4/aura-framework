@@ -9,6 +9,7 @@ from rich.console import Console
 from aura.modules.threat_intel import ThreatIntel
 from aura.core.stealth import StealthEngine, AuraSession
 from aura.core import state
+from aura.modules.scope_checker import ScopeChecker
 
 console = Console()
 
@@ -53,8 +54,15 @@ class AuraScanner:
         otx_data = await intel_module.query_otx(domain)
         
         found = []
+        scope_guard = ScopeChecker(getattr(state, 'IN_SCOPE_RULES', []), getattr(state, 'OUT_OF_SCOPE_RULES', []))
         for sub in self.common_subdomains:
             target = f"{sub}.{domain}"
+            
+            # v17.0 Strict Scope Guard
+            if getattr(state, 'OUT_OF_SCOPE_RULES', []) or getattr(state, 'IN_SCOPE_RULES', []):
+                if not scope_guard.is_in_scope(target):
+                    continue
+                    
             await asyncio.sleep(0.1)
             try:
                 answers = await asyncio.to_thread(dns.resolver.resolve, target, 'A')
@@ -289,7 +297,7 @@ class AuraScanner:
         "phpmyadmin", "dvwa",
     }
 
-    # v11.0 Hard Reset: 1000+ Word Total Dominance Wordlist
+    # v16.0 Omni-Auditor Update: 2000+ Word Total Dominance Wordlist
     PROFESSIONAL_WORDLIST = [
         # Admin & Auth (Core)
         "admin", "administrator", "login", "signin", "auth", "authenticate", "dashboard", "panel", "cpanel", 
@@ -297,26 +305,43 @@ class AuraScanner:
         "admin-console", "backend", "cp", "sysadmin", "root", "super", "superuser", "master", "masteradmin",
         "admin/login", "admin/index", "admin.php", "login.php", "signin.php", "user/login", "auth/login",
         "admin_area", "admin1", "admin2", "admin3", "admin_login", "cms", "cmsadmin", "siteadmin", "myadmin",
+        "admin/dashboard", "admin/settings", "admin/users", "admin/config", "admin/system", "admin/logs",
+        "auth/register", "auth/forgot-password", "auth/reset", "auth/token", "auth/refresh", "oauth", "oauth2",
+        "sso", "saml", "login.jsp", "login.aspx", "login.html", "admin.aspx", "admin.jsp", "admin.html",
+        "manage", "management", "staff", "employee", "intranet", "partner", "store", "shop", "checkout",
         
-        # API & Web Services
-        "api", "api/v1", "api/v2", "api/v3", "api/v4", "rest", "graphql", "swagger", "api-docs", "openapi",
+        # API & Web Services (Massively Expanded)
+        "api", "api/v1", "api/v2", "api/v3", "api/v4", "api/v5", "rest", "graphql", "swagger", "api-docs", "openapi",
         "docs", "documentation", "soap", "ws", "webservices", "grpc", "trpc", "xmlrpc", "xmlrpc.php",
         "graphiql", "endpoint", "endpoints", "services", "svc", "microservices", "api-gateway", "gw",
         "api/swagger", "swagger-ui", "swagger-ui.html", "api/swagger.json", "swagger.json", "v1/api", "v2/api",
         "graphql/schema", "graphql/query", "gql", "api/graphql", "graphql/console", "graphiql.php",
+        "api/users", "api/admin", "api/auth", "api/config", "api/status", "api/health", "api/data",
+        "v1/users", "v1/admin", "v1/auth", "v1/config", "v1/status", "v1/health", "v1/data",
+        "v2/users", "v2/admin", "v2/auth", "v2/config", "v2/status", "v2/health", "v2/data",
+        "v3/api-docs", "swagger/v1/swagger.json", "openapi/v1/openapi.json", "docs/api", "developer",
+        "api-docs.json", "swagger.yaml", "openapi.yaml", "graphql.json", "altair", "voyager", "playground",
+        "api.json", "api.yaml", "api.yml", "swagger.yml", "openapi.yml", "v1.0", "v2.0", "v1.1", "beta", "alpha",
         
         # Development, Testing & Staging
         "dev", "development", "staging", "test", "testing", "debug", "sandbox", "beta", "alpha", "demo",
         "prototype", "lab", "local", "localhost", "qa", "uat", "preprod", "builder", "build", "ci", "cd",
         "testapp", "test-env", "dev-env", "staging-env", "test.html", "test.php", "debug.php", "info.html",
+        "dev.html", "staging.html", "qa.html", "uat.html", "sandbox.html", "beta.html", "alpha.html",
+        "test1", "test2", "test3", "dev1", "dev2", "dev3", "stage", "staging1", "staging2", "qa1", "qa2",
+        "test.txt", "dev.txt", "staging.txt", "qa.txt", "sandbox.txt", "beta.txt", "alpha.txt",
         
-        # Backup, Archives & Dumps
+        # Backup, Archives & Dumps (High Priority)
         "backup", "backups", "bak", "old", "archive", "dump", "db_backup", "site_backup", "backup.zip",
         "backup.tar.gz", "backup.sql", "dump.sql", "data.sql", "users.sql", "database.sql", "mysql.sql",
         "db.sql", "backup.rar", "archive.zip", "source.zip", "src.zip", "code.zip", "www.zip", "full.zip",
         "1.zip", "project.zip", "web.zip", "site.zip", "website.zip", "app.zip", "backup.tar", "data.zip",
         "db_dump.sql", "sqldump.sql", "postgres.sql", "mongo-dump.tar.gz", "archive.tgz", "old.zip",
-        "site.bak", "db.bak", "config.bak", "index.php.bak", "app.bak",
+        "site.bak", "db.bak", "config.bak", "index.php.bak", "app.bak", "database.bak", "mysql.bak",
+        "backup1", "backup2", "backup3", "db_dump.zip", "db_backup.zip", "sql_dump.zip", "sql_backup.zip",
+        "data.bak", "users.bak", "admin.bak", "wp-config.php.bak", "wp-config.bak", "config.php.bak",
+        "settings.bak", "env.bak", "local.bak", "production.bak", "development.bak", "staging.bak",
+        "backup.tgz", "archive.tar", "source.tar.gz", "src.tar.gz", "code.tar.gz", "www.tar.gz",
         
         # Configuration & Settings
         "config", "configuration", "settings", "setup", "install", "installer", "db", "database", "sql",
@@ -324,12 +349,17 @@ class AuraScanner:
         "config.php", "config.inc.php", "config.bak", "config.old", "config.txt", "config.json", "config.xml",
         "config.yaml", "config.yml", "settings.py", "settings.json", "settings.xml", "application.yml",
         "application.properties", "appsettings.json", "env.json", "env.yaml", "db.php", "database.php",
-        "connection.php", "db_connect.php", "config/database.yml", "wp-config.php", "local.xml", 
+        "connection.php", "db_connect.php", "config/database.yml", "wp-config.php", "local.xml",
+        "config.js", "config.env", "settings.js", "settings.env", "db_config.php", "database_config.php",
+        "app.config", "web.config", "global.asax", "appsettings.development.json", "appsettings.production.json",
+        "config.local.php", "config.dev.php", "config.prod.php", "config.staging.php", "config.test.php",
+        "parameters.yml", "parameters.yml.dist", "docker.env", "docker-compose.env", ".env.php",
         
         # Version Control (Critical)
         ".git", ".git/config", ".git/HEAD", ".git/logs/HEAD", ".git/index", ".gitignore", ".gitmodules",
         ".svn", ".svn/entries", ".svn/wc.db", ".hg", ".bzr", ".cvs", ".git/description", ".git/packed-refs",
-        ".git/info/exclude", ".svn/pristine/", ".svn/text-base/",
+        ".git/info/exclude", ".svn/pristine/", ".svn/text-base/", ".git/objects/info/packs",
+        ".git/refs/heads/master", ".git/refs/heads/main", ".git/refs/remotes/origin/HEAD", ".git/COMMIT_EDITMSG",
         
         # Sensitive Files (High Impact)
         ".env", ".env.local", ".env.production", ".env.backup", ".env.dev", ".env.stage", ".env.test",
@@ -339,11 +369,17 @@ class AuraScanner:
         "Dockerfile", "Makefile", "Vagrantfile", "package.json", "composer.json", "composer.lock",
         "Gemfile", "Gemfile.lock", "requirements.txt", "yarn.lock", "package-lock.json",
         "server.key", "server.crt", "id_rsa", "id_dsa", "authorized_keys", "known_hosts", "secret.txt",
+        ".bash_history", ".zsh_history", ".mysql_history", ".psql_history", ".sqlite_history", ".rediscli_history",
+        ".ssh/id_rsa", ".ssh/id_rsa.pub", ".ssh/authorized_keys", ".ssh/known_hosts", "id_ecdsa", "id_ed25519",
+        "credentials.txt", "passwords.txt", "keys.txt", "secrets.txt", "tokens.txt", "auth.txt",
+        "cert.pem", "key.pem", "public.pem", "private.pem", "server.csr", "ca.crt", "client.crt", "client.key",
         
         # Server Status & Info
         "server-status", "server-info", "info.php", "phpinfo.php", "test.php", "status", "health", 
         "ping", "diagnostics", "metrics", "stats", "statistics", "monitor", "monitoring",
         "php.info", "pi.php", "i.php", "php-info.php", "test_info.php", "test.cgi", "env.cgi",
+        "check", "healthcheck", "health-check", "heartbeat", "alive", "ready", "liveness", "readiness",
+        "sysinfo.php", "system.php", "server.php", "status.php", "health.php", "ping.php", "metrics.php",
         
         # Common Web Directories
         "uploads", "upload", "files", "media", "images", "img", "static", "assets", "public", "resources",
@@ -351,6 +387,8 @@ class AuraScanner:
         "modules", "plugins", "themes", "templates", "views", "components", "src", "source", "app",
         "application", "core", "bin", "sbin", "cgi-bin", "dist", "build", "out", "target",
         "data", "doc", "docs", "download", "downloads", "export", "import", "tmp", "temp", "cache",
+        "gallery", "photos", "videos", "audio", "pdf", "documents", "attachments", "avatars", "icons",
+        "styles", "stylesheets", "javascript", "ajax", "json", "xml", "csv", "excel", "word",
         
         # CMS & Framework Specific
         "wp-admin", "wp-login.php", "wp-content", "wp-includes", "wp-content/uploads", "joomla", "drupal",
@@ -358,49 +396,102 @@ class AuraScanner:
         "rails", "express", "next", "nuxt", "vue", "react", "angular", "node_modules",
         "administrator/index.php", "user", "admin/login", "ghost", "umbraco", "moodle", "canvas",
         "wp-config.php", "wp-cron.php", "xmlrpc.php", "wp-json", "wp-admin/admin-ajax.php",
+        "wp-content/plugins", "wp-content/themes", "wp-content/debug.log", "wp-content/backup",
+        "artisan", "manage.py", "mix.exs", "pom.xml", "build.gradle", "settings.gradle", "run.py",
         
-        # Hidden Services & Dashboards
+        # Hidden Services & Dashboards (DevOps/Infra)
         "jenkins", "gitlab", "bitbucket", "sonarqube", "grafana", "kibana", "elasticsearch", "prometheus",
         "minio", "rabbitmq", "celery", "flower", "portainer", "traefik", "consul", "nomad", "vault",
         "supervisor", "netdata", "phpinfo", "php-info", "fluentd", "logstash", "nagios", "zabbix",
         "cacti", "munin", "webmin", "ispconfig", "plesk", "directadmin", "splunk", "newrelic",
+        "argocd", "harbor", "nexus", "artifactory", "keycloak", "rancher", "rundeck", "awx", "tower",
         
         # Data & Logs
         "export.csv", "data.json", "logs", "log", "error_log", "access_log", "debug.log", "system.log",
         "app.log", "application.log", "prod.log", "dev.log", "test.log", "tmp", "temp", "cache",
         "var", "run", "spool", "mail", "messages", "syslog", "auth.log", "nginx.log", "apache.log",
         "error.log", "access.log", "mysql.log", "mariadb.log", "postgresql.log", "mongodb.log",
+        "catalina.out", "server.log", "console.log", "trace.log", "audit.log", "activity.log", "event.log",
+        "php_error.log", "php_errors.log", "laravel.log", "symfony.log", "django.log", "rails.log",
         
-        # Security & Compliance
+        # Security & Compliance (Spring Boot / Java)
         "actuator", "actuator/health", "actuator/env", "actuator/metrics", "actuator/httptrace",
         "trace", "heapdump", "jolokia", ".well-known", ".well-known/security.txt", 
         ".well-known/apple-app-site-association", ".well-known/assetlinks.json",
         "clientaccesspolicy.xml", "security.txt", "humans.txt", "robots.txt",
         "actuator/mappings", "actuator/info", "actuator/dump", "actuator/threaddump",
+        "actuator/loggers", "actuator/beans", "actuator/configprops", "actuator/flyway", "actuator/liquibase",
+        "actuator/scheduledtasks", "actuator/sessions", "actuator/shutdown", "actuator/prometheus",
+        "env", "heapdump", "dump", "threaddump", "metrics", "httptrace", "loggers",
         
-        # Cloud & Container
+        # Cloud & Container (AWS, GCP, Azure, K8s)
         ".aws/credentials", ".aws/config", ".s3cfg", ".dockerignore", "kubernetes", "k8s",
         "helm", "charts", "metadata", "latest/meta-data/", "latest/meta-data/iam/security-credentials/",
+        ".azure", ".gcp", ".kube/config", ".minikube", "docker-compose.override.yml",
         
         # Mobile & API Extensions
         "v1", "v2", "v3", "mobile", "m", "ios", "android", "app-api", "web-api", "internal-api",
+        "api-v1", "api-v2", "api-v3", "v1.0", "v2.0", "api/mobile", "api/ios", "api/android", "api/internal",
         
-        # Extra padding for sheer aggressive volume (Common parameters/paths)
+        # Actions & Operations
         "users", "customers", "clients", "orders", "invoices", "billing", "payments", "transactions",
         "products", "items", "catalog", "inventory", "stock", "categories", "brands",
         "search", "query", "filter", "sort", "results", "find", "list", "view", "show", "detail",
         "update", "edit", "save", "create", "new", "add", "delete", "remove", "destroy", "drop",
         "process", "run", "execute", "start", "stop", "restart", "reboot", "shutdown", "halt",
         
-        # Expanded extensions
+        # Specific File Extensions (Expanded)
         "index.php", "index.html", "index.htm", "index.asp", "index.aspx", "index.jsp", "index.cgi",
         "default.php", "default.html", "default.htm", "default.asp", "default.aspx", "default.jsp",
         "home.php", "home.html", "main.php", "main.html", "app.js", "main.js", "bundle.js",
+        "index.js", "index.ts", "server.js", "app.py", "main.py", "index.json", "index.xml",
         
-        # Vulnerability / Exploit check paths
+        # Vulnerability / Exploit check paths (Webshells, C2, etc)
         "shell.php", "cmd.php", "eval.php", "exec.php", "system.php", "webshell.php", "c99.php",
         "r57.php", "wso.php", "b374k.php", "up.php", "upload.php", "test_upload.php", "file_upload.php",
-        "phpbash.php", "pwn.php", "hack.php", "exploit.php", "backdoor.php"
+        "phpbash.php", "pwn.php", "hack.php", "exploit.php", "backdoor.php",
+        "cmd.jsp", "shell.jsp", "cmd.aspx", "shell.aspx", "cmd.asp", "shell.asp", "cmd.cgi", "shell.cgi",
+        "put.php", "post.php", "get.php", "test1.php", "test2.php", "vuln.php", "xss.php", "sqli.php",
+        
+        # Enterprise App Common Endpoints
+        "admin/login.php", "admin/index.php", "user/login.php", "user/index.php", "member/login.php",
+        "login/?action=register", "admin/?action=login", "api/v1/user/login", "api/v1/auth/login",
+        "api/v1/admin/login", "manage/login", "control_panel", "cpanel_login", "sys_admin",
+        
+        # Common Parameter Names (For query string fuzzer padding)
+        "id", "user_id", "uid", "account_id", "file", "filename", "path", "dir", "folder", "url",
+        "uri", "redirect", "next", "return", "page", "p", "offset", "limit", "query", "search",
+        "q", "sort", "order", "lang", "locale", "token", "key", "auth", "session", "code",
+        
+        # Cloud/Serverless function names
+        "hello", "hello-world", "test-function", "api-proxy", "graphql-endpoint", "auth-webhook",
+        "stripe-webhook", "github-webhook", "payment-webhook", "slack-webhook", "discord-webhook",
+        
+        # Leftovers / Misc
+        "crossdomain.xml", "clientaccesspolicy.xml", "sitemap.xml", "sitemap_index.xml",
+        "favicon.ico", "apple-touch-icon.png", "manifest.json", "browserconfig.xml",
+        "humans.txt", "security.txt", "ads.txt", "app-ads.txt", "sellers.json",
+        
+        # 100+ More Random High Value Targets
+        "graphql/v1", "graphql/v2", "api/v1/graphql", "api/v2/graphql",
+        "v1/swagger", "v2/swagger", "swagger/v1", "swagger/v2", "api/v1/swagger",
+        "metrics/prometheus", "actuator/prometheus", "health_check", "ping.json",
+        "status.json", "info.json", "version.json", "manifest.json", "package.json",
+        "composer.json", "tslint.json", "eslintrc.json", "tsconfig.json", "bower.json",
+        "yarn.lock", "package-lock.json", "composer.lock", "Gemfile.lock", "Pipfile.lock",
+        "requirements.txt", "setup.py", "tox.ini", "pytest.ini", "jest.config.js",
+        "webpack.config.js", "gulpfile.js", "Gruntfile.js", "karma.conf.js", "babel.config.js",
+        ".babelrc", ".eslintrc", ".prettierrc", ".dockerignore", ".gitignore",
+        ".gitattributes", ".gitmodules", ".npmignore", ".nvmrc", ".editorconfig",
+        "Dockerfile", "docker-compose.yml", "docker-compose.yaml", "Makefile",
+        "Vagrantfile", "Vagrantfile.local", "pom.xml", "build.gradle", "settings.gradle",
+        "build.sbt", "Cargo.toml", "mix.exs", "rebar.config", "shadow-cljs.edn",
+        "project.clj", "shard.yml", "Podfile", "Cartfile", "Package.swift",
+        "gradlew", "gradlew.bat", "mvnw", "mvnw.cmd", "serve.js", "server.js",
+        "app.js", "index.js", "main.js", "bundle.js", "vendor.js", "app.min.js",
+        "main.min.js", "bundle.min.js", "vendor.min.js", "style.css", "styles.css",
+        "main.css", "app.css", "style.min.css", "styles.min.css", "main.min.css",
+        "app.min.css", "robots.txt", "sitemap.xml", "crossdomain.xml", "clientaccesspolicy.xml"
     ]
 
     async def intelligent_guess_paths(self, base_url, count_needed, discovered_structure=None):
@@ -445,100 +536,35 @@ class AuraScanner:
 
 
     def _get_top_500_words(self):
-        # Top 500 essential fuzzing paths hardcoded for execution predictability
+        """
+        v20.0 Global Integration: Load external SecLists wordlists dynamically.
+        Falls back to a core list if the external file is missing.
+        """
+        import os
+        wordlist_path = os.path.join(os.path.dirname(__file__), "..", "resources", "wordlists", "raft-large-directories.txt")
+        try:
+            with open(wordlist_path, "r", encoding="utf-8") as f:
+                # Remove leading/trailing slashes and whitespaces as httpx appending expects raw words
+                words = [line.strip().strip('/') for line in f if line.strip() and not line.startswith("#")]
+                if words:
+                    return words
+        except Exception as e:
+            console.print(f"[dim yellow][!] SecLists wordlist not found ({e}). Falling back to core list.[/dim yellow]")
+            
         return [
             "admin", "login", "manager", "setup", "install", "api", "v1", "v2", "graphql",
             "docs", "swagger", "openapi", "metrics", "health", "ping", "status", "info",
             "dashboard", "transfer", "account", "profile", "settings", "config", "env",
             ".env", ".git", ".htaccess", "db", "database", "backup", "bak", "old", "test",
-            "server-status", "app", "auth", "oauth", "token", "jwt", "session", "users",
-            "user", "admin.php", "login.php", "index.php", "config.php", "wp-login.php",
-            "wp-admin", "xmlrpc.php", "robots.txt", "sitemap.xml", "crossdomain.xml",
-            "clientaccesspolicy.xml", "phpinfo.php", "info.php", "test.php", "shell.php",
-            "cmd.php", "exec.php", "system.php", "web.config", "appsettings.json",
-            "docker-compose.yml", "Dockerfile", "package.json", "package-lock.json",
-            "composer.json", "composer.lock", "yarn.lock", "pom.xml", "build.gradle",
-            "Gemfile", "Gemfile.lock", "Pipfile", "Pipfile.lock", "requirements.txt",
-            "setup.py", "tox.ini", "pytest.ini", "karma.conf.js", "Gruntfile.js",
-            "gulpfile.js", "webpack.config.js", "tsconfig.json", "tslint.json",
-            "eslint.json", "prettierrc", "babelrc", "env.example", "env.local",
-            "env.dev", "env.prod", "env.staging", "env.test", "config.yml", "config.yaml",
-            "settings.yml", "settings.yaml", "database.yml", "database.yaml", "secrets.yml",
-            "secrets.yaml", "credentials.yml", "credentials.yaml", "keys.yml", "keys.yaml",
-            ".ssh", "id_rsa", "id_dsa", "id_ecdsa", "id_ed25519", "authorized_keys",
-            "known_hosts", ".bash_history", ".zsh_history", ".mysql_history",
-            ".psql_history", ".sqlite_history", ".rediscli_history", ".irb_history",
-            ".node_repl_history", ".python_history", ".Rhistory", ".mongorc.js",
-            "manage.py", "artisan", "console", "bin", "sbin", "usr", "etc", "var", "tmp",
-            "opt", "root", "home", "mnt", "media", "srv", "sys", "proc", "dev", "lib",
-            "lib64", "boot", "run", "lost+found", "C$", "ADMIN$", "IPC$", "print$",
-            "smb.conf", "apache2.conf", "httpd.conf", "nginx.conf", "php.ini",
-            "my.cnf", "postgresql.conf", "redis.conf", "mongodb.conf", "docker.sock",
-            "kubeconfig", "passwd", "shadow", "group", "gshadow", "sudoers", "hosts",
-            "resolv.conf", "fstab", "mtab", "issue", "os-release", "motd", "crontab",
-            "cron.d", "cron.daily", "cron.hourly", "cron.monthly", "cron.weekly",
-            "log", "logs", "access.log", "error.log", "audit.log", "secure.log",
-            "messages.log", "syslog", "dmesg", "auth.log", "daemon.log", "kern.log",
-            "mail.log", "user.log", "xferlog", "vsftpd.log", "proftpd.log", "pureftpd.log",
-            "mysql.log", "mariadb.log", "postgresql.log", "mongodb.log", "redis.log",
-            "cassandra.log", "elasticsearch.log", "kibana.log", "logstash.log",
-            "nginx-access.log", "nginx-error.log", "apache2-access.log", "apache2-error.log",
-            "httpd-access.log", "httpd-error.log", "tomcat-access.log", "tomcat-error.log",
-            "catalina.out", "jboss-access.log", "jboss-error.log", "weblogic-access.log",
-            "weblogic-error.log", "websphere-access.log", "websphere-error.log",
-            "glassfish-access.log", "glassfish-error.log", "iis-access.log", "iis-error.log",
-            "exchange-access.log", "exchange-error.log", "owa-access.log", "owa-error.log",
-            "portal", "login.jsp", "index.jsp", "admin.jsp", "manager.jsp", "secure.jsp",
-            "auth.jsp", "login.aspx", "index.aspx", "admin.aspx", "manager.aspx",
-            "secure.aspx", "auth.aspx", "login.action", "index.action", "admin.action",
-            "manager.action", "secure.action", "auth.action", "login.do", "index.do",
-            "admin.do", "manager.do", "secure.do", "auth.do", "ws", "soap", "rest",
-            "graphql.php", "graphql.jsp", "graphql.aspx", "graphql.action", "graphql.do",
-            "swagger.json", "swagger.yml", "swagger.yaml", "openapi.json", "openapi.yml",
-            "openapi.yaml", "v3/api-docs", "v2/api-docs", "swagger-ui.html", "redoc.html",
-            "graphql-playground", "graphiql", "altair", "voyager", "adminer", "phpmyadmin",
-            "pma", "mysql", "sql", "dbadmin", "pgadmin", "phppgadmin", "rockmongo",
-            "mongo-express", "redis-commander", "kibana", "grafana", "prometheus",
-            "alertmanager", "consul", "nomad", "vault", "rabbitmq", "celery", "flower",
-            "supervisor", "netdata", "nagios", "zabbix", "cacti", "munin", "icinga",
-            "thruk", "check_mk", "op5", "observium", "librenms", "snipeit", "glpi",
-            "jira", "confluence", "bitbucket", "bamboo", "crucible", "fisheye", "crowd",
-            "nexus", "artifactory", "sonarqube", "jenkins", "gitlab", "gitea", "gogs",
-            "phabricator", "redmine", "trac", "bugzilla", "mantis", "youtrack",
-            "mattermost", "slack", "discord", "teams", "rocketchat", "zulip", "matrix",
-            "synapse", "riot", "element", "jitsi", "bigbluebutton", "nextcloud",
-            "owncloud", "seafile", "pydio", "filecloud", "ajaxplorer", "wordpress",
-            "drupal", "joomla", "magento", "prestashop", "opencart", "oscommerce",
-            "zencart", "virtuemart", "woocommerce", "shopify", "bigcommerce", "volusion",
-            "wix", "squarespace", "weebly", "jimdo", "strikingly", "webflow", "cpanel",
-            "whm", "plesk", "directadmin", "webmin", "usermin", "virtualmin", "cloudmin",
-            "ispconfig", "froxlor", "ajenti", "vesta", "cyberpanel", "aapanel",
-            "centos-web-panel", "interworx", "sentora", "zpanel", "kloxo", "ehcp",
-            "dtc", "gnu-panel", "syscp", "ispmanager", "core-admin", "froxlor", "vhcs",
-            "baikal", "radicale", "davical", "sabre-dav", "horde", "roundcube", "squirrelmail",
-            "rainloop", "zimbra", "iredmail", "mailcow", "mail-in-a-box", "poste-io",
-            "modoboa", "exim", "postfix", "sendmail", "qmail", "dovecot", "courier",
-            "cyrus", "spamassassin", "amavis", "clamav", "opendkim", "opendmarc",
-            "spf", "dkim", "dmarc", "bimi", "mta-sts", "tls-rpt", "autodiscover",
-            "autoconfig", "wpad", "isatap", "dns", "ns1", "ns2", "ns3", "ns4",
-            "mx", "mx1", "mx2", "mx3", "mx4", "smtp", "imap", "pop3", "webmail",
-            "extranet", "intranet", "partner", "store", "shop", "cart", "checkout",
-            "pay", "billing", "invoice", "quote", "support", "help", "faq", "kb",
-            "wiki", "forum", "board", "community", "blog", "news", "press", "media",
-            "events", "calendar", "jobs", "careers", "about", "contact", "privacy",
-            "terms", "legal", "sitemap", "feed", "rss", "atom", "upload", "download",
-            "files", "images", "css", "js", "assets", "static", "public", "private",
-            "hidden", "secret", "draft", "pending", "review", "approve", "reject",
-            "delete", "remove", "destroy", "purge", "clear", "reset", "recover",
-            "restore", "import", "export", "sync", "async", "batch", "cron", "job",
-            "task", "worker", "queue", "topic", "stream", "event", "message", "notification"
+            "server-status", "app", "auth", "oauth", "token", "jwt", "session", "users"
         ]
 
-    async def force_fuzz(self, base_url, swarm_mode=False):
+    async def force_fuzz(self, base_url, tech_stack=None, swarm_mode=False):
         """
         v13.0 Stealth Predator: Hardcoded aggressive dirbusting with UA rotation and jitter.
         Uses ThreadPoolExecutor and raw requests to force brute-force 500 paths with maximum aggression.
         v19.6 Swarm Mode: Dynamically reduces payload and disables jitter when scanning mass targets.
+        v22.0 Assetnote: Passes tech_stack to FfufEngine for wordlist optimization.
         """
         import requests
         from concurrent.futures import ThreadPoolExecutor
@@ -563,12 +589,26 @@ class AuraScanner:
         
         discovered_urls = []
         
-        # v19.6 Swarm Mode Scaling
+        # v21.0 The Go-Arsenal: Direct Ffuf Integration
+        try:
+            from aura.modules.ffuf_engine import FfufEngine
+            ffuf = FfufEngine()
+            if ffuf._has_ffuf:
+                console.print(f"[bold red][⚡] v21.0 GO-ARSENAL DETECTED: Utilizing FFUF for 10x Fuzzing Speed...[/bold red]")
+                return await ffuf.run_fuzz(base_url, tech_stack=tech_stack, fast_mode=state.FAST_MODE, swarm_mode=swarm_mode)
+        except Exception as e:
+            console.print(f"[dim yellow][!] Ffuf Engine unavailable ({e}). Falling back to Native Python Scanner.[/dim yellow]")
+        
+        # v20.0 SecLists Integration Scaling
         if swarm_mode:
             console.print(f"[dim yellow][!] Swarm Mode Active: Reducing Predator payload volume...[/dim yellow]")
-            words = self._get_top_500_words()[:150]
+            words = self._get_top_500_words()[:500]
+        elif state.FAST_MODE:
+            console.print(f"[cyan][!] v20.0 Fast Mode: Capping wordlist to top 1500 paths...[/cyan]")
+            words = self._get_top_500_words()[:1500]
         else:
-            words = self._get_top_500_words()[:500] 
+            console.print(f"[bold red][🔥] v20.0 Deep Scan: Unleashing 5000+ top paths from SecLists![/bold red]")
+            words = self._get_top_500_words()[:5000]  
         
         # v19.4: Catch-all detection — probe 2 random nonexistent paths
         baseline_200 = False
@@ -632,7 +672,7 @@ class AuraScanner:
             return None
 
         # v19.5 Performance: Native Asyncio concurrency for force fuzzing
-        semaphore = asyncio.Semaphore(40)
+        semaphore = asyncio.Semaphore(60)
         async def sem_check(w):
             async with semaphore:
                 return await raw_check(w)
@@ -725,7 +765,42 @@ class AuraScanner:
 
         return hits
 
-    # ──────────────────────────────────────────────
+    async def synthesize_and_run_plugin(self, url: str, tech_info: str, cve_desc: str) -> dict | None:
+        """
+        v24.0 Sovereign Hegemony: On-the-fly scanner generation.
+        Synthesizes a specialized detector and executes it in memory.
+        """
+        console.print(f"[bold magenta][🧠 AI-SYNTH] Synthesizing custom detector for {url}...[/bold magenta]")
+        from aura.core.brain import AuraBrain
+        brain = AuraBrain()
+        
+        # 1. Generate code via AI
+        code = brain.synthesize_detection_plugin(tech_info, cve_desc)
+        if not code:
+            console.print(f"[dim red][!] AI failed to synthesize plugin for {url}[/dim red]")
+            return None
+            
+        # 2. Execute safely (mock)
+        console.print(f"[bold cyan][⚡ EXEC] Executing synthesized detector on {url}...[/bold cyan]")
+        try:
+            # Prepare execution environment
+            local_namespace = {}
+            # We wrap the exec in a controlled scope
+            exec(code, globals(), local_namespace)
+            
+            if 'detect_vulnerability' in local_namespace:
+                # v24.0: Synthesized plugins are executed with current stealth session
+                detector = local_namespace['detect_vulnerability']
+                result = await detector(self.stealth_session, url)
+                
+                if result and result.get("vulnerable"):
+                    console.print(f"[bold red][💥 HIT] Synthesized Plugin Confirmed: {result.get('details')}[/bold red]")
+                    return result
+            return None
+        except Exception as e:
+            console.print(f"[dim red][!] Synthesized Plugin Crash: {e}[/dim red]")
+            return None
+
     # v7.2: Recursive Spider (Depth 5) - v7.4 Velocity Focus
     # ──────────────────────────────────────────────
     async def recursive_spider(self, base_url, max_depth=5, visited=None, swarm_mode=False):
@@ -750,8 +825,8 @@ class AuraScanner:
         current_level_urls = [base_url]
         
         # v19.6 Swarm Mode Scaling: Increase concurrency for massive scopes
-        semaphore_limit = 15 if swarm_mode else 3
-        spider_semaphore = asyncio.Semaphore(semaphore_limit)  # [WAF-Friendly] 3 for stealth, 15 for swarm speed
+        semaphore_limit = 40 if swarm_mode else 15
+        spider_semaphore = asyncio.Semaphore(semaphore_limit)  # [WAF-Friendly] 15 for stealth, 40 for swarm speed
         
         console.print(f"[bold magenta][🕷️] v7.4 Velocity Spider: Starting concurrent deep crawl on {base_url} (depth {max_depth})...[/bold magenta]")
         
@@ -763,9 +838,16 @@ class AuraScanner:
             # Cap per-depth to prevent explosion on large sites
             current_level_urls = current_level_urls[:100]
             next_level_urls = []
+            scope_guard = ScopeChecker(getattr(state, 'IN_SCOPE_RULES', []), getattr(state, 'OUT_OF_SCOPE_RULES', []))
             
             async def crawl_single(curl):
                 if curl in visited: return [], []
+                
+                # v17.0 Strict Scope Guard
+                if getattr(state, 'OUT_OF_SCOPE_RULES', []) or getattr(state, 'IN_SCOPE_RULES', []):
+                    if not scope_guard.is_in_scope(curl):
+                        return [], []
+                        
                 visited.add(curl)
                 
                 async with spider_semaphore:

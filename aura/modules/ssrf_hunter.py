@@ -48,24 +48,23 @@ class SSRFHunter:
     via response content OR Interactsh DNS callback.
     """
 
-    OAST_DOMAIN = None  # Set at runtime: e.g. "abc123.oast.pro"
+    OAST_CATCHER = None
+    OAST_URL = None
 
     def __init__(self, session=None, oast_domain: str = None):
         self.session = session
-        if oast_domain:
-            self.OAST_DOMAIN = oast_domain
         self._try_load_oast()
 
     def _try_load_oast(self):
         """Try to pick up existing OAST domain from Aura's oast module."""
         try:
-            from aura.modules.oast import OASTProbe
-            probe = OASTProbe()
-            if probe.oast_url:
-                # Extract just the domain part for DNS callback testing
-                self.OAST_DOMAIN = re.sub(r"https?://", "", probe.oast_url).split("/")[0]
-        except Exception:
-            pass
+            from aura.modules.oast import OastCatcher
+            self.OAST_CATCHER = OastCatcher()
+            url = self.OAST_CATCHER.setup()
+            if url:
+                self.OAST_URL = url
+        except Exception as e:
+            console.print(f"[dim red]Failed to load OAST: {e}[/dim red]")
 
     @staticmethod
     def _extract_url_params(url: str) -> list[tuple[str, str]]:
@@ -125,27 +124,35 @@ class SSRFHunter:
                 break
 
         # Blind SSRF via OAST DNS callback
-        if not findings and self.OAST_DOMAIN:
-            oast_payload = f"http://{param_name}.{self.OAST_DOMAIN}/"
+        if not findings and self.OAST_URL:
+            # v17.0 OOB Validation Engine - Precise Webhook Targeting
+            oast_payload = f"{self.OAST_URL}?source=aura_ssrf&param={param_name}"
             qs = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
             qs[param_name] = [oast_payload]
             new_query  = urllib.parse.urlencode(qs, doseq=True)
             target_url = parsed._replace(query=new_query).geturl()
 
+            console.print(f"[dim yellow][SSRF] Sending OAST probe via {param_name}...[/dim yellow]")
             await self._probe(target_url)
-            # Note: actual DNS callback confirmation requires polling Interactsh
-            # We flag this as UNCONFIRMED pending OAST callback
-            console.print(f"[yellow][SSRF?] Blind SSRF probe sent via {param_name} → {oast_payload}[/yellow]")
-            findings.append(self._make_finding(
-                vuln_type="Blind SSRF (OAST Probe Sent)",
-                severity="HIGH",
-                cvss=8.6,
-                url=base_url,
-                param=param_name,
-                payload=oast_payload,
-                proof=f"OAST DNS probe sent to {self.OAST_DOMAIN}. Check for DNS callback.",
-                confirmed=False,
-            ))
+            
+            # v17.0 Zero-Rejection Engine: Synchronous Polling for undeniable proof
+            await asyncio.sleep(3)
+            interactions = self.OAST_CATCHER.poll()
+            
+            if interactions:
+                # We got a hit! Confirmed Out-of-Band SSRF.
+                proof_data = str(interactions[0])[:300]
+                console.print(f"[bold red][!!! SSRF CONFIRMED !!!] OAST Callback received from {base_url} via {param_name}[/bold red]")
+                findings.append(self._make_finding(
+                    vuln_type="Blind SSRF (OAST Confirmed)",
+                    severity="CRITICAL",
+                    cvss=9.8,
+                    url=base_url,
+                    param=param_name,
+                    payload=oast_payload,
+                    proof=f"OAST HTTP Callback Received. Server made a request to our webhook. Evidence: {proof_data}",
+                    confirmed=True,
+                ))
 
         return findings
 
@@ -198,13 +205,11 @@ class SSRFHunter:
 
         confirmed = [f for f in all_findings if f.get("confirmed")]
         if confirmed:
-            console.print(f"[bold red][SSRF] {len(confirmed)} SSRF(s) CONFIRMED![/bold red]")
-        elif all_findings:
-            console.print(f"[yellow][SSRF] {len(all_findings)} OAST probe(s) sent — awaiting callbacks.[/yellow]")
+            console.print(f"[bold red][SSRF] {len(confirmed)} SSRF(s) CONFIRMED with physical evidence![/bold red]")
+            return confirmed
         else:
-            console.print("[dim green][SSRF] No SSRF vulnerabilities found.[/dim green]")
-
-        return all_findings
+            console.print("[dim green][SSRF] No SSRF vulnerabilities successfully verified Out-of-Band.[/dim green]")
+            return []
 
     async def scan_target(self, base_url: str) -> list[dict]:
         """
