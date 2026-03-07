@@ -72,7 +72,22 @@ class BusinessLogicAuditor:
                     if res.status_code == 200 and len(res.text) > 200:
                         # Check if different data is returned (heuristic: different content length)
                         original_res = await self.session.get(url, timeout=state.NETWORK_TIMEOUT)
-                        if abs(len(res.text) - len(original_res.text)) > 50:
+                        
+                        # --- Baseline Check for Ghost v5 ---
+                        # Fetch an obviously invalid ID to get the default 'error' or 'not found' page length
+                        if key == "path_segment":
+                            invalid_url = url.replace(f"/{orig_val}/", f"/999999999/").replace(f"/{orig_val}", f"/999999999")
+                        else:
+                            invalid_params = {k: v for k, v in params.items()}
+                            invalid_params[key] = ["999999999"]
+                            invalid_query = urlencode({k: v[0] for k, v in invalid_params.items()})
+                            invalid_url = urlunparse(parsed._replace(query=invalid_query))
+                            
+                        invalid_res = await self.session.get(invalid_url, timeout=state.NETWORK_TIMEOUT)
+                        invalid_len = len(invalid_res.text) if invalid_res else 0
+                        
+                        # Only proceed if the response length differs significantly from BOTH the original and the invalid baseline
+                        if abs(len(res.text) - len(original_res.text)) > 50 and abs(len(res.text) - invalid_len) > 50:
                             # Ask AI to confirm if data leakage occurred
                             ai_confirm_prompt = f"""
                             IDOR Test Result Analysis:
@@ -80,6 +95,7 @@ class BusinessLogicAuditor:
                             Test URL: {test_url} (param {key}={test_val})
                             Original Response Size: {len(original_res.text)} bytes
                             Test Response Size: {len(res.text)} bytes
+                            Invalid Baseline Size: {invalid_len} bytes
                             Test Response Snippet: {res.text[:500]}
 
                             Does the test response show data belonging to a DIFFERENT user/object than expected?

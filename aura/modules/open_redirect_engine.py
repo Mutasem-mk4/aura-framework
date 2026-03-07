@@ -53,9 +53,19 @@ class OpenRedirectEngine:
         return "aura-redirect-test.com" in loc
 
     async def _test_param(self, client, url: str, param: str, payload: str) -> dict | None:
-        """Tests a single redirect parameter with a payload."""
+        """Tests a single redirect parameter with a payload.
+        v23.0: Baseline check to eliminate false positives.
+        """
         test_url = f"{url}?{param}={payload}"
         try:
+            # --- Baseline: check without evil payload ---
+            baseline_url = f"{url}?{param}=https://www.google.com"
+            baseline_r = await client.get(baseline_url, timeout=8, follow_redirects=False)
+            baseline_loc = baseline_r.headers.get("Location", "")
+            # If the site redirects to anything on param=google too, it's just a generic redirect, not a vulnerability
+            if baseline_r.status_code in (301, 302, 303, 307, 308) and "google.com" in baseline_loc:
+                return None  # Site blindly redirects all param values, not an IDOR
+
             r = await client.get(test_url, timeout=8, follow_redirects=False)
             if r.status_code in (301, 302, 303, 307, 308) and self._check_redirected(r):
                 loc = r.headers.get("Location", "")
@@ -71,6 +81,7 @@ class OpenRedirectEngine:
                         f"Parameter: `{param}`\n"
                         f"Payload: {payload}\n"
                         f"Location: {loc}\n"
+                        f"Baseline ({baseline_url}): {baseline_r.status_code} (no evil redirect)\n"
                         f"Impact: Can be chained with OAuth to steal access_tokens, "
                         f"or used for phishing attacks."
                     ),
@@ -81,6 +92,7 @@ class OpenRedirectEngine:
         except Exception:
             pass
         return None
+
 
     async def _scan_oauth_redirect(self, client, base_url: str) -> list:
         """Tests OAuth redirect_uri for open redirect."""

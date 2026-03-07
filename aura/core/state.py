@@ -75,7 +75,7 @@ CUSTOM_CONSULTANT = "Independent Security Researcher"
 CUSTOM_COMPANY = "Security Assessment Team"
 
 # Gemini AI Configuration: Primary and Secondary mappings for resilience
-GEMINI_API_KEY = "AIzaSyCrnsofNTDx0J5IBaUa0RI9heQNmn2bBxE"
+GEMINI_API_KEY = "AIzaSyAPiNH7TSmsBx_G2Z13GzlKZA6jUMnx1Hg"
 GEMINI_MODEL = "gemini-2.5-flash" # v19.4: gemini-2.5-flash (confirmed available with this API key)
 
 # OSINT API Keys (read from environment or .env)

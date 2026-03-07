@@ -533,3 +533,6 @@ class AuraStorage:
                 proof=f.get("proof")
             )
         return True
+
+    # v23.0: Alias — many modules call save_finding, which is add_finding
+    save_finding = add_finding

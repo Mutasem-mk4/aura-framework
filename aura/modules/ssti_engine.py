@@ -76,21 +76,33 @@ class SSTIEngine:
 
     async def _probe_param(self, client, url: str, param: str, probe: str,
                            expected: str, engine: str) -> dict | None:
-        """Injects a single probe into a URL parameter."""
+        """Injects a single probe into a URL parameter.
+        v23.0: Uses baseline comparison to eliminate false positives.
+        """
         try:
-            # GET injection
+            # --- Baseline: fetch without payload ---
+            baseline_r = await client.get(url, params={param: "aura_baseline_test_xyz"}, timeout=8)
+            baseline_text = baseline_r.text
+            # If the expected value is ALREADY in the baseline, skip — not injectable
+            if expected in baseline_text:
+                return None
+
+            # --- GET injection ---
             r = await client.get(url, params={param: probe}, timeout=8)
             if expected in r.text:
                 return {"url": url, "param": param, "probe": probe,
                         "expected": expected, "engine": engine,
                         "response_snippet": r.text[:300]}
 
-            # POST injection
+            # --- POST injection ---
             r = await client.post(url, data={param: probe}, timeout=8)
             if expected in r.text:
-                return {"url": url, "param": param, "probe": probe,
-                        "expected": expected, "engine": engine,
-                        "response_snippet": r.text[:300], "method": "POST"}
+                # Also check POST baseline
+                baseline_post = await client.post(url, data={param: "aura_baseline_test_xyz"}, timeout=8)
+                if expected not in baseline_post.text:
+                    return {"url": url, "param": param, "probe": probe,
+                            "expected": expected, "engine": engine,
+                            "response_snippet": r.text[:300], "method": "POST"}
         except Exception:
             pass
         return None
