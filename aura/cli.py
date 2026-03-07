@@ -623,7 +623,8 @@ def auto(target, enforce_scope, tor, cloud_swarm, fast, open_report):
         # v22.4: If no findings, generate a null-findings recon report so the user always gets a file
         if not md_path:
             import os, datetime
-            report_dir = os.path.join(os.getcwd(), "reports")
+            _pkg_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            report_dir = os.path.join(_pkg_root, "reports")
             os.makedirs(report_dir, exist_ok=True)
             ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             md_path = os.path.join(report_dir, f"recon_report_{target.replace('/', '_')}_{ts}.md")
