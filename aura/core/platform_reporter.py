@@ -48,7 +48,9 @@ class PlatformReporter:
 
     def __init__(self, db_path=None):
         self.db = AuraStorage(db_path)
-        self.report_dir = os.path.join(os.getcwd(), "reports")
+        # v22.6: Use __file__ to anchor reports dir to project root (not os.getcwd())
+        _pkg_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        self.report_dir = os.path.join(_pkg_root, "reports")
         os.makedirs(self.report_dir, exist_ok=True)
 
     def _get_findings(self, target_filter: str = None) -> list[dict]:
