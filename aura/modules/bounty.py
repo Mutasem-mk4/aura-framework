@@ -296,6 +296,12 @@ class BountyHunter:
         """Scans for leaked secrets using RegEx and high-entropy string detection (v3 - Expanded)."""
         if not url.startswith("http"):
             url = f"http://{url}"
+        
+        # v22.6 DNS Pre-flight Guard
+        import urllib.parse as _urlp
+        _h = _urlp.urlparse(url).netloc
+        if state.is_dns_failed(_h):
+            return []
             
         console.print(f"[bold yellow][*] Bounty Hunter v3: Scanning for secrets on {url}...[/bold yellow]")
         

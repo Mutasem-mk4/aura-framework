@@ -241,6 +241,13 @@ class PowerStack:
         live_urls = [r for r in results if r and isinstance(r, str)]
         
         if not live_urls and urls:
+            # v22.6: Only force reachable if DNS is not dead
+            from aura.core import state as _state
+            import urllib.parse as _urlp
+            _first_host = _urlp.urlparse(urls[0]).netloc if urls else ""
+            if _first_host and _state.is_dns_failed(_first_host):
+                console.print(f"[dim yellow][!] Target DNS dead. Skipping forced reachability.[/dim yellow]")
+                return []
             console.print(f"[bold red][!] Warning: All liveness probes failed. v19.2: Forcing first 5 URLs as 'Reachable' to prevent engine stall.[/bold red]")
             return urls[:5]
 

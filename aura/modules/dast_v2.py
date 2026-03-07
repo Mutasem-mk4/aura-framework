@@ -62,6 +62,12 @@ class AuraSingularity:
             search_url = f"http://{url}"
         else:
             search_url = url
+        
+        # v22.6 DNS Pre-flight Guard: skip Playwright for dead hosts
+        import urllib.parse as _urlp
+        _h = _urlp.urlparse(search_url).netloc
+        if state.is_dns_failed(_h):
+            return []
             
         console.print(f"[bold red][🌋] SINGULARITY ACTIVATED: Initiating CoT Attack on {search_url}...[/bold red]")
         

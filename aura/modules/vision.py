@@ -95,6 +95,12 @@ class VisualEye:
         """Captures a screenshot, fingerprints tech stack, and runs OCR intelligence analysis."""
         if not url.startswith("http"):
             url = f"http://{url}"
+        
+        # v22.6 DNS Pre-flight Guard
+        import urllib.parse as _urlp
+        _h = _urlp.urlparse(url).netloc
+        if state.is_dns_failed(_h):
+            return None
             
         console.print(f"[bold yellow][*] VisualEye: Capturing screenshot & Analyzing {url}...[/bold yellow]")
         path = os.path.join(self.output_dir, f"{filename}.png")

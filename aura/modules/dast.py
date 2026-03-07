@@ -1086,8 +1086,12 @@ class AuraDAST:
         
         # v22.5 DNS Pre-flight Guard: skip entirely if host is known dead
         if not url.startswith("http"): url = f"http://{url}"
-        _h = __import__("urllib.parse").urlparse(url).netloc
-        if state.is_dns_failed(_h):
+        try:
+            import urllib.parse as _urlp
+            _h = _urlp.urlparse(url).netloc
+        except Exception:
+            _h = ""
+        if _h and state.is_dns_failed(_h):
             return []
         
         visited.add(url)
