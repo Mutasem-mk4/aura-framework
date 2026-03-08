@@ -100,7 +100,7 @@ class MarkdownReporter:
                 # Steps To Reproduce
                 f.write("### Steps To Reproduce\n")
                 # Attempt to extract secret-specific details
-                if "secret" in f_type.lower():
+                if "secret" in f_type.lower() or "credential" in f_type.lower():
                     val_status = finding.get('validation_status', 'UNVERIFIED')
                     val_evidence = finding.get('validation_evidence', '')
                     secret_val = finding.get('secret_value', '********')
@@ -109,20 +109,37 @@ class MarkdownReporter:
                         f.write(f"**Verification Status:** ✅ CONFIRMED EXPLOITABLE\n\n")
                     f.write("1. Navigate to the following exposed endpoint:\n")
                     f.write(f"   ```http\n   GET {url}\n   ```\n")
-                    f.write(f"2. Observe the leaked `{f_type}` credential (partial value: `{secret_val}`).\n")
+                    f.write(f"2. Observe the leaked `{f_type}` credential (exact raw value: `{secret_val}`).\n")
                     f.write("3. You can reproduce this immediately via terminal:\n")
-                    f.write(f"   ```bash\n   curl -sk \"{url}\" | grep -oE \"[A-Za-z0-9/+=]{{32,64}}\"\n   ```\n")
+                    f.write(f"   ```bash\n   curl -sk \"{url}\" | grep -F \"{secret_val}\"\n   ```\n")
                     
                     if val_evidence:
                         f.write("4. Direct API authentication confirms the credential is live and holds access privileges:\n")
                         f.write(f"   ```json\n   {val_evidence}\n   ```\n")
                 else:
                     payload = finding.get('payload', 'Target-specific payload')
+                    raw_request = finding.get('raw_request', '')
+                    proof = finding.get('proof', '')
+                    
                     f.write("1. Navigate to the vulnerable endpoint:\n")
                     f.write(f"   `{url}`\n")
                     f.write(f"2. Inject the following payload:\n")
                     f.write(f"   ```\n   {payload}\n   ```\n")
-                    f.write("3. Observe the successful execution/bypass.\n")
+                    if raw_request:
+                        f.write(f"3. Replay the following exact HTTP Request:\n")
+                        # Add proper indentation to the block
+                        formatted_req = "\n".join([f"   {line}" for line in raw_request.splitlines()])
+                        f.write(f"   ```http\n{formatted_req}\n   ```\n")
+                        step_num = 4
+                    else:
+                        step_num = 3
+                        
+                    if proof:
+                        f.write(f"{step_num}. Observe the successful execution/bypass in the response:\n")
+                        formatted_proof = "\n".join([f"   {line}" for line in proof.splitlines()])
+                        f.write(f"   ```\n{formatted_proof}\n   ```\n")
+                    else:
+                        f.write(f"{step_num}. Observe the successful execution/bypass.\n")
                 
                 f.write("\n")
                 

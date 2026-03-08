@@ -25,12 +25,14 @@ class HeavyWeaponry:
         # cmd = ["sqlmap", "-u", url, "--batch", "--random-agent", "--level=5", "--risk=3"]
         return [{"type": "Sqlmap Hit", "severity": "CRITICAL", "content": "Confirmed DB access via Sqlmap."}]
 
-    def import_external_finding(self, target_id, finding: Dict):
+    def import_external_finding(self, target_value, finding: Dict):
         """Persists external tool findings into AuraStorage."""
+        content = finding["content"]
+        if finding.get("severity"):
+            content = f"[{finding['severity']}] {content}"
+            
         self.db.add_finding(
-            target_id=target_id,
-            finding_type=finding["type"],
-            severity=finding["severity"],
-            content=finding["content"],
-            status="CONFIRMED_EXTERNAL"
+            target_value=target_value,
+            content=content,
+            finding_type=finding["type"]
         )

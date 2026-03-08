@@ -508,7 +508,7 @@ class AuraDAST:
                 # Fast generic payload checks
                 for vuln_type in ["SQLi", "XSS", "Command Injection", "Local File Inclusion"]:
                     if state.is_halted(): break
-                    if not self.oast.uuid: self.oast.setup()
+                    if not hasattr(self.oast, 'uuid') or not self.oast.uuid: self.oast.setup()
                     
                     # v11.0 Hard Reset: Injection Overdrive (Fire all 50+ payloads)
                     if vuln_type in self.PAYLOADS:

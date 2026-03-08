@@ -110,24 +110,37 @@ class PlatformReporter:
                 fp.write(f"{f.get('content', f_type + ' vulnerability detected.')}\n\n")
 
                 fp.write("### Steps to Reproduce\n")
-                if "secret" in f_type.lower():
+                if "secret" in f_type.lower() or "credential" in f_type.lower():
                     fp.write(f"1. Navigate to: `{url}`\n")
-                    fp.write(f"2. Observe the exposed credential: `{f.get('secret_value', '[redacted]')}`\n")
+                    fp.write(f"2. Observe the exact exposed credential: `{f.get('secret_value', 'N/A')}`\n")
                     if confirmed:
                         fp.write(f"3. Validate liveness:\n")
                         fp.write(f"   ```bash\n   # {account_info}\n   ```\n")
-                elif "403" in f_type.lower() or "bypass" in f_type.lower():
-                    fp.write(f"1. Send a request to `{url}` — observe 403.\n")
-                    fp.write(f"2. Retry with header `X-Forwarded-For: 127.0.0.1` — observe 200.\n")
-                elif "cors" in f_type.lower():
-                    fp.write(f"1. Send OPTIONS request to `{url}` with `Origin: https://evil.com`\n")
-                    fp.write(f"2. Observe `Access-Control-Allow-Origin: https://evil.com` in response.\n")
-                elif "graphql" in f_type.lower():
-                    fp.write(f"1. Send POST to `{url}` with body: `{{\"query\":\"{{ __schema {{ types {{ name }} }} }}\"}}`\n")
-                    fp.write(f"2. Observe full schema returned in response.\n")
                 else:
-                    fp.write(f"1. Navigate to `{url}`.\n")
-                    fp.write(f"2. {f.get('content', 'Observe the vulnerability.')[:200]}\n")
+                    payload = f.get('payload', '')
+                    raw_req = f.get('raw_request', '')
+                    proof = f.get('proof', '')
+                    
+                    if payload or raw_req:
+                        step = 1
+                        if url != "N/A":
+                            fp.write(f"{step}. Target Endpoint: `{url}`\n")
+                            step += 1
+                        if payload:
+                            fp.write(f"{step}. Inject the following payload:\n   ```\n   {payload}\n   ```\n")
+                            step += 1
+                        if raw_req:
+                            fp.write(f"{step}. Replay Exact HTTP Request:\n")
+                            formatted_req = "\n".join([f"   {line}" for line in raw_req.splitlines()])
+                            fp.write(f"   ```http\n{formatted_req}\n   ```\n")
+                            step += 1
+                        if proof:
+                            fp.write(f"{step}. Observe the Proof of Exploitation in the response:\n")
+                            formatted_proof = "\n".join([f"   {line}" for line in proof.splitlines()])
+                            fp.write(f"   ```\n{formatted_proof}\n   ```\n")
+                    else:
+                        fp.write(f"1. Navigate to `{url}`.\n")
+                        fp.write(f"2. {f.get('content', 'Observe the vulnerability.')}\n")
                 fp.write("\n")
 
                 fp.write("### Impact\n")
@@ -184,13 +197,35 @@ class PlatformReporter:
                 if "secret" in f_type.lower() or "credential" in f_type.lower():
                     fp.write(f"1. Fetch the exposed resource:\n")
                     fp.write(f"   ```bash\n   curl -s '{url}'\n   ```\n")
-                    fp.write(f"2. The response contains the exposed credential value: `{f.get('secret_value', '[redacted]')}`\n")
+                    fp.write(f"2. The response contains the EXACT exposed credential value: `{f.get('secret_value', 'N/A')}`\n")
                     if confirmed:
                         fp.write(f"3. The credential was validated as live:\n")
                         fp.write(f"   > {f.get('account_info', '')}\n")
                 else:
-                    fp.write(f"1. Navigate to: `{url}`\n")
-                    fp.write(f"2. {f.get('content', '...')[:300]}\n")
+                    payload = f.get('payload', '')
+                    raw_req = f.get('raw_request', '')
+                    proof = f.get('proof', '')
+                    
+                    if payload or raw_req:
+                        step = 1
+                        if url != "N/A":
+                            fp.write(f"{step}. Target Endpoint: `{url}`\n")
+                            step += 1
+                        if payload:
+                            fp.write(f"{step}. Inject Payload:\n   ```\n   {payload}\n   ```\n")
+                            step += 1
+                        if raw_req:
+                            fp.write(f"{step}. Or Replay this Exact HTTP Request:\n")
+                            formatted_req = "\n".join([f"   {line}" for line in raw_req.splitlines()])
+                            fp.write(f"   ```http\n{formatted_req}\n   ```\n")
+                            step += 1
+                        if proof:
+                            fp.write(f"{step}. Observe Response Proof:\n")
+                            formatted_proof = "\n".join([f"   {line}" for line in proof.splitlines()])
+                            fp.write(f"   ```\n{formatted_proof}\n   ```\n")
+                    else:
+                        fp.write(f"1. Navigate to: `{url}`\n")
+                        fp.write(f"2. {f.get('content', '...')}\n")
                 fp.write("\n")
 
                 fp.write("### Impact\n")
@@ -240,8 +275,26 @@ class PlatformReporter:
                 fp.write(f"{f.get('content', f_type + ' vulnerability identified.')}\n\n")
 
                 fp.write("**Reproduction Steps:**\n")
-                fp.write(f"1. Access: `{url}`\n")
-                fp.write(f"2. {f.get('content', '...')[:200]}\n\n")
+                if "secret" in f_type.lower() or "credential" in f_type.lower():
+                    fp.write(f"1. Fetch `{url}`\n")
+                    fp.write(f"2. Extract raw credential: `{f.get('secret_value', 'N/A')}`\n\n")
+                else:
+                    payload = f.get('payload', '')
+                    raw_req = f.get('raw_request', '')
+                    proof = f.get('proof', '')
+                    if payload or raw_req:
+                        if url != "N/A":
+                            fp.write(f"- **Target:** `{url}`\n")
+                        if payload:
+                            fp.write(f"- **Payload:** `{payload}`\n")
+                        if raw_req:
+                            fp.write(f"- **HTTP Request:**\n   ```http\n   {raw_req.replace(chr(10), chr(10)+'   ')}\n   ```\n")
+                        if proof:
+                            fp.write(f"- **Response Proof:**\n   ```\n   {proof.replace(chr(10), chr(10)+'   ')}\n   ```\n")
+                        fp.write("\n")
+                    else:
+                        fp.write(f"1. Access: `{url}`\n")
+                        fp.write(f"2. {f.get('content', '...')}\n\n")
 
                 fp.write("**Impact:**\n")
                 fp.write(f"{f.get('impact_desc', 'Security impact to the target.')}\n\n")

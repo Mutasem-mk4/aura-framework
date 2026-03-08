@@ -169,7 +169,7 @@ class PoCEngine:
         console.print(f"[bold yellow][🔬 PoC-LFI] Reading sensitive file: {base_url}{path}[/bold yellow]")
         try:
             resp = await self.session.get(f"{base_url}{path}", timeout=state.NETWORK_TIMEOUT)
-            if resp.status_code == 200 and len(resp.text) > 10:
+            if resp and resp.status_code == 200 and len(resp.text) > 10:
                 lines = [l.strip() for l in resp.text.splitlines() if l.strip()][:3]
                 snippet = "\n".join(lines)
 

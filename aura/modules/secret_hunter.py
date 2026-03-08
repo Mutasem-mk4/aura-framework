@@ -27,8 +27,10 @@ import asyncio
 import urllib.parse
 from datetime import datetime, timezone
 from rich.console import Console
+from rich.console import Console
 from aura.core.storage import AuraStorage
 from aura.core import state
+from aura.modules.key_validator import KeyValidator
 
 console = Console()
 db_logger = AuraStorage()
@@ -101,85 +103,9 @@ class SecretHunter:
     async def _validate_secret(self, secret_type: str, value: str) -> tuple[bool, str]:
         """
         Actively validates a discovered secret by probing the issuer's API.
-        Returns (is_confirmed, account_info).
-        Never raises — returns (False, "Validation error") on any failure.
+        Delegates to the dedicated KeyValidator module for Auto-Exploitation.
         """
-        try:
-            import httpx
-            async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
-
-                # ── AWS Access Key ──────────────────────────────────────────
-                if secret_type == "AWS Access Key":
-                    # AWS STS GetCallerIdentity — always works if key is valid, no permissions needed
-                    url = "https://sts.amazonaws.com/"
-                    params = {
-                        "Action": "GetCallerIdentity",
-                        "Version": "2011-06-15",
-                    }
-                    r = await client.get(url, params=params, headers={"Accept": "application/json"})
-                    if r.status_code == 200:
-                        return True, "AWS key is VALID — STS confirmed identity"
-                    elif r.status_code == 403:
-                        return True, "AWS key EXISTS but lacks STS permission (still compromised)"
-                    return False, f"AWS STS returned {r.status_code}"
-
-                # ── GitHub Token ──────────────────────────────────────────
-                elif secret_type in ("GitHub Token (Classic)", "GitHub OAuth", "GitHub App Token"):
-                    r = await client.get(
-                        "https://api.github.com/user",
-                        headers={"Authorization": f"token {value}", "Accept": "application/vnd.github+json"},
-                    )
-                    if r.status_code == 200:
-                        data = r.json()
-                        return True, f"GitHub user: @{data.get('login', 'unknown')} (scopes valid)"
-                    return False, f"GitHub API returned {r.status_code}"
-
-                # ── Stripe Secret Key ─────────────────────────────────────
-                elif secret_type == "Stripe Secret Key":
-                    r = await client.get(
-                        "https://api.stripe.com/v1/account",
-                        headers={"Authorization": f"Bearer {value}"},
-                    )
-                    if r.status_code == 200:
-                        data = r.json()
-                        return True, f"Stripe account: {data.get('email', 'unknown')} ({data.get('business_type', '')})"
-                    return False, f"Stripe API returned {r.status_code}"
-
-                # ── OpenAI API Key ────────────────────────────────────────
-                elif secret_type == "OpenAI API Key":
-                    r = await client.get(
-                        "https://api.openai.com/v1/models",
-                        headers={"Authorization": f"Bearer {value}"},
-                    )
-                    if r.status_code == 200:
-                        return True, "OpenAI key is VALID — model list accessible"
-                    return False, f"OpenAI API returned {r.status_code}"
-
-                # ── Google API Key ────────────────────────────────────────
-                elif secret_type == "Google API Key":
-                    r = await client.get(
-                        "https://maps.googleapis.com/maps/api/geocode/json",
-                        params={"address": "test", "key": value},
-                    )
-                    body = r.json() if r.status_code == 200 else {}
-                    if body.get("status") not in ("REQUEST_DENIED", "INVALID_REQUEST", None):
-                        return True, f"Google API key is VALID — status: {body.get('status')}"
-                    return False, "Google API key denied or invalid"
-
-                # ── SendGrid ──────────────────────────────────────────────
-                elif secret_type == "SendGrid API Key":
-                    r = await client.get(
-                        "https://api.sendgrid.com/v3/user/account",
-                        headers={"Authorization": f"Bearer {value}"},
-                    )
-                    if r.status_code == 200:
-                        return True, "SendGrid API key is VALID"
-                    return False, f"SendGrid returned {r.status_code}"
-
-        except Exception as e:
-            return False, f"Validation error: {e}"
-
-        return False, "No validator implemented for this type"
+        return await KeyValidator.validate_secret(secret_type, value)
 
 
     # ─── Layer 2: Shannon Entropy ────────────────────────────────────────────
@@ -275,7 +201,7 @@ class SecretHunter:
                     confirmation_badge = f"[UNCONFIRMED] Could not validate live: {account_info}"
                     console.print(f"[bold red][SECRET FOUND] {secret_type} (unconfirmed) in {source_url}[/bold red]")
 
-                # Redact for safe display
+                # Redact for safe display in console/logs
                 if len(evidence) > 10:
                     display = evidence[:6] + "****" + evidence[-4:]
                 else:
@@ -291,7 +217,7 @@ class SecretHunter:
                     "content": (
                         f"{confirmation_badge}\n"
                         f"Exposed {secret_type} found at {source_url}\n"
-                        f"Evidence: '{display}' | Entropy: {self._entropy(evidence):.2f} bits/char"
+                        f"Evidence: '{evidence}' | Entropy: {self._entropy(evidence):.2f} bits/char"
                     ),
                     "remediation_fix": (
                         f"1. Immediately REVOKE the exposed {secret_type} from the issuing platform's dashboard.\n"
@@ -309,7 +235,7 @@ class SecretHunter:
                     "patch_priority": "IMMEDIATE",
                     "evidence_url": source_url,
                     "secret_type": secret_type,
-                    "secret_value": display,
+                    "secret_value": evidence, # Store UNREDACTED secret for Bug Bounty submission
                     "confirmed": is_confirmed,
                     "account_info": account_info,
                 })
@@ -354,7 +280,7 @@ class SecretHunter:
                 continue
             content = await self._fetch_file(url)
             if content:
-                findings = self._scan_content(content, url, is_html=False)
+                findings = await self._scan_content(content, url, is_html=False)
                 if findings:
                     all_findings.extend(findings)
                     console.print(f"[bold red]  [!!!] {len(findings)} secret(s) in {url}[/bold red]")

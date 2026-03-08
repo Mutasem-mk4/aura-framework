@@ -5,17 +5,17 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="aura-cli",
-    version="19.5.0",
-    author="Aura Security",
-    author_email="security@aura.local",
-    description="The Apex Predator. Next-generation, autonomous, AI-driven Bug Bounty and Penetration Testing framework.",
+    version="25.0.0",
+    author="Mutasem Kharma",
+    author_email="mutasem@aura-project.io",
+    description="Aura v25.0 — The Omni-Sovereign Bug Bounty & Pentest Framework.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/Mutasem-mk4/Aura-Predator",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
-        "Private :: Do Not Upload",
+        "Framework :: Pytest",
         "Operating System :: OS Independent",
         "Topic :: Security",
     ],

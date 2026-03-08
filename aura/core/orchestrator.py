@@ -2,6 +2,7 @@ import json
 import asyncio
 import os
 import random
+import gc
 from aura.core.brain import AuraBrain
 from aura.core.stealth import StealthEngine, AuraSession
 from aura.modules.scanner import AuraScanner
@@ -35,9 +36,10 @@ from aura.modules.wayback_scanner import WaybackScanner   # v20.0 Phase 4: Histo
 from aura.modules.bypass_engine import BypassEngine       # v20.0 Phase 5: 403 Bypass Engine
 from aura.core.markdown_reporter import MarkdownReporter  # v20.0 Markdown Bounty Report
 from aura.modules.race_condition_hunter import RaceConditionHunter  # v28.0 Phase 14
-from aura.modules.ssti_engine import SSTIEngine                     # v28.0 Phase 15
-from aura.modules.smuggling_engine import SmugglingEngine            # v28.0 Phase 16
-from aura.modules.cache_poisoning_engine import CachePoisoningEngine # v29.0 Phase 17
+from aura.modules.evidence_dumper import EvidenceDumper                  # v26.0 Phase 1
+from aura.modules.artifact_builder import ArtifactBuilder                # v26.0 Phase 3
+from aura.modules.cache_poisoning_engine import CachePoisoningEngine   # v29.0 Phase 17
+from aura.modules.logic_hunter import LogicHunter                      # v37.0 Phase 18
 from aura.modules.xxe_engine import XXEEngine                        # v29.0 Phase 18
 from aura.modules.prototype_pollution_engine import PrototypePollutionEngine  # v29.0 Phase 19
 from aura.modules.dom_hunter import DOMHunter                        # v29.0 Phase 20
@@ -49,10 +51,17 @@ from aura.modules.open_redirect_engine import OpenRedirectEngine     # v31.0 Pha
 from aura.modules.file_upload_engine import FileUploadEngine         # v31.0 Phase 26
 from aura.modules.deserialize_engine import DeserializationEngine    # v31.0 Phase 27
 from aura.modules.ws_oauth_engine import WSAndOAuthEngine            # v31.0 Phase 28
+from aura.modules.ssti_engine import SSTIEngine                  # v28.0 Phase 15
+from aura.modules.smuggling_engine import SmugglingEngine        # v28.0 Phase 16
 from aura.modules.exploit_radar import ExploitRadar # v32.0 Exploit Radar
 from aura.modules.dorks_intel import DorksIntel     # v33.0 Dorks Intel
+from aura.modules.subdomain_takeover import SubdomainTakeoverHunter # v34.0 Auto-Exploitation
+from aura.modules.nuclei_engine import NucleiEngine                 # v35.0 Heavy Artillery
 from aura.core import state
 from aura.core.storage import AuraStorage
+from aura.core.oast_server import OASTManager
+from aura.modules.submitter import BountySubmitter
+from aura.modules.profit_engine import ProfitEngine
 from rich.console import Console
 
 console = Console()
@@ -94,8 +103,14 @@ class NeuralOrchestrator:
         self.dast_semaphore = asyncio.Semaphore(10)       # Velocity v7.4: Scaled from 5 to 10
         self.sing_semaphore = asyncio.Semaphore(5)        # Velocity v7.4: Scaled from 3 to 5
         self.scope_checker  = ScopeChecker()              # v20.0: Bug Bounty Scope Guard
+        self.oast = OASTManager.get_instance()           # v38.0: OAST Subsystem
+        self.oast_task = None
         self.dorks_intel    = DorksIntel()                # v33.0: Dorks Intelligence
-        
+        self.takeover_hunter = SubdomainTakeoverHunter()   # v34.0: Auto-Exploitation Takeover
+        self.nuclei_engine   = NucleiEngine()              # v35.0: Heavy Artillery
+        self.submitter       = BountySubmitter()           # Phase 32: Submission Gate
+        self.profit_engine   = ProfitEngine()              # Phase 32: Profit Advisor
+
         from aura.modules.cloud_swarm import CloudSwarm
         self.cloud_swarm = CloudSwarm()                   # v21.0: Cloud Swarm
         
@@ -166,6 +181,21 @@ class NeuralOrchestrator:
             await self.lateral.pivot_from_finding(content_obj)
             
         return None
+
+    async def _memory_watchdog(self):
+        """v32.0 Titan Memory Optimizer: Prevents OOM and DB-Lock on huge targets."""
+        try:
+            while True:
+                await asyncio.sleep(600)  # Every 10 minutes
+                console.print("[dim yellow][🛡️ TITAN] Running Titan Memory Garbage Collection & DB Vacuum...[/dim yellow]")
+                # Force garbage collection
+                collected = gc.collect()
+                console.print(f"[dim yellow]   -> Cleaned {collected} unreferenced objects from RAM.[/dim yellow]")
+                # Force DB Vacuum if applicable
+                if hasattr(self.db, 'vacuum'):
+                    self.db.vacuum()
+        except asyncio.CancelledError:
+            console.print("[dim yellow][🛡️ TITAN] Memory Watchdog gracefully terminated.[/dim yellow]")
 
     async def activate_sentient_mode(self, domain: str):
         """
@@ -243,6 +273,9 @@ class NeuralOrchestrator:
         console.print(f"[bold red][!] INITIALIZING ZENITH PROTOCOL FOR: {domain}[/bold red]")
         console.print(f"[SIEGE] [bold red]Aura v25.0 [OMEGA PROTOTYPE][/bold red]: Engaging Sentient Singularity for {domain}...")
         self.db.log_action("START_CHAIN", domain, "NeuralOrchestrator engaged (v25.0 Omega Singularity)", campaign_id)
+
+        # v32.0 Titan Memory Optimizer
+        watchdog_task = asyncio.create_task(self._memory_watchdog())
 
         # v25.0 Omega Prototype: Activate Sentient Intelligence
         await self.activate_sentient_mode(domain)
@@ -345,6 +378,7 @@ class NeuralOrchestrator:
             except Exception as inner_e:
                 console.print(f"[yellow][!] Pre-Flight Connection Failed for {domain}: {inner_e}[/yellow]")
                 self.db.save_target({"target": domain, "type": "Domain", "status": "DOWN"})
+                if 'watchdog_task' in locals(): watchdog_task.cancel()
                 return {"status": "ERROR", "reason": "connection_failed"}
         
         # Use recon_domain for OSINT that requires a hostname rather than raw IP
@@ -419,7 +453,11 @@ class NeuralOrchestrator:
         findings = [] # Persistent finding aggregation for CoT
         vulns = []    # Shared vulnerability list for AI and DAST
 
-        # v5.0: RECON PIPELINE (Subfinder → HTTPX → Nmap)
+        # v38.0: Initialize OAST Subsystem and start background polling
+        await self.oast.initialize()
+        self.oast_task = asyncio.create_task(self._oast_polling_loop(recon_domain))
+
+        # v5.0 Phase 1: Recon Pipeline (Subfinder -> HTTPX -> Nmap)
         console.print("[bold cyan][*] Phase 0.6: v5.0 Recon Pipeline (Subfinder→HTTPX→Nmap)...[/bold cyan]")
         recon_data = await self.recon_pipeline.run(recon_domain, target_ip)
         self.db.log_action("RECON_PIPELINE", recon_domain, 
@@ -435,11 +473,21 @@ class NeuralOrchestrator:
         
         # 2. Recon & Vision + Tech Analysis (Ghost v4 Intel)
         results = await self.scanner.discover_subdomains(recon_domain)
+        all_subdomains = []
         for res in results:
-            # Fix: scanner.discover_subdomains returns a list of DICTS now, not strings
             if isinstance(res, dict):
                 self.db.save_target(res)
-            
+                if res.get("target"):
+                    all_subdomains.append(res["target"])
+
+        # v34.0 Auto-Exploitation: Subdomain Takeover Probing
+        if all_subdomains:
+            takeover_findings = await self.takeover_hunter.run(all_subdomains)
+            for tf in takeover_findings:
+                self.db.add_finding(recon_domain, tf['content'], tf['type'], campaign_id=campaign_id)
+                findings.append(tf)
+                vulns.append(tf)
+
         # 2.1 Active Reconnaissance (Phase 23: Port Scanning & DirBusting)
         if self.mission_state.get("step") == "ACTIVE_RECON_COMPLETE":
              console.print("[bold yellow][🩹] Zenith: Step 'ACTIVE_RECON_COMPLETE' detected in mission state. Skipping phase 2.1...[/bold yellow]")
@@ -447,9 +495,9 @@ class NeuralOrchestrator:
             console.print("[cyan][*] Phase 2.1: Active Reconnaissance (Port Scanning & DirBusting)...[/cyan]")
             await self.broadcast("Executing Active Port Scan & Directory Brute Forcing...", type="status", icon="radar")
 
-        # v6.0: PowerStack Phase 2.0 — Nuclei CVE Scan
-        console.print("[bold cyan][*] Phase 2.0: v6.0 PowerStack — Nuclei CVE/Template Scan...[/bold cyan]")
-        nuclei_findings = await self.power_stack.nuclei_scan(target_url)
+        # v35.0: The Heavy Artillery — Nuclei Engine
+        console.print("[bold cyan][*] Phase 2.0: v35.0 Heavy Artillery — Nuclei Deep CVE Scan...[/bold cyan]")
+        nuclei_findings = await self.nuclei_engine.scan(target_url)
         for nf in nuclei_findings:
             self.db.add_finding(recon_domain, nf['content'], nf['type'], campaign_id=campaign_id)
             findings.append(nf)
@@ -657,6 +705,29 @@ class NeuralOrchestrator:
             if ep not in discovered_urls:
                 discovered_urls.append(ep)
         self.db.log_action("JS_CSS_EXTRACT", recon_domain, f"Extracted {len(js_endpoints)} hidden endpoints from JS/CSS", campaign_id)
+
+        # Phase 2.3c2: v33.0 JS Decompiler & Webpack Unpacker
+        console.print("[bold cyan][*] Phase 2.3c2: v33.0 JS Decompiler & Webpack Unpacker...[/bold cyan]")
+        try:
+            from aura.modules.js_decompiler import JSDecompiler
+            js_decompiler = JSDecompiler(session=self.session)
+            # Find all JS files from discovered URLs to decompile
+            js_files = [u for u in discovered_urls if u.endswith('.js') or '/static/js/' in u]
+            if js_files:
+                decompiled_results = await js_decompiler.extract_from_js(target_url, js_files)
+                for de_ep in decompiled_results.get("endpoints", []):
+                    if not de_ep.startswith("http"):
+                        de_ep = f"{target_url.rstrip('/')}/{de_ep.lstrip('/')}"
+                    if de_ep not in discovered_urls:
+                        discovered_urls.append(de_ep)
+                
+                for js_url, sec_val in decompiled_results.get("secrets", []):
+                    f_content = f"Hardcoded Secret via JS Decompiler in {js_url}: {sec_val}"
+                    f_type = "Exposed Hardcoded Secrets (JS)"
+                    self.db.add_finding(recon_domain, f_content, f_type, campaign_id=campaign_id)
+                    findings.append({"type": f_type, "content": f_content, "severity": "HIGH"})
+        except Exception as e:
+            console.print(f"[dim red][JS Decompiler] Skipped: {e}[/dim red]")
         
         #  Phase 2.3d: Shodan Port-based Web Discovery
         if intel_data.get("shodan") and intel_data["shodan"].get("ports"):
@@ -910,7 +981,7 @@ class NeuralOrchestrator:
                 plan_raw = self.brain.reason(context)
 
         console.print(f"[cyan][*] Ghost v4 Plan formulated with Intelligence. Executing chain...[/cyan]")
-        self.db.log_action("PLAN_FORMULATED", domain, f"Plan size: {len(plan_raw)}", campaign_id)
+        self.db.log_action("PLAN_FORMULATED", domain, f"Plan size: {len(str(plan_raw or ''))}", campaign_id)
 
         # v19.0 Ghost-Ops: Tactical Diversion
         await self.ghost_ops.launch_diversion(domain)
@@ -1071,7 +1142,7 @@ class NeuralOrchestrator:
         self.db.save_target({"target": domain, "status": "COMPLETED"})
             
         # Step 4.5: Phase 26 OAST Polling
-        if self.dast.oast.uuid:
+        if hasattr(self.dast.oast, 'uuid') and self.dast.oast.uuid:
             console.print("[cyan][👁️] Phase 26: God Mode OAST Polling... Waiting for blind callbacks.[/cyan]")
             await self.broadcast("Waiting for out-of-band blind exploitation callbacks...", type="status", icon="eye")
             await asyncio.sleep(5) # Give out-of-band requests time to hit
@@ -1281,7 +1352,7 @@ class NeuralOrchestrator:
             if jwt_findings:
                 all_findings.extend(jwt_findings)
                 for jf in jwt_findings:
-                    self.db.save_finding(recon_domain, jf)
+                    self.db.save_finding(recon_domain, jf.get("content", str(jf)), jf.get("type", "JWT Attack"))
                 console.print(f"[bold red][[JWT]] {len(jwt_findings)} JWT weakness(es) confirmed![/bold red]")
         except Exception as e:
             console.print(f"[dim red][JWT] Skipped: {e}[/dim red]")
@@ -1295,7 +1366,7 @@ class NeuralOrchestrator:
             if ma_findings:
                 all_findings.extend(ma_findings)
                 for mf in ma_findings:
-                    self.db.save_finding(recon_domain, mf)
+                    self.db.save_finding(recon_domain, mf.get("content", str(mf)), mf.get("type", "Mass Assignment"))
                 console.print(f"[bold red][[MassAssign]] {len(ma_findings)} Mass Assignment weakness(es) confirmed![/bold red]")
         except Exception as e:
             console.print(f"[dim red][MassAssign] Skipped: {e}[/dim red]")
@@ -1304,18 +1375,12 @@ class NeuralOrchestrator:
         console.print("[bold red][*] Phase 14 [SIEGE]: Race Condition Hunter — sub-millisecond burst attack...[/bold red]")
         try:
             race_hunter = RaceConditionHunter(session=session)
-            # Collect discovered URLs from DB for candidate filtering
-            race_urls = [
-                row[0] for row in self.db.conn.execute(
-                    "SELECT url FROM operations WHERE target = ? AND url IS NOT NULL ORDER BY id DESC LIMIT 150",
-                    (recon_domain,)
-                ).fetchall()
-            ] if hasattr(self.db, 'conn') else [target_url]
-            race_findings = await race_hunter.scan_urls(race_urls or [target_url])
+            # Use dynamically discovered endpoints from the Recon/Spider phases
+            race_findings = await race_hunter.scan_urls(discovered_urls if discovered_urls else [target_url])
             if race_findings:
                 all_findings.extend(race_findings)
                 for rf in race_findings:
-                    self.db.save_finding(recon_domain, rf)
+                    self.db.save_finding(recon_domain, rf.get("content", str(rf)), rf.get("type", "Race Condition"))
                 console.print(f"[bold red][[RACE]] {len(race_findings)} Race Condition(s) CONFIRMED![/bold red]")
         except Exception as e:
             console.print(f"[dim red][Race] Skipped: {e}[/dim red]")
@@ -1334,7 +1399,7 @@ class NeuralOrchestrator:
             if ssti_findings:
                 all_findings.extend(ssti_findings)
                 for sf in ssti_findings:
-                    self.db.save_finding(recon_domain, sf)
+                    self.db.save_finding(recon_domain, sf.get("content", str(sf)), sf.get("finding_type", "SSTI Engine"))
                 console.print(f"[bold red][[SSTI]] {len(ssti_findings)} Template Injection(s) → potential RCE![/bold red]")
         except Exception as e:
             console.print(f"[dim red][SSTI] Skipped: {e}[/dim red]")
@@ -1347,7 +1412,7 @@ class NeuralOrchestrator:
             if smug_findings:
                 all_findings.extend(smug_findings)
                 for smf in smug_findings:
-                    self.db.save_finding(recon_domain, smf)
+                    self.db.save_finding(recon_domain, smf.get("content", str(smf)), smf.get("finding_type", "HTTP Request Smuggling"))
                 console.print(f"[bold red][[SMUGGLING]] {len(smug_findings)} HTTP Desync vulnerability confirmed![/bold red]")
         except Exception as e:
             console.print(f"[dim red][Smuggling] Skipped: {e}[/dim red]")
@@ -1388,11 +1453,34 @@ class NeuralOrchestrator:
             if cache_findings:
                 all_findings.extend(cache_findings)
                 for cf in cache_findings:
-                    self.db.save_finding(recon_domain, cf)
-                console.print(f"[bold red][[CACHE POISON]] {len(cache_findings)} Cache Poisoning vector(s) found![/bold red]")
+                    self.db.save_finding(recon_domain, cf.get("content", str(cf)), cf.get("type", "Web Cache Poisoning"))
+                console.print(f"[bold red][[CACHE]] {len(cache_findings)} Web Cache Poisoning vulnerability confirmed![/bold red]")
         except Exception as e:
-            console.print(f"[dim red][Cache Poison] Skipped: {e}[/dim red]")
+            console.print(f"[dim red][Cache] Skipped: {e}[/dim red]")
 
+        # v37.0 Phase 18: Business Logic & Taint Analysis
+        console.print("[bold magenta][*] Phase 18 [SINGULARITY]: Generating AI Logic-Flaw Mutations...[/bold magenta]")
+        try:
+            logic_hunter = LogicHunter(session=session)
+            # Find POST/PUT operations to analyze state-changing payloads
+            post_requests = self.db.conn.execute(
+                "SELECT url, method, data FROM operations WHERE target = ? AND method IN ('POST', 'PUT', 'PATCH') AND data IS NOT NULL LIMIT 5",
+                (recon_domain,)
+            ).fetchall() if hasattr(self.db, 'conn') else []
+            
+            logic_findings = []
+            for url, method, data in post_requests:
+                findings = await logic_hunter.scan_mutations(url, method, data)
+                if findings:
+                    logic_findings.extend(findings)
+            
+            if logic_findings:
+                all_findings.extend(logic_findings)
+                for lf in logic_findings:
+                    self.db.save_finding(recon_domain, lf.get("content", str(lf)), lf.get("type", "Business Logic Vulnerability"))
+                console.print(f"[bold red][[LOGIC]] {len(logic_findings)} Business Logic bypass(es) discovered![/bold red]")
+        except Exception as e:
+            console.print(f"[dim red][LogicHunter] Skipped: {e}[/dim red]")
         # v29.0 Phase 18: XXE Engine — XML External Entity injection
         console.print("[bold red][*] Phase 18 [PHANTOM]: XXE Engine — XML file read and SSRF...[/bold red]")
         try:
@@ -1471,7 +1559,7 @@ class NeuralOrchestrator:
             if mfa_findings:
                 all_findings.extend(mfa_findings)
                 for mf in mfa_findings:
-                    self.db.save_finding(recon_domain, mf)
+                    self.db.save_finding(recon_domain, mf, mf.get("finding_type", "2FA/MFA Bypass"))
                 console.print(f"[bold red][[2FA]] {len(mfa_findings)} 2FA bypass vector(s) found![/bold red]")
         except Exception as e:
             console.print(f"[dim red][2FA] Skipped: {e}[/dim red]")
@@ -1561,6 +1649,49 @@ class NeuralOrchestrator:
         except Exception as e:
             console.print(f"[dim red][WS+OAuth] Skipped: {e}[/dim red]")
 
+        # v25.0 Phase 29: Autonomous Auth Matrix (IDOR Hunter)
+        console.print("[bold red][*] Phase 29 [APEX]: Autonomous Auth Matrix — Hunting for BOLA/IDOR...[/bold red]")
+        try:
+            from aura.modules.auth_matrix import AuthMatrix
+            auth_matrix = AuthMatrix(session=self.session)
+            if auth_matrix.enabled:
+                idor_urls = [row[0] for row in self.db.conn.execute("SELECT url FROM operations WHERE target = ? AND url IS NOT NULL ORDER BY id DESC LIMIT 500", (recon_domain,)).fetchall()] if hasattr(self.db, 'conn') else discovered_urls
+                idor_findings = await auth_matrix.scan_for_idor(idor_urls)
+                if idor_findings:
+                    all_findings.extend(idor_findings)
+                    for inf in idor_findings:
+                        self.db.save_finding(recon_domain, inf)
+        except Exception as e:
+            console.print(f"[dim red][Auth Matrix] Skipped: {e}[/dim red]")
+
+        # v31.0 Phase 30: API Breaker - Schema Discovery & Autonomous BOLA Fuzzing
+        console.print("[bold red][*] Phase 30 [ARMAGEDDON]: API Breaker — Schema Discovery & Autonomous BOLA Fuzzing...[/bold red]")
+        try:
+            from aura.modules.api_breaker import APIBreaker
+            api_breaker = APIBreaker(session=session)
+            api_findings = await api_breaker.scan_target(target_url)
+            if api_findings:
+                all_findings.extend(api_findings)
+                for af in api_findings:
+                    self.db.save_finding(recon_domain, af)
+                console.print(f"[bold red][[API Breaker]] {len(api_findings)} API Vulnerability vector(s) found![/bold red]")
+        except Exception as e:
+            console.print(f"[dim red][API Breaker] Skipped: {e}[/dim red]")
+
+        # v34.0 Phase 31: The LLM Hijacker - Prompt Injection & SSRF
+        console.print("[bold red][*] Phase 31 [AI OVERRIDE]: LLM Hijacker — Executing Prompt Injection on Chatbots...[/bold red]")
+        try:
+            from aura.modules.llm_hijacker import LLMHijacker
+            llm_hijacker = LLMHijacker(session=session)
+            ai_findings = await llm_hijacker.scan_urls(discovered_urls)
+            if ai_findings:
+                all_findings.extend(ai_findings)
+                for aif in ai_findings:
+                    self.db.save_finding(recon_domain, aif)
+                console.print(f"[bold red][[LLM HIJACK]] {len(ai_findings)} AI Vulnerability vector(s) found![/bold red]")
+        except Exception as e:
+            console.print(f"[dim red][LLM Hijacker] Skipped: {e}[/dim red]")
+
         # v22.0: Generate Bug Bounty Markdown Report
         console.print("[cyan][*] Compiling HackerOne/Bugcrowd Markdown Report...[/cyan]")
 
@@ -1576,7 +1707,51 @@ class NeuralOrchestrator:
 
         console.print("[bold green][[SUCCESS]] NeuralOrchestrator: Mission complete.[/bold green]")
         self.db.log_action("MISSION_COMPLETE", domain, "NeuralOrchestrator chain finished", campaign_id)
+
+        # ──────────────────────────────────────────────────────────
+        #  Phase 32: Integrated Submission Gate (Autonomous Profit)
+        # ──────────────────────────────────────────────────────────
+        if all_findings:
+            console.print("\n[bold cyan]🚀 Phase 32 [ZENITH]: Integrated Submission Gate Engaged...[/bold cyan]")
+            # 1. Rank findings by ROI
+            priority_report_path = self.profit_engine.generate_priority_report(target_filter=domain)
+            
+            # 2. Check for "Submit-Ready" candidates (Critical/High with specific patterns)
+            high_roi_findings = [f for f in all_findings if f.get("severity") in ["CRITICAL", "HIGH"]]
+            
+            if high_roi_findings:
+                top_v = high_roi_findings[0]
+                v_type = top_v.get("type", "Unknown")
+                v_sev = top_v.get("severity", "MEDIUM")
+                
+                console.print(f"[bold yellow][!] High-ROI Finding Detected: {v_type} ({v_sev})[/bold yellow]")
+                
+                if state.AUTO_SUBMIT:
+                    # Autonomous Submission Protocol
+                    await self.broadcast(f"AUTONOMOUS SUBMISSION: Proceeding with {v_type} to primary platform...", type="status", icon="upload")
+                    platform = os.environ.get("AURA_PRIMARY_PLATFORM", "hackerone")
+                    program = os.environ.get("AURA_DEFAULT_PROGRAM", "target_program")
+                    
+                    if platform and program:
+                        sub_res = await self.submitter.submit(
+                            platform=platform,
+                            program=program,
+                            title=f"Aura v25.0: {v_type} on {domain}",
+                            description=top_v.get("content", "See attachment for details."),
+                            severity=v_sev.lower(),
+                            impact=top_v.get("impact_desc", "")
+                        )
+                        if sub_res.get("success"):
+                            self.db.log_action("AUTO_SUBMIT_SUCCESS", domain, f"Report ID: {sub_res.get('id')}", campaign_id)
+                        else:
+                            self.db.log_action("AUTO_SUBMIT_FAILED", domain, str(sub_res.get("error")), campaign_id)
+                else:
+                    # Semi-Autonomous Recommendation
+                    console.print(f"[bold cyan][👑] AURA ADVICE: This finding is submit-ready. Run:[/bold cyan]")
+                    console.print(f"    [yellow]aura submit --target {domain} --platform hackerone --program <program>[/yellow]\n")
         
+        if 'watchdog_task' in locals(): watchdog_task.cancel()
+
         return {
             "status": "COMPLETE",
             "findings": len(all_findings),
@@ -1621,6 +1796,17 @@ class NeuralOrchestrator:
         except Exception as e:
             # logger.error(f"Oracle Chaining Error: {e}")
             pass
+
+    async def _oast_polling_loop(self, recon_domain: str):
+        """v38.0: Background loop to poll OAST server for out-of-band hits."""
+        while True:
+            try:
+                # Poll OAST server
+                await self.oast.poll(db_callback=self.db.save_finding)
+            except Exception as e:
+                logger.debug(f"OAST Polling loop error: {e}")
+            
+            await asyncio.sleep(state.OAST_POLL_INTERVAL if hasattr(state, "OAST_POLL_INTERVAL") else 30)
 
 class MirrorSimulator:
     """

@@ -637,6 +637,10 @@ class AuraSession:
         self.shadow_manager = ShadowProxyManager() # v16.0 Omni-Auditor Shadow Proxy
         self.swarm_orchestrator = ShadowSwarmOrchestrator(self.brain) # v23.0 Shadow-Swarm
         self.void_tunnel = VoidTunnel(self) # v23.0 Void-Tunneling
+        
+        from aura.modules.waf_evader import AIEvader
+        self.ai_evader = AIEvader(self.brain) # v25.0 AI WAF Evader
+        
         self.retries = 1  # v19.6: Siege Optimization - Reduced default from 3 to 1 to fast-fail dead nodes
         self.base_delay = 1.0 # v15.0: Adaptive Throttling Baseline
         self._opsec_verified = False
@@ -784,6 +788,12 @@ class AuraSession:
                 await self.morphic.apply_morphic_jitter()
                 
             params = self.stealth.get_stealth_params(force_rotate=(attempt > 0))
+            
+            # v28.0 Phase 2: Open Proxy Swarm Rotation unconditionally from proxies.txt
+            if self.shadow_manager.proxies:
+                shadow_node = self.shadow_manager.get_shadow_node()
+                params["proxies"] = {"http": shadow_node, "https": shadow_node}
+                
             current_proxy = params["proxies"]["http"] if params["proxies"] else None
             
             # v15.1 Infiltrator Jitter: Adaptive delay matching human patterns
@@ -850,6 +860,14 @@ class AuraSession:
                     # Keep log size manageable
                     if len(self.latency_log) > 500: self.latency_log.pop(0)
                         
+                    # v27.0 Dynamic Response Tracking (Auto-Throttle)
+                    if latency_ms > 2000:
+                        # Server is struggling to keep up with our thread pool. Slow down gracefully.
+                        self.base_delay = min(self.base_delay * 1.5, 10.0)
+                        from rich.console import Console
+                        Console().print(f"[bold yellow][Throttle] High Server Latency ({latency_ms:.0f}ms). Slowing down delay to {self.base_delay:.2f}s...[/bold yellow]")
+
+                        
                 except Exception as e:
                     # Phase 8.1: Handle Proxy Errors (Cloud Swarm / Custom Proxy)
                     err_msg = str(e).lower()
@@ -905,7 +923,11 @@ class AuraSession:
                 waf = self.stealth.detect_waf(resp.headers, resp.text)
                 if resp.status_code in [403, 429]:
                     self.stats["blocked_requests"] += 1
-                    if current_proxy: self.stealth.swarm.report_failure(current_proxy)
+                    if current_proxy: 
+                        self.stealth.swarm.report_failure(current_proxy)
+                        self.shadow_manager.report_failure(current_proxy)
+                        from rich.console import Console
+                        Console().print(f"[bold magenta][🌩️ SWARM] WAF Block ({resp.status_code}) -> Burning Proxy IP! Rotating...[/bold magenta]")
                     
                     if resp.status_code == 429:
                         self.base_delay = min(self.base_delay * 1.5, 20.0) # Adaptive Backoff Trigger for Rate Limits
@@ -918,41 +940,41 @@ class AuraSession:
                         # (Normally handled by Orchestrator, but this is a fail-safe)
                         pass
 
-                    # v19.0 Singularity: Adaptive Synthesis Feedback Loop
+                    # v25.0 Apex Automation: AI WAF Evasion
                     mutated = False
-                    if brain.enabled and attempt < 2: # Limit payload mutations to 2 attempts max to prevent freezes
+                    if brain.enabled and attempt < 2 and resp.status_code == 403:
                          self.stats["mutated_requests"] += 1
                          
                          # Mutate POST data if string
                          if "data" in req_kwargs and isinstance(req_kwargs["data"], str):
-                             req_kwargs["data"] = await brain.self_heal_mutation(
+                             mutations = await self.ai_evader.mutate_payload(
                                  req_kwargs["data"], 
-                                 resp.status_code, 
                                  resp.text, 
-                                 resp.headers,
-                                 attempt,
-                                 waf_type=waf
+                                 tech_stack="Generic"
                              )
-                             mutated = True
-                             
+                             if mutations:
+                                 req_kwargs["data"] = random.choice(mutations)
+                                 mutated = True
+                                 
                          # Mutate GET parameters
-                         if "params" in req_kwargs and isinstance(req_kwargs["params"], dict):
+                         elif "params" in req_kwargs and isinstance(req_kwargs["params"], dict):
                              for k, v in req_kwargs["params"].items():
-                                 req_kwargs["params"][k] = await brain.self_heal_mutation(
+                                 mutations = await self.ai_evader.mutate_payload(
                                      str(v), 
-                                     resp.status_code, 
                                      resp.text, 
-                                     resp.headers,
-                                     attempt,
-                                     waf_type=waf
+                                     tech_stack="Generic"
                                  )
-                             mutated = True
+                                 if mutations:
+                                     # Evolve the parameter if blocked
+                                     req_kwargs["params"][k] = random.choice(mutations)
+                                     mutated = True
+                                     break # Only mutate one param at a time to prevent chaos
                     
                     # If we successfully mutated, retry.
-                    # Or if it's a 429 rate limit, we keep retrying up to max_attempts.
-                    if mutated and attempt < 2: # [Fix] Strict mutation cap immediately applied
+                    # Or if it's a 429 rate limit, or WAF block and we have rotating proxies, we keep retrying.
+                    if mutated and attempt < 2:
                         continue
-                    if resp.status_code == 429 and attempt < max_attempts - 1:
+                    if (resp.status_code == 429 or (resp.status_code == 403 and self.shadow_manager.proxies)) and attempt < max_attempts - 1:
                         continue
                         
                     return resp # For insurmountable 403s, just return rather than infinite looping
@@ -961,7 +983,9 @@ class AuraSession:
                 # v15.0: On Success, gradually increase speed
                 if resp.status_code < 400:
                     self.stats["successful_requests"] += 1
-                    self.base_delay = max(self.base_delay * 0.95, 0.3)
+                    # v27.0 Dynamic Throttle: Only speed up if latency is healthy (<1000ms)
+                    if latency_ms < 1000:
+                        self.base_delay = max(self.base_delay * 0.95, 0.3)
                     
                 if current_proxy: self.stealth.swarm.report_success(current_proxy)
                 return resp

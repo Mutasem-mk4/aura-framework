@@ -125,36 +125,21 @@ class SSRFHunter:
 
         # Blind SSRF via OAST DNS callback
         if not findings and self.OAST_URL:
-            # v17.0 OOB Validation Engine - Precise Webhook Targeting
-            oast_payload = f"{self.OAST_URL}?source=aura_ssrf&param={param_name}"
+            # v38.0: Unique OAST Correlation
+            oast_payload = self.OAST_CATCHER.get_payload("SSRFHunter", base_url)
             qs = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
             qs[param_name] = [oast_payload]
             new_query  = urllib.parse.urlencode(qs, doseq=True)
             target_url = parsed._replace(query=new_query).geturl()
 
-            console.print(f"[dim yellow][SSRF] Sending OAST probe via {param_name}...[/dim yellow]")
+            console.print(f"[dim yellow][SSRF] Sending unique OAST probe via {param_name}...[/dim yellow]")
             await self._probe(target_url)
             
-            # v17.0 Zero-Rejection Engine: Synchronous Polling for undeniable proof
-            await asyncio.sleep(3)
-            interactions = self.OAST_CATCHER.poll()
-            
-            if interactions:
-                # We got a hit! Confirmed Out-of-Band SSRF.
-                proof_data = str(interactions[0])[:300]
-                console.print(f"[bold red][!!! SSRF CONFIRMED !!!] OAST Callback received from {base_url} via {param_name}[/bold red]")
-                findings.append(self._make_finding(
-                    vuln_type="Blind SSRF (OAST Confirmed)",
-                    severity="CRITICAL",
-                    cvss=9.8,
-                    url=base_url,
-                    param=param_name,
-                    payload=oast_payload,
-                    proof=f"OAST HTTP Callback Received. Server made a request to our webhook. Evidence: {proof_data}",
-                    confirmed=True,
-                ))
-
+            # v38.0: The background loop in NeuralOrchestrator will handle detection and logging.
+            # We no longer need to sleep or local-poll here.
+        
         return findings
+
 
     @staticmethod
     def _make_finding(vuln_type, severity, cvss, url, param, payload, proof, confirmed) -> dict:
@@ -170,6 +155,9 @@ class SSRFHunter:
                 f"Payload used: `{payload}`\n"
                 f"Proof: {proof}"
             ),
+            "payload": payload,
+            "raw_request": f"GET {url}?{param}={payload}\nHost: {urllib.parse.urlparse(url).netloc}",
+            "proof": proof,
             "remediation_fix": (
                 "1. Validate and sanitize all URL inputs on the server side.\n"
                 "2. Use an allowlist of permitted domains/IPs.\n"

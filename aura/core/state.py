@@ -60,23 +60,32 @@ TOR_MODE = False
 TOR_PORT = 9050 # Dynamic: verified by stealth engine
 CLOUD_SWARM_MODE = False
 FAST_MODE = False # v14.2: Optimized rapid-fire mode (skips deep audits)
+AUTO_SUBMIT = False # v19.5: Phase 32 Integrated Submission Gate
 
 # Network Stability & Performance Scaling (Hyper-Acceleration Phase 19)
 GLOBAL_CONCURRENCY_LIMIT = 10  # Increased for Protocol Warp parallelization
 REQUEST_JITTER_MODE = True      # Forces subtle random delays to avoid triggering system-wide blocks
 NETWORK_TIMEOUT = 30            # v18.1: Shared Framework-Wide Timeout (Single Source of Truth)
+OAST_POLL_INTERVAL = 15         # v38.0: OAST polling frequency (seconds)
 
 # Phase 16.4: Authentication & Firewall Bypass (User-Defined)
 CUSTOM_HEADERS = {}
 CUSTOM_COOKIES = {}
+
+# v25.0 Apex Automation: BOLA / IDOR Dual-Session Tokens
+AUTH_TOKEN_ATTACKER = os.environ.get("AUTH_TOKEN_ATTACKER")
+AUTH_TOKEN_VICTIM = os.environ.get("AUTH_TOKEN_VICTIM")
 
 # Professional Reporting Options
 CUSTOM_CONSULTANT = "Independent Security Researcher"
 CUSTOM_COMPANY = "Security Assessment Team"
 
 # Gemini AI Configuration: Primary and Secondary mappings for resilience
-GEMINI_API_KEY = "AIzaSyAPiNH7TSmsBx_G2Z13GzlKZA6jUMnx1Hg"
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_MODEL = "gemini-2.5-flash" # v19.4: gemini-2.5-flash (confirmed available with this API key)
+AI_PROVIDER = os.environ.get("AI_PROVIDER", "gemini") # v22.1: Multi-Model Architecture
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.0-flash-001")
 
 # OSINT API Keys (read from environment or .env)
 SHODAN_API_KEY = os.environ.get("SHODAN_API_KEY")

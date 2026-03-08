@@ -481,6 +481,86 @@ def nexus():
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
+@cli.command(name="c2")
+def c2_dashboard():
+    """[V27.0 OMNI-VIEW] Launch the Real-Time Terminal Dashboard."""
+    from rich.live import Live
+    from rich.layout import Layout
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.align import Align
+    import time
+    
+    def generate_layout():
+        layout = Layout(name="root")
+        layout.split_column(
+            Layout(name="header", size=3),
+            Layout(name="main")
+        )
+        layout["main"].split_row(
+            Layout(name="stats", ratio=1),
+            Layout(name="logs", ratio=2)
+        )
+        return layout
+
+    def update_dashboard(layout):
+        targets = db.get_all_targets()
+        findings = db.get_all_findings()
+        audit_logs = db.get_audit_logs()
+        
+        # Calculate Severities
+        critical = sum(1 for f in findings if f.get("severity") in ["CRITICAL", "EXCEPTIONAL"])
+        high = sum(1 for f in findings if f.get("severity") == "HIGH")
+        medium = sum(1 for f in findings if f.get("severity") == "MEDIUM")
+        
+        # Header
+        header_text = Text(f"AURA v27.0 COMMAND & CONTROL (LIVE) — Targets: {len(targets)} | Findings: {len(findings)}", style="bold white on red", justify="center")
+        layout["header"].update(header_text)
+        
+        # Stats Table
+        stats_table = Table(box=None, expand=True)
+        stats_table.add_column("Metric", style="cyan")
+        stats_table.add_column("Value", style="bold white", justify="right")
+        stats_table.add_row("Live Targets", str(len(targets)))
+        stats_table.add_row("Total Findings", str(len(findings)))
+        stats_table.add_row("Critical / High", f"[red]{critical}[/red] / [light_salmon1]{high}[/light_salmon1]")
+        stats_table.add_row("Medium / Low", f"[yellow]{medium}[/yellow] / [green]{len(findings)-critical-high-medium}[/green]")
+        
+        # Active Campaigns
+        with sqlite3.connect(db.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM campaigns WHERE status='ACTIVE'")
+            active_camps = cursor.fetchone()[0]
+        stats_table.add_row("Active Campaigns", str(active_camps))
+        
+        layout["stats"].update(Panel(stats_table, title="[bold blue]Threat Intelligence[/bold blue]", border_style="blue"))
+        
+        # Logs Table
+        log_table = Table(show_header=True, expand=True, header_style="bold magenta", border_style="grey39")
+        log_table.add_column("Time", width=10, style="dim")
+        log_table.add_column("Action", width=20, style="cyan")
+        log_table.add_column("Target", width=30)
+        
+        for log in audit_logs[:15]:  # show last 15
+            log_table.add_row(
+                str(log["timestamp"])[11:19],
+                str(log["action"]),
+                str(log["target"])[:30]
+            )
+        layout["logs"].update(Panel(log_table, title="[bold magenta]Global Audit Stream (Recent)[/bold magenta]", border_style="magenta"))
+        
+        return layout
+
+    try:
+        import sqlite3 # ensuring accessible scope
+        layout = generate_layout()
+        with Live(layout, refresh_per_second=2, screen=True):
+            while True:
+                update_dashboard(layout)
+                time.sleep(1)
+    except KeyboardInterrupt:
+        console.print("[dim cyan]Closing C2 Dashboard...[/dim cyan]")
+
 @cli.command(name="fix-network")
 def fix_network():
     """[UTILITY] EMERGENCY: Reset network settings and flush DNS."""

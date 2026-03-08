@@ -16,9 +16,24 @@ def main():
     parser = argparse.ArgumentParser(description="AURA Omni-Sovereign v16.1")
     parser.add_argument("target", nargs="?", help="Target domain/IP for the mission")
     parser.add_argument("--nexus", action="store_true", help="Launch interactive Nexus War Room")
+    parser.add_argument("--auto-submit", action="store_true", help="Enable autonomous bounty submission (Phase 32)")
+    parser.add_argument("--ai-provider", choices=["gemini", "openrouter"], help="AI Provider to use (Phase 33)")
+    parser.add_argument("--ai-model", help="AI Model to use (Phase 33)")
     
     args = parser.parse_args()
     
+    if args.ai_provider:
+        from aura.core import state
+        state.AI_PROVIDER = args.ai_provider
+    if args.ai_model:
+        from aura.core import state
+        state.OPENROUTER_MODEL = args.ai_model # Use this for either provider as default
+    
+    if args.auto_submit:
+        from aura.core import state
+        state.AUTO_SUBMIT = True
+        console.print("[bold red][!] AURA: Autonomous Submission Protocol enabled.[/bold red]")
+
     if args.nexus:
         orchestrator = NeuralOrchestrator()
         launch_nexus(orchestrator)

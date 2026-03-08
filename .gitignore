@@ -21,27 +21,36 @@ wheels/
 .installed.cfg
 *.egg
 
-# Database
+# Database & State
 *.db
+*.aura_state
+.aura_halt_signal
+.aura_dns_failures
+.aura_vault_backup
 
-# Environment
+# Environment & Secrets
 .env
+.pypirc
 venv/
 
-# Project specific
+# Project Artifacts
 screenshots/
-aura_report.html
-nexus/
+reports/
+pocs/
+aura_exploits/
 *.log
-*.txt
-!requirements.txt
-!help.txt
-!help_output.txt
-!domains.txt
-!proxies.txt
-!targets.txt
-!trace.txt
-!trace_output.txt
-*.db
-!aura.db
-.aura_state
+
+# Sensitive or Temporary Input/Output
+targets.txt
+proxies.txt
+domains.txt
+trace.txt
+dump.json
+do_dump.json
+findings_dump.txt
+help_output.txt
+
+# OS/IDE
+.DS_Store
+.vscode/
+.idea/

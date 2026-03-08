@@ -6,9 +6,9 @@ build-backend = "setuptools.build_meta"
 name = "aura-framework"
 version = "25.0.0"
 authors = [
-  { name="Mutasem Kharma", email="author@example.com" },
+  { name="Mutasem Kharma", email="mutasem@aura-project.io" },
 ]
-description = "Aura Framework - v15.0 Quantum Dominion [Enterprise Suite]"
+description = "Aura v25.0 — The Omni-Sovereign Bug Bounty & Pentest Framework."
 readme = "README.md"
 requires-python = ">=3.9"
 classifiers = [

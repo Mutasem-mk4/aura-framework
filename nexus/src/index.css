@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-aura-dark text-white font-sans;
+  }
+}
+
+.aura-glass {
+  @apply bg-aura-card border border-white/10 backdrop-blur-md;
+}
+
+.aura-glow {
+  box-shadow: 0 0 20px rgba(192, 38, 211, 0.2);
+}

@@ -189,10 +189,12 @@ class DOMHunter:
                 for param in test_params:
                     hit = await self._scan_dom_xss(page, url, param, nonce)
                     if hit:
+                        poc_url = hit['url']
                         evidence = (
                             f"DOM XSS CONFIRMED\n"
                             f"URL: {hit['url']}\n"
                             f"Parameter: {hit['param']}\n"
+                            f"1-Click PoC: `{poc_url}`\n"
                             f"{hit['evidence']}\n\n"
                             f"Impact: Attacker can execute arbitrary JavaScript in victim's browser, "
                             f"steal cookies/tokens, perform account takeover."
@@ -208,6 +210,7 @@ class DOMHunter:
                             "url": url,
                             "confirmed": True,
                             "poc_evidence": evidence,
+                            "poc_link": poc_url,
                         })
                         break  # one per URL is enough
 

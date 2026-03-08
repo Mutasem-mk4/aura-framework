@@ -75,6 +75,28 @@ class FfufEngine:
             console.print(f"[dim red][!] Wordlist missing: {selected_wordlist}. Falling back to default.[/dim red]")
             selected_wordlist = self.default_wordlist
             
+        # v27.0: Context-Aware Smart Wordlists (AI Generated)
+        ai_wordlist = []
+        if tech_stack:
+            from aura.core.brain import AuraBrain
+            brain = AuraBrain()
+            if brain.enabled:
+                prompt = (
+                    f"Generate a highly specific, deeply hidden bug bounty directory fuzzing wordlist "
+                    f"for a target running: {', '.join(tech_stack)}. "
+                    f"Focus on configuration files, backup files, exposed API endpoints, and development debug panels specific to this stack. "
+                    f"Return ONLY the raw paths, one per line. No markdown formatting, no explanations. Max 50 paths."
+                )
+                try:
+                    console.print(f"[cyan][🧠] AI BRAIN: Synthesizing Context-Aware Smart Wordlist for {tech_stack}...[/cyan]")
+                    ai_response = await asyncio.to_thread(brain._call_ai, prompt)
+                    if ai_response:
+                        ai_paths = [p.strip().strip('`').strip('/') for p in ai_response.splitlines() if p.strip() and not p.startswith('#')]
+                        ai_wordlist = [path for path in ai_paths if 1 < len(path) < 50]
+                        console.print(f"[bold magenta][⚡] SHIVA ENGINE: Injected {len(ai_wordlist)} AI-Generated Target-Specific Paths into fuzz queue![/bold magenta]")
+                except Exception as e:
+                    pass
+            
         if not os.path.exists(selected_wordlist):
             return []
 
@@ -115,6 +137,12 @@ class FfufEngine:
 
             with open(temp_wordlist, "w", encoding="utf-8", newline="\n") as f_out:
                 count = 0
+                
+                # v27.0: Inject AI Smart Wordlist at the very top (highest priority)
+                for path in ai_wordlist:
+                    f_out.write(path + "\n")
+                    count += 1
+                    
                 for line in raw_data:
                     if count >= limit: break
                     clean = line.strip().strip('/')
@@ -152,6 +180,7 @@ class FfufEngine:
                 "-s",  # Silent mode
                 "-o", out_file,
                 "-of", "json",
+                "-dns", "8.8.8.8", # v27.0: Fix "DNS global failure state"
                 "-maxtime", "300" 
             ]
             

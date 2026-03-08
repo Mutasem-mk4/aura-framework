@@ -6,6 +6,7 @@ import re
 import asyncio
 from typing import Dict, Any, Optional
 
+import httpx
 from google import genai
 from aura.core import state
 
@@ -28,6 +29,7 @@ class AuraBrain:
         "admin": "Administrative panels are entry points for lateral movement and credential harvesting. Recommendation: Brute-force discovery of sub-directories (/admin, /wp-admin) or check for default credentials.",
         "jenkins": "Jenkins instances often contain CI/CD secrets and SSH keys. If accessed, it could lead to a full Supply Chain compromise.",
         "api": "Unprotected APIs often suffer from Broken Object Level Authorization (BOLA). Recommendation: Fuzz endpoints for IDOR vulnerabilities.",
+        "logic_flaw": "State-changing APIs (POST/PUT) handling quantities, prices, or roles can be bypassed. Mutate numeric values to negative bounds and append highly privileged boolean flags.",
         "staging": "Staging environments are often less protected than production and may contain legacy data or debug symbols.",
         "docker": "Exposed Docker registries or sockets can lead to container escape and host takeover.",
         "vpn": "VPN endpoints are high-value targets for initial access. Recommendation: Check for known CVEs in the underlying software (Pulse Secure, Fortinet, etc.)."
@@ -38,20 +40,34 @@ class AuraBrain:
         self.tactical_memory = [] # Phase 18: Tactical Memory
         self.payload_cache = {}  # Initialize payload cache for Level 1 & 2
         self.ai_cache = {} # v19.2: General AI query cache
-        if state.GEMINI_API_KEY:
+        if state.AI_PROVIDER == "gemini" and state.GEMINI_API_KEY:
             try:
                 self.client = genai.Client(api_key=state.GEMINI_API_KEY)
                 self.enabled = True
                 logger.info("AuraBrain Singularity: Gemini Engine online (SDK v1).")
             except Exception as e:
                 logger.error(f"AuraBrain: Failed to initialize Gemini: {e}")
+        elif state.AI_PROVIDER == "openrouter" and state.OPENROUTER_API_KEY:
+            self.openrouter_key = state.OPENROUTER_API_KEY
+            self.enabled = True
+            logger.info(f"AuraBrain Singularity: OpenRouter Engine online ({state.OPENROUTER_MODEL}).")
 
     def _call_ai(self, prompt, system_instruction=None, use_cache=True):
-        """v19.2: Sentinel-G AI Resurrection - Enhanced retry logic with exponential backoff & caching."""
+        """v19.2/v22.1: Multi-Model AI Router - Redirects to Gemini SDK or OpenRouter HTTP."""
+        if not self.enabled: return None
         if use_cache and prompt in self.ai_cache:
             return self.ai_cache[prompt]
 
-        max_retries = 5 # Increased for higher resilience
+        if state.AI_PROVIDER == "gemini":
+            return self._call_gemini_sdk(prompt, system_instruction, use_cache)
+        else:
+            return self._call_openrouter(prompt, system_instruction, use_cache)
+
+    def _call_gemini_sdk(self, prompt, system_instruction=None, use_cache=True):
+        """Standard Gemini SDK call with retry logic."""
+        import random
+        import time
+        max_retries = 5
         for attempt in range(max_retries):
             try:
                 response = self.client.models.generate_content(
@@ -60,24 +76,47 @@ class AuraBrain:
                     config={'system_instruction': system_instruction or self.SYSTEM_PROMPT}
                 )
                 res_text = response.text.strip().replace("```json", "").replace("```", "").strip()
-                if use_cache:
-                    self.ai_cache[prompt] = res_text
+                if use_cache: self.ai_cache[prompt] = res_text
                 return res_text
             except Exception as e:
-                err_str = str(e).lower()
-                # If it's a quota or safety filter, don't retry as aggressively
-                if "quota" in err_str or "safety" in err_str:
-                    logger.error(f"Sentinel-G Blocked: {e}")
-                    break
-                
-                if attempt == max_retries - 1:
-                    logger.error(f"Sentinel-G Final Failure: {e}")
-                    break
-                
-                wait_time = (2 ** attempt) + random.uniform(0.1, 1.0)
-                logger.warning(f"Sentinel-G Retry ({attempt+1}/{max_retries}) in {wait_time:.1f}s: {e}")
+                if "quota" in str(e).lower(): break
+                if attempt == max_retries - 1: break
+                time.sleep((2 ** attempt) + random.uniform(0.1, 1.0))
+        return None
+
+    def _call_openrouter(self, prompt, system_instruction=None, use_cache=True):
+        """v22.1: OpenRouter HTTP Implementation (OpenAI Compatibility)."""
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.openrouter_key}",
+            "HTTP-Referer": "https://github.com/Mutasem-mk4/Aura", # Required by OpenRouter
+            "X-Title": "Aura Zenith Singularity",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": state.OPENROUTER_MODEL,
+            "messages": [
+                {"role": "system", "content": system_instruction or self.SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ]
+        }
+        
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                with httpx.Client(timeout=state.NETWORK_TIMEOUT) as client:
+                    resp = client.post(url, headers=headers, json=payload)
+                    resp.raise_for_status()
+                    data = resp.json()
+                    res_text = data['choices'][0]['message']['content'].strip()
+                    res_text = res_text.replace("```json", "").replace("```", "").strip()
+                    if use_cache: self.ai_cache[prompt] = res_text
+                    return res_text
+            except Exception as e:
+                logger.warning(f"OpenRouter Attempt {attempt+1} Failed: {e}")
                 import time
-                time.sleep(wait_time)
+                time.sleep(2 + attempt)
         return None
 
     def autonomous_plan(self, url: str, dom_context: str, network_context: list) -> dict:
@@ -112,14 +151,10 @@ class AuraBrain:
                     "Focus on specific attack vectors based on the tech stack and risk score.\n"
                     "Provide concise actionable recommendations."
                 )
-                response = self.client.models.generate_content(
-                    model=state.GEMINI_MODEL,
-                    contents=prompt,
-                    config={'system_instruction': self.SYSTEM_PROMPT}
-                )
-                return response.text
+                res = self._call_ai(prompt)
+                if res: return res
             except Exception as e:
-                logger.warning(f"AuraBrain: Gemini query failed, falling back to rules. Error: {e}")
+                logger.warning(f"AuraBrain: AI query failed, falling back to rules. Error: {e}")
 
         insights = []
         for pattern, explanation in self.REASONING_PATTERNS.items():
@@ -209,14 +244,7 @@ class AuraBrain:
             "Respond ONLY in JSON array: [{'parameter': 'name', 'payload': 'value', 'type': 'Logic Injection', 'reason': 'string'}]"
         )
         try:
-            response = self.client.models.generate_content(
-                model=state.GEMINI_MODEL,
-                contents=prompt,
-                config={'system_instruction': self.SYSTEM_PROMPT}
-            )
-            raw = response.text.strip()
-            import re
-            
+            raw = self._call_ai(prompt)
             parsed = self._clean_json(raw)
             return parsed if isinstance(parsed, list) else []
         except Exception:
@@ -238,11 +266,7 @@ class AuraBrain:
             "Respond ONLY with a JSON array: [{'type': 'Logic Flaw', 'severity': 'HIGH/CRITICAL', 'reason': 'str', 'remediation': 'str'}]"
         )
         try:
-            response = self.client.models.generate_content(
-                model=state.GEMINI_MODEL,
-                contents=prompt,
-                config={'system_instruction': self.SYSTEM_PROMPT}
-            )
+            raw = self._call_ai(prompt)
             return self._clean_json(raw)
         except Exception as e:
             logger.error(f"AuraBrain Logic Audit: {e}")
@@ -348,12 +372,7 @@ class AuraBrain:
             "Return ONLY the raw GraphQL string."
         )
         try:
-            response = self.client.models.generate_content(
-                model=state.GEMINI_MODEL,
-                contents=prompt,
-                config={'system_instruction': self.SYSTEM_PROMPT}
-            )
-            return response.text.strip().replace("```graphql", "").replace("```", "")
+            return self._call_ai(prompt)
         except Exception as e:
             logger.error(f"AuraBrain GraphQL: {e}")
             return 'mutation { login(user: "admin") { token } }'
@@ -387,12 +406,7 @@ class AuraBrain:
                 "Return ONLY the severity name."
             )
             try:
-                response = self.client.models.generate_content(
-                    model=state.GEMINI_MODEL,
-                    contents=prompt,
-                    config={'count': 1}
-                )
-                res = response.text.strip().upper()
+                res = self._call_ai(prompt, system_instruction="Respond ONLY with: CRITICAL, HIGH, MEDIUM, or LOW.")
                 if res in ["CRITICAL", "HIGH", "MEDIUM", "LOW"]:
                     return res
             except: pass

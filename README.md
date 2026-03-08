@@ -1,18 +1,23 @@
 # 🌌 Aura: The Apex Predator (v19.5 Singularity Edition)
+# Aura v25.0 — The Omni-Sovereign Bug Bounty Framework 🚀
 
-<div align="center">
-  <h3>Absolute Systemic Domination. Zero Compromises.</h3>
-  <img src="https://img.shields.io/badge/Version-19.5-red.svg" alt="Version 19.5">
-  <img src="https://img.shields.io/badge/Python-3.10+-blue.svg" alt="Python Version">
-  <img src="https://img.shields.io/badge/Architecture-NeuralOrchestrator-purple.svg" alt="Architecture">
-  <img src="https://img.shields.io/badge/License-Confidential-black.svg" alt="License">
-</div>
+**Aura** is the apex predator of security automation. A next-generation, autonomous, AI-driven framework designed to dominate the bug bounty battlefield through sentient logic and hyper-accelerated exploitation.
 
----
+## 🛠️ Instant Installation
 
-**Aura** is a next-generation, autonomous, AI-driven Bug Bounty and Penetration Testing framework. Designed to transcend traditional vulnerability scanners, Aura doesn't just look for open ports—it analyzes infinite attack surfaces, deduces business logic flaws, weaponizes exploits on the fly, and generates boardroom-ready HackerOne/Bugcrowd reports.
+You can now install Aura globally from anywhere:
 
-With the advent of **v19.5 Turbine Engine**, Aura achieves unprecedented operational velocity without sacrificing depth.
+```bash
+pip install aura-cli
+```
+
+## 🚀 Speed-of-Light Usage
+
+Run your first mission with zero configuration:
+
+```bash
+aura example.com
+```
 
 ## 🚀 Key Innovations
 

@@ -14,6 +14,7 @@ Strategy:
 import asyncio
 import re
 import itertools
+import urllib.parse
 from rich.console import Console
 from aura.core import state
 
@@ -179,11 +180,20 @@ class SSTIEngine:
                                                       hit["param"], engine, method)
 
                 severity = "CRITICAL" if rce_result else "HIGH"
+                
+                # Auto-Exploitation Phase 2: 1-Click PoC URL Generator
+                poc_link = ""
+                if method == "GET":
+                    poc_link = f"{hit['url']}?{hit['param']}={urllib.parse.quote_plus(hit['probe'])}"
+                else:
+                    poc_link = f"curl -X POST -d '{hit['param']}={hit['probe']}' '{hit['url']}'"
+                
                 evidence = (
                     f"SSTI CONFIRMED: {hit['engine']} template injection\n"
                     f"URL: {hit['url']}\n"
                     f"Parameter: `{hit['param']}`\n"
                     f"Probe: {hit['probe']} → Expected: {hit['expected']}\n"
+                    f"1-Click PoC: `{poc_link}`\n"
                     f"Response Snippet: {hit['response_snippet']}\n"
                 )
                 if rce_result:
@@ -200,6 +210,7 @@ class SSTIEngine:
                     "url": url,
                     "confirmed": True,
                     "poc_evidence": evidence,
+                    "poc_link": poc_link
                 })
 
         return findings

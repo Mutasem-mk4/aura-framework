@@ -146,6 +146,10 @@ class XXEEngine:
 
                         console.print(f"[bold red][📄 XXE CONFIRMED] {description} on {url} via {ct}[/bold red]")
 
+                        from aura.modules.evidence_dumper import EvidenceDumper
+                        raw_req = EvidenceDumper.dump_request(r, original_payload=payload)
+                        raw_res = EvidenceDumper.dump_response(r)
+
                         findings.append({
                             "type": "XXE – XML External Entity",
                             "finding_type": "XML External Entity (XXE) Injection",
@@ -156,6 +160,8 @@ class XXEEngine:
                             "url": url,
                             "confirmed": True,
                             "poc_evidence": evidence,
+                            "raw_request": raw_req,
+                            "raw_response": raw_res
                         })
                         return findings  # one confirmed per URL is enough
 

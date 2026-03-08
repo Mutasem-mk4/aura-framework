@@ -74,9 +74,10 @@ class RaceConditionHunter:
             except Exception as e:
                 return (0, time.monotonic() - t0, str(e)[:100])
 
-        # Use a single shared connection pool for accurate timing
+        # Use an HTTP/2 Connection Pool for TRUE multiplexed parallel bursting
+        # HTTP/2 sends all packets down a single TCP pipe, avoiding TLS handshake jitter
         limits = httpx.Limits(max_connections=RACE_CONCURRENCY, max_keepalive_connections=RACE_CONCURRENCY)
-        async with httpx.AsyncClient(limits=limits, verify=False, follow_redirects=True) as client:
+        async with httpx.AsyncClient(limits=limits, verify=False, follow_redirects=True, http2=True) as client:
             tasks = [_single_req(client) for _ in range(RACE_CONCURRENCY)]
             results = await asyncio.gather(*tasks)
 
