@@ -13,7 +13,7 @@ async def run_mission(target):
     await orchestrator.execute_advanced_chain(target)
 
 def main():
-    parser = argparse.ArgumentParser(description="AURA Omni-Sovereign v16.1")
+    parser = argparse.ArgumentParser(description="AURA Omni-Sovereign v25.0.0")
     parser.add_argument("target", nargs="?", help="Target domain/IP for the mission")
     parser.add_argument("--nexus", action="store_true", help="Launch interactive Nexus War Room")
     parser.add_argument("--auto-submit", action="store_true", help="Enable autonomous bounty submission (Phase 32)")

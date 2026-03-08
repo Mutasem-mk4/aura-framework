@@ -64,7 +64,7 @@ class NexusShell(cmd.Cmd):
 
     def do_exit(self, arg):
         """Exit the Nexus War Room."""
-        console.print("[bold red][!] Shutdown AURA-NEXUS. Commander disengaged.[/bold red]")
+        console.print(Panel("[bold red]NEXUS WAR ROOM v25.0.0[/bold red]", border_style="red"))
         return True
 
     def default(self, line):

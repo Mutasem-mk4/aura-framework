@@ -1370,5 +1370,11 @@ def profit(target_filter):
         console.print(f"[red][!] Profit engine error: {e}[/red]")
 
 
-if __name__ == "__main__":
+def main():
+    """Main entry point for the aura command."""
+    # Diagnostic: ensure we're calling the right script
+    # console.print("[dim cyan][DEBUG] AURA Core Entry Point — Running Python CLI...[/dim cyan]")
     cli()
+
+if __name__ == "__main__":
+    main()

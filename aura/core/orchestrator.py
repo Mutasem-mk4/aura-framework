@@ -271,7 +271,7 @@ class NeuralOrchestrator:
             return {"status": "blocked", "reason": "out_of_scope"}
 
         console.print(f"[bold red][!] INITIALIZING ZENITH PROTOCOL FOR: {domain}[/bold red]")
-        console.print(f"[SIEGE] [bold red]Aura v25.0 [OMEGA PROTOTYPE][/bold red]: Engaging Sentient Singularity for {domain}...")
+        console.print(f"[SIEGE] [bold red]AURA v25.0.0 (THE OMEGA PROTOTYPE)][/bold red]: Engaging Sentient Singularity for {domain}...")
         self.db.log_action("START_CHAIN", domain, "NeuralOrchestrator engaged (v25.0 Omega Singularity)", campaign_id)
 
         # v32.0 Titan Memory Optimizer
