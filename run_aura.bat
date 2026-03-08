@@ -5,10 +5,10 @@ setlocal enabledelayedexpansion
 cd /d "%~dp0"
 
 :: 1. Auto-detect Python command
-set PY_CMD=python
+set "PY_CMD=python"
 where !PY_CMD! >nul 2>nul
 if errorlevel 1 (
-    set PY_CMD=py
+    set "PY_CMD=py"
     where !PY_CMD! >nul 2>nul
     if errorlevel 1 (
         :: Fallback: Try standard AppData location (latest first)
@@ -25,7 +25,7 @@ if errorlevel 1 (
 )
 :found_py
 
-if "%~1"=="" (
+if "%~1" == "" (
     echo.
     echo [!] Aura Sentinel - Tactical Runner
     echo ------------------------------------
@@ -39,21 +39,23 @@ if "%~1"=="" (
     exit /b
 )
 
-:: 2. Check AI options (Safely handle special characters)
+:: 2. Check AI options (Bypass findstr to avoid "Bad command line" errors)
 set "ARGS=%*"
 set HAS_AI=0
-echo !ARGS! | findstr /I /C:"--ai-provider" >nul && set HAS_AI=1
-echo !ARGS! | findstr /I /C:"--ai-model" >nul && set HAS_AI=1
+set "TEST_ARGS=!ARGS:--ai-provider=!"
+if not "!TEST_ARGS!" == "!ARGS!" set HAS_AI=1
+set "TEST_ARGS=!ARGS:--ai-model=!"
+if not "!TEST_ARGS!" == "!ARGS!" set HAS_AI=1
 
-if !HAS_AI!==0 (
+if !HAS_AI! == 0 (
     set "ARGS=!ARGS! --ai-provider gemini"
 )
 
-echo [🚀] Engaging Zenith Protocol via "!PY_CMD!" for: %~1
+echo [🚀] Engaging Zenith Protocol via "!PY_CMD!" for: %1
 "!PY_CMD!" aura_main.py !ARGS!
 if errorlevel 1 (
     echo.
-    echo [!] Deployment failed. If you see 'ModuleNotFoundError', run:
+    echo [!] Mission aborted. If you see 'ModuleNotFoundError', please run:
     echo     pip install rich aiohttp httpx curl_cffi google-generativeai beautifulsoup4 lxml PyYAML jinja2
 )
 
