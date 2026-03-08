@@ -34,7 +34,7 @@ setuptools.setup(
     ],
     entry_points={
         "console_scripts": [
-            "aura=aura.cli:main",
+            "aura-cli=aura.cli:main",
         ],
     },
 )
