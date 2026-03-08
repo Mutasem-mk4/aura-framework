@@ -39,17 +39,8 @@ if "%~1" == "" (
     exit /b
 )
 
-:: 2. Check AI options (Bypass findstr to avoid "Bad command line" errors)
+:: 2. Launch Mission
 set "ARGS=%*"
-set HAS_AI=0
-set "TEST_ARGS=!ARGS:--ai-provider=!"
-if not "!TEST_ARGS!" == "!ARGS!" set HAS_AI=1
-set "TEST_ARGS=!ARGS:--ai-model=!"
-if not "!TEST_ARGS!" == "!ARGS!" set HAS_AI=1
-
-if !HAS_AI! == 0 (
-    set "ARGS=!ARGS! --ai-provider gemini"
-)
 
 echo [🚀] Engaging Zenith Protocol via "!PY_CMD!" for: %1
 "!PY_CMD!" aura_main.py !ARGS!

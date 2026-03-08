@@ -40,34 +40,23 @@ class AuraBrain:
         self.tactical_memory = [] # Phase 18: Tactical Memory
         self.payload_cache = {}  # Initialize payload cache for Level 1 & 2
         self.ai_cache = {} # v19.2: General AI query cache
-        if state.AI_PROVIDER == "gemini" and state.GEMINI_API_KEY:
+        if state.GEMINI_API_KEY:
             try:
                 self.client = genai.Client(api_key=state.GEMINI_API_KEY)
                 self.enabled = True
                 logger.info("AuraBrain Singularity: Gemini Engine online (SDK v1).")
             except Exception as e:
                 logger.error(f"AuraBrain: Failed to initialize Gemini: {e}")
-        elif state.AI_PROVIDER == "openrouter" and state.OPENROUTER_API_KEY:
-            self.openrouter_key = state.OPENROUTER_API_KEY
-            self.enabled = True
-            logger.info(f"AuraBrain Singularity: OpenRouter Engine online ({state.OPENROUTER_MODEL}).")
 
     def _call_ai(self, prompt, system_instruction=None, use_cache=True):
-        """v19.2/v22.1: Multi-Model AI Router - Redirects to Gemini SDK or OpenRouter HTTP."""
+        """Stable Gemini SDK call with iterative retry and cache logic."""
         if not self.enabled: return None
         if use_cache and prompt in self.ai_cache:
             return self.ai_cache[prompt]
 
-        if state.AI_PROVIDER == "gemini":
-            return self._call_gemini_sdk(prompt, system_instruction, use_cache)
-        else:
-            return self._call_openrouter(prompt, system_instruction, use_cache)
-
-    def _call_gemini_sdk(self, prompt, system_instruction=None, use_cache=True):
-        """Standard Gemini SDK call with retry logic."""
         import random
         import time
-        max_retries = 5
+        max_retries = 3
         for attempt in range(max_retries):
             try:
                 response = self.client.models.generate_content(
@@ -75,6 +64,8 @@ class AuraBrain:
                     contents=prompt,
                     config={'system_instruction': system_instruction or self.SYSTEM_PROMPT}
                 )
+                if not response or not response.text:
+                    continue
                 res_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                 if use_cache: self.ai_cache[prompt] = res_text
                 return res_text
@@ -82,41 +73,6 @@ class AuraBrain:
                 if "quota" in str(e).lower(): break
                 if attempt == max_retries - 1: break
                 time.sleep((2 ** attempt) + random.uniform(0.1, 1.0))
-        return None
-
-    def _call_openrouter(self, prompt, system_instruction=None, use_cache=True):
-        """v22.1: OpenRouter HTTP Implementation (OpenAI Compatibility)."""
-        url = "https://openrouter.ai/api/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {self.openrouter_key}",
-            "HTTP-Referer": "https://github.com/Mutasem-mk4/Aura", # Required by OpenRouter
-            "X-Title": "Aura Zenith Singularity",
-            "Content-Type": "application/json"
-        }
-        
-        payload = {
-            "model": state.OPENROUTER_MODEL,
-            "messages": [
-                {"role": "system", "content": system_instruction or self.SYSTEM_PROMPT},
-                {"role": "user", "content": prompt}
-            ]
-        }
-        
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                with httpx.Client(timeout=state.NETWORK_TIMEOUT) as client:
-                    resp = client.post(url, headers=headers, json=payload)
-                    resp.raise_for_status()
-                    data = resp.json()
-                    res_text = data['choices'][0]['message']['content'].strip()
-                    res_text = res_text.replace("```json", "").replace("```", "").strip()
-                    if use_cache: self.ai_cache[prompt] = res_text
-                    return res_text
-            except Exception as e:
-                logger.warning(f"OpenRouter Attempt {attempt+1} Failed: {e}")
-                import time
-                time.sleep(2 + attempt)
         return None
 
     def autonomous_plan(self, url: str, dom_context: str, network_context: list) -> dict:
@@ -133,9 +89,11 @@ class AuraBrain:
         )
         try:
             raw = self._call_ai(prompt)
-            plan = json.loads(raw)
-            self.tactical_memory.append(f"Planned: {plan.get('target_vector')}")
-            return plan
+            plan = self._clean_json(raw)
+            if plan.get("plan"):
+                self.tactical_memory.append(f"Planned: {plan.get('target_vector')}")
+                return plan
+            return {"plan": "Fallback Recon", "target_vector": "Unknown", "reasoning": "AI Connectivity Degraded"}
         except Exception:
             return {"plan": "Fallback Recon", "target_vector": "Unknown", "reasoning": "AI Connectivity Degraded"}
 

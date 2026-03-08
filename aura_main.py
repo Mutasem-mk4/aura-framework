@@ -17,8 +17,6 @@ def main():
     parser.add_argument("target", nargs="?", help="Target domain/IP for the mission")
     parser.add_argument("--nexus", action="store_true", help="Launch interactive Nexus War Room")
     parser.add_argument("--auto-submit", action="store_true", help="Enable autonomous bounty submission (Phase 32)")
-    parser.add_argument("--ai-provider", choices=["gemini", "openrouter"], help="AI Provider to use (Phase 33)")
-    parser.add_argument("--ai-model", help="AI Model to use (Phase 33)")
     
     args = parser.parse_args()
     

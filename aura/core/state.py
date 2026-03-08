@@ -82,10 +82,7 @@ CUSTOM_COMPANY = "Security Assessment Team"
 
 # Gemini AI Configuration: Primary and Secondary mappings for resilience
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-GEMINI_MODEL = "gemini-2.5-flash" # v19.4: gemini-2.5-flash (confirmed available with this API key)
-AI_PROVIDER = os.environ.get("AI_PROVIDER", "gemini") # v22.1: Multi-Model Architecture
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
-OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.0-flash-001")
+GEMINI_MODEL = "gemini-2.0-flash" # Stable Release Model
 
 # OSINT API Keys (read from environment or .env)
 SHODAN_API_KEY = os.environ.get("SHODAN_API_KEY")
