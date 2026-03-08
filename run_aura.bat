@@ -34,6 +34,7 @@ if "%~1" == "" (
     echo Examples:
     echo   aura intel.com
     echo   aura intel.com --ai-provider gemini
+    echo   aura intel.com --free-ai
     echo   aura intel.com --ai-model anthropic/claude-3.5-sonnet
     echo.
     exit /b

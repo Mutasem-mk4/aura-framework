@@ -82,7 +82,17 @@ CUSTOM_COMPANY = "Security Assessment Team"
 
 # Gemini AI Configuration: Primary and Secondary mappings for resilience
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-GEMINI_MODEL = "gemini-2.0-flash" # Stable Release Model
+GEMINI_MODEL = "gemini-2.0-flash" 
+
+# Zero-Cost AI (OpenRouter Free Tier)
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+OPENROUTER_FREE_MODE = False # Enabled via --free-ai CLI flag
+ZENITH_FREE_STACK = [
+    "google/gemini-2.0-flash-exp:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "mistralai/mistral-7b-instruct:free",
+    "openrouter/auto"
+]
 
 # OSINT API Keys (read from environment or .env)
 SHODAN_API_KEY = os.environ.get("SHODAN_API_KEY")

@@ -40,6 +40,8 @@ class AuraBrain:
         self.tactical_memory = [] # Phase 18: Tactical Memory
         self.payload_cache = {}  # Initialize payload cache for Level 1 & 2
         self.ai_cache = {} # v19.2: General AI query cache
+        
+        # Primary Gemini SDK
         if state.GEMINI_API_KEY:
             try:
                 self.client = genai.Client(api_key=state.GEMINI_API_KEY)
@@ -47,16 +49,40 @@ class AuraBrain:
                 logger.info("AuraBrain Singularity: Gemini Engine online (SDK v1).")
             except Exception as e:
                 logger.error(f"AuraBrain: Failed to initialize Gemini: {e}")
+        
+        # OpenRouter Free Mode
+        if state.OPENROUTER_API_KEY:
+            self.enabled = True
+            logger.info("AuraBrain Singularity: OpenRouter Free-Tier Engine engaged.")
 
     def _call_ai(self, prompt, system_instruction=None, use_cache=True):
-        """Stable Gemini SDK call with iterative retry and cache logic."""
+        """Zero-Cost Multi-Model Router with failover."""
         if not self.enabled: return None
         if use_cache and prompt in self.ai_cache:
             return self.ai_cache[prompt]
 
+        # 1. Try Primary Gemini SDK first (if enabled and not in exclusive Free mode)
+        if state.GEMINI_API_KEY and not state.OPENROUTER_FREE_MODE:
+            res = self._call_gemini_sdk(prompt, system_instruction, use_cache)
+            if res: return res
+
+        # 2. Try OpenRouter Free Stack (if enabled or if Gemini failed)
+        if state.OPENROUTER_API_KEY:
+            for model_id in state.ZENITH_FREE_STACK:
+                try:
+                    res = self._call_openrouter_free(model_id, prompt, system_instruction, use_cache)
+                    if res: return res
+                except Exception as e:
+                    logger.warning(f"Free Model {model_id} failed: {e}")
+                    continue
+        
+        return None
+
+    def _call_gemini_sdk(self, prompt, system_instruction=None, use_cache=True):
+        """Direct Gemini SDK call."""
         import random
         import time
-        max_retries = 3
+        max_retries = 2
         for attempt in range(max_retries):
             try:
                 response = self.client.models.generate_content(
@@ -64,15 +90,41 @@ class AuraBrain:
                     contents=prompt,
                     config={'system_instruction': system_instruction or self.SYSTEM_PROMPT}
                 )
-                if not response or not response.text:
-                    continue
+                if not response or not response.text: continue
                 res_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                 if use_cache: self.ai_cache[prompt] = res_text
                 return res_text
-            except Exception as e:
-                if "quota" in str(e).lower(): break
+            except Exception:
                 if attempt == max_retries - 1: break
-                time.sleep((2 ** attempt) + random.uniform(0.1, 1.0))
+                time.sleep(1 + random.uniform(0.1, 0.5))
+        return None
+
+    def _call_openrouter_free(self, model_id, prompt, system_instruction=None, use_cache=True):
+        """OpenRouter Free API interaction via HTTP."""
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {state.OPENROUTER_API_KEY}",
+            "HTTP-Referer": "https://github.com/Mutasem-mk4/Aura",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": model_id,
+            "messages": [
+                {"role": "system", "content": system_instruction or self.SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ]
+        }
+        try:
+            with httpx.Client(timeout=state.NETWORK_TIMEOUT) as client:
+                resp = client.post(url, headers=headers, json=payload)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    res_text = data['choices'][0]['message']['content'].strip()
+                    res_text = res_text.replace("```json", "").replace("```", "").strip()
+                    if use_cache: self.ai_cache[prompt] = res_text
+                    return res_text
+        except Exception:
+            pass
         return None
 
     def autonomous_plan(self, url: str, dom_context: str, network_context: list) -> dict:

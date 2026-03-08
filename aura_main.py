@@ -17,10 +17,16 @@ def main():
     parser.add_argument("target", nargs="?", help="Target domain/IP for the mission")
     parser.add_argument("--nexus", action="store_true", help="Launch interactive Nexus War Room")
     parser.add_argument("--auto-submit", action="store_true", help="Enable autonomous bounty submission (Phase 32)")
+    parser.add_argument("--free-ai", action="store_true", help="Engage Zero-Cost Multi-Model AI (OpenRouter Free Tier)")
     
     args = parser.parse_args()
     
     
+    from aura.core import state
+    if args.free_ai:
+        state.OPENROUTER_FREE_MODE = True
+        console.print("[bold cyan][AI] Zero-Cost Multi-Model Engine engaged.[/bold cyan]")
+
     if args.auto_submit:
         from aura.core import state
         state.AUTO_SUBMIT = True
