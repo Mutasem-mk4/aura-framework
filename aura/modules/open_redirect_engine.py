@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
+r"""
 Aura v31.0 - Open Redirect Engine (Phase 25)
 =============================================
 Detects open redirect vulnerabilities and chains them to OAuth token theft.

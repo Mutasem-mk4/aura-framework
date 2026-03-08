@@ -20,12 +20,6 @@ def main():
     
     args = parser.parse_args()
     
-    if args.ai_provider:
-        from aura.core import state
-        state.AI_PROVIDER = args.ai_provider
-    if args.ai_model:
-        from aura.core import state
-        state.OPENROUTER_MODEL = args.ai_model # Use this for either provider as default
     
     if args.auto_submit:
         from aura.core import state
