@@ -66,6 +66,8 @@ Examples:
     parser.add_argument("--dry-run", action="store_true", help="[v2] Preview submission payload without sending (use with --submit)")
     parser.add_argument("--platform", default="intigriti", choices=["intigriti", "h1", "hackerone"], help="[v2] Target platform (default: intigriti)")
     parser.add_argument("--csrf", action="store_true", help="[v2] Scan for CSRF vulnerabilities on discovered mutating endpoints")
+    parser.add_argument("--xss", action="store_true", help="[v2] Scan for XSS — Reflected, DOM, and Stored")
+    parser.add_argument("--no-headless", action="store_true", help="[v2] Show browser window during XSS scan (debug mode)")
     parser.add_argument("--victim", action="store_true", help="[v2] Use VICTIM session token for crawl/attack")
     parser.add_argument("--map", default=None, help="[v2] Path to discovery_map.json (auto-detected if omitted)")
     parser.add_argument("--model", default="llama3.1", help="[v2] Ollama model name (default: llama3.1)")
@@ -113,6 +115,11 @@ Examples:
         from aura.modules.csrf_engine import run_csrf_scan
         console.print(f"[bold red]🔴 CSRF Scan: {args.target}[/bold red]")
         run_csrf_scan(args.target, discovery_map_path=args.map)
+    elif args.xss and args.target:
+        from aura.modules.xss_engine import run_xss_scan
+        headless = not getattr(args, 'no_headless', False)
+        console.print(f"[bold yellow]🟡 XSS Scan: {args.target} ({'headless' if headless else 'visible browser'})[/bold yellow]")
+        run_xss_scan(args.target, discovery_map_path=args.map, headless=headless)
     elif args.target:
         asyncio.run(_run_mission(args.target))
     else:
