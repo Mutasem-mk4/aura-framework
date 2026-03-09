@@ -62,6 +62,9 @@ Examples:
     parser.add_argument("--hunt", action="store_true", help="[v2] Cross-tenant BOLA/IDOR hunt using attacker+victim sessions")
     parser.add_argument("--report", metavar="FINDINGS_JSON", default=None, help="[v2] AI-analyze a findings JSON and generate Intigriti reports")
     parser.add_argument("--burp", metavar="BURP_XML", default=None, help="[v2] Import Burp Suite HTTP history XML export as discovery map")
+    parser.add_argument("--submit", metavar="REPORT_MD", default=None, help="[v2] Auto-submit report to Intigriti/HackerOne")
+    parser.add_argument("--dry-run", action="store_true", help="[v2] Preview submission payload without sending (use with --submit)")
+    parser.add_argument("--platform", default="intigriti", choices=["intigriti", "h1", "hackerone"], help="[v2] Target platform (default: intigriti)")
     parser.add_argument("--victim", action="store_true", help="[v2] Use VICTIM session token for crawl/attack")
     parser.add_argument("--map", default=None, help="[v2] Path to discovery_map.json (auto-detected if omitted)")
     parser.add_argument("--model", default="llama3.1", help="[v2] Ollama model name (default: llama3.1)")
@@ -98,6 +101,13 @@ Examples:
         console.print(f"[bold yellow]📊 Importing Burp XML: {args.burp}[/bold yellow]")
         target = args.target or (self.target_filter if hasattr(args, 'target_filter') else None)
         run_burp_import(args.burp, target=args.target)
+    elif args.submit:
+        from aura.modules.submitter_v2 import run_submit
+        dry = getattr(args, 'dry_run', False)
+        plat = getattr(args, 'platform', 'intigriti')
+        mode_label = "[DRY RUN]" if dry else ""
+        console.print(f"[bold green]🚀 Submitting to {plat.upper()} {mode_label}: {args.submit}[/bold green]")
+        run_submit(args.submit, platform=plat, dry_run=dry)
     elif args.target:
         asyncio.run(_run_mission(args.target))
     else:
