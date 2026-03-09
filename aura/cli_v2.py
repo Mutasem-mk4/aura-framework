@@ -65,6 +65,7 @@ Examples:
     parser.add_argument("--submit", metavar="REPORT_MD", default=None, help="[v2] Auto-submit report to Intigriti/HackerOne")
     parser.add_argument("--dry-run", action="store_true", help="[v2] Preview submission payload without sending (use with --submit)")
     parser.add_argument("--platform", default="intigriti", choices=["intigriti", "h1", "hackerone"], help="[v2] Target platform (default: intigriti)")
+    parser.add_argument("--csrf", action="store_true", help="[v2] Scan for CSRF vulnerabilities on discovered mutating endpoints")
     parser.add_argument("--victim", action="store_true", help="[v2] Use VICTIM session token for crawl/attack")
     parser.add_argument("--map", default=None, help="[v2] Path to discovery_map.json (auto-detected if omitted)")
     parser.add_argument("--model", default="llama3.1", help="[v2] Ollama model name (default: llama3.1)")
@@ -108,6 +109,10 @@ Examples:
         mode_label = "[DRY RUN]" if dry else ""
         console.print(f"[bold green]🚀 Submitting to {plat.upper()} {mode_label}: {args.submit}[/bold green]")
         run_submit(args.submit, platform=plat, dry_run=dry)
+    elif args.csrf and args.target:
+        from aura.modules.csrf_engine import run_csrf_scan
+        console.print(f"[bold red]🔴 CSRF Scan: {args.target}[/bold red]")
+        run_csrf_scan(args.target, discovery_map_path=args.map)
     elif args.target:
         asyncio.run(_run_mission(args.target))
     else:
