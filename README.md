@@ -70,28 +70,35 @@ Run a rapid, completely passive discovery phase.
 aura auto "target.com" --fast
 ```
 
-### 3. Targeted Module Execution
-Deploy specific operational engines on demand.
+### 4. Advanced v2 Security Engines
+Deploy the new specialized detection engines for deeper vulnerability discovery.
 
 ```bash
-# Extract and verify all endpoints from JavaScript files
-aura js "https://target.com"
+# Recon & JS Secret Scraper (40+ subdomains, JS keys, S3 buckets)
+aura example.com --recon
 
-# Hunt for exposed Cloud/AWS credentials
-aura cloud "https://target.com"
+# SQL Injection Engine (Time-based, Error-based, Boolean blind)
+aura example.com --sqli
 
-# Crawl the Wayback Machine for hidden legacy parameters
-aura wayback "target.com"
+# XSS Engine (DOM, Reflected, Polyglot payloads)
+aura example.com --xss
 
-# Attempt Subdomain Takeovers
-aura takeover "target.com"
+# Auth Logic Engine (JWT, Password Reset, ATO, 2FA bypass)
+aura example.com --auth
+
+# CSRF Engine (Mutating endpoint analysis)
+aura example.com --csrf
+
+# BOLA/IDOR Hunt (Cross-tenant testing requiring --victim session)
+aura example.com --hunt --victim
 ```
 
-### 4. Profit Engine (Automated Reporting)
+### 5. Profit Engine (Automated Reporting)
 After a successful run, compile all verified vulnerabilities into a professional Markdown report ready for submission to HackerOne or Bugcrowd.
 
 ```bash
-aura profit intel
+# Analyze findings and generate a report
+aura --report reports/findings.json
 ```
 
 ## 🛡️ Required Configuration
