@@ -69,6 +69,8 @@ Examples:
     parser.add_argument("--xss", action="store_true", help="[v2] Scan for XSS — Reflected, DOM, and Stored")
     parser.add_argument("--no-headless", action="store_true", help="[v2] Show browser window during XSS scan (debug mode)")
     parser.add_argument("--auth", action="store_true", help="[v2] Auth Logic scan — JWT, password reset, ATO, 2FA bypass, file exposure")
+    parser.add_argument("--sqli", action="store_true", help="[v2] SQL Injection scan — Error, Boolean, and Time-based blind")
+    parser.add_argument("--recon", action="store_true", help="[v2] Recon & JS Secret Scraper — Subdomains, JS keys, Cloud buckets, Ports")
     parser.add_argument("--victim", action="store_true", help="[v2] Use VICTIM session token for crawl/attack")
     parser.add_argument("--map", default=None, help="[v2] Path to discovery_map.json (auto-detected if omitted)")
     parser.add_argument("--model", default="llama3.1", help="[v2] Ollama model name (default: llama3.1)")
@@ -125,6 +127,14 @@ Examples:
         from aura.modules.auth_engine import run_auth_scan
         console.print(f"[bold bright_red]🔐 Auth Logic Scan: {args.target}[/bold bright_red]")
         run_auth_scan(args.target)
+    elif args.sqli and args.target:
+        from aura.modules.sqli_engine import run_sqli_scan
+        console.print(f"[bold yellow]🟠 SQLi Scan: {args.target}[/bold yellow]")
+        run_sqli_scan(args.target, discovery_map_path=args.map)
+    elif args.recon and args.target:
+        from aura.modules.recon_engine import run_recon
+        console.print(f"[bold cyan]🔍 Recon Mode: {args.target}[/bold cyan]")
+        run_recon(args.target)
     elif args.target:
         asyncio.run(_run_mission(args.target))
     else:
