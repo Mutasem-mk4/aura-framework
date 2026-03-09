@@ -60,8 +60,11 @@ Examples:
     parser.add_argument("--free-ai", action="store_true", help="Use local Ollama AI (zero cost)")
     parser.add_argument("--crawl", action="store_true", help="[v2] Authenticated crawler — maps all API endpoints")
     parser.add_argument("--hunt", action="store_true", help="[v2] Cross-tenant BOLA/IDOR hunt using attacker+victim sessions")
+    parser.add_argument("--report", metavar="FINDINGS_JSON", default=None, help="[v2] AI-analyze a findings JSON and generate Intigriti reports")
+    parser.add_argument("--burp", metavar="BURP_XML", default=None, help="[v2] Import Burp Suite HTTP history XML export as discovery map")
     parser.add_argument("--victim", action="store_true", help="[v2] Use VICTIM session token for crawl/attack")
     parser.add_argument("--map", default=None, help="[v2] Path to discovery_map.json (auto-detected if omitted)")
+    parser.add_argument("--model", default="llama3.1", help="[v2] Ollama model name (default: llama3.1)")
 
     args = parser.parse_args()
 
@@ -85,6 +88,16 @@ Examples:
         from aura.modules.idor_engine_v2 import run_hunt
         console.print(f"[bold red]🔥 BOLA/IDOR Hunt: {args.target}[/bold red]")
         run_hunt(args.target, discovery_map_path=args.map)
+    elif args.report:
+        from aura.modules.ai_analyst import run_report
+        console.print(f"[bold cyan]🧠 AI Security Analyst: {args.report}[/bold cyan]")
+        model = getattr(args, 'model', 'llama3.1')
+        run_report(args.report, model=model)
+    elif args.burp:
+        from aura.modules.burp_reader import run_burp_import
+        console.print(f"[bold yellow]📊 Importing Burp XML: {args.burp}[/bold yellow]")
+        target = args.target or (self.target_filter if hasattr(args, 'target_filter') else None)
+        run_burp_import(args.burp, target=args.target)
     elif args.target:
         asyncio.run(_run_mission(args.target))
     else:
