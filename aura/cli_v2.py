@@ -68,6 +68,7 @@ Examples:
     parser.add_argument("--csrf", action="store_true", help="[v2] Scan for CSRF vulnerabilities on discovered mutating endpoints")
     parser.add_argument("--xss", action="store_true", help="[v2] Scan for XSS — Reflected, DOM, and Stored")
     parser.add_argument("--no-headless", action="store_true", help="[v2] Show browser window during XSS scan (debug mode)")
+    parser.add_argument("--auth", action="store_true", help="[v2] Auth Logic scan — JWT, password reset, ATO, 2FA bypass, file exposure")
     parser.add_argument("--victim", action="store_true", help="[v2] Use VICTIM session token for crawl/attack")
     parser.add_argument("--map", default=None, help="[v2] Path to discovery_map.json (auto-detected if omitted)")
     parser.add_argument("--model", default="llama3.1", help="[v2] Ollama model name (default: llama3.1)")
@@ -120,6 +121,10 @@ Examples:
         headless = not getattr(args, 'no_headless', False)
         console.print(f"[bold yellow]🟡 XSS Scan: {args.target} ({'headless' if headless else 'visible browser'})[/bold yellow]")
         run_xss_scan(args.target, discovery_map_path=args.map, headless=headless)
+    elif args.auth and args.target:
+        from aura.modules.auth_engine import run_auth_scan
+        console.print(f"[bold bright_red]🔐 Auth Logic Scan: {args.target}[/bold bright_red]")
+        run_auth_scan(args.target)
     elif args.target:
         asyncio.run(_run_mission(args.target))
     else:
