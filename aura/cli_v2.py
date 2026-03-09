@@ -59,7 +59,9 @@ Examples:
     parser.add_argument("--auto-submit", action="store_true", help="Enable autonomous bounty submission")
     parser.add_argument("--free-ai", action="store_true", help="Use local Ollama AI (zero cost)")
     parser.add_argument("--crawl", action="store_true", help="[v2] Authenticated crawler — maps all API endpoints")
+    parser.add_argument("--hunt", action="store_true", help="[v2] Cross-tenant BOLA/IDOR hunt using attacker+victim sessions")
     parser.add_argument("--victim", action="store_true", help="[v2] Use VICTIM session token for crawl/attack")
+    parser.add_argument("--map", default=None, help="[v2] Path to discovery_map.json (auto-detected if omitted)")
 
     args = parser.parse_args()
 
@@ -79,6 +81,10 @@ Examples:
         launch_nexus(orchestrator)
     elif args.crawl and args.target:
         asyncio.run(_run_crawl(args.target, victim=args.victim))
+    elif args.hunt and args.target:
+        from aura.modules.idor_engine_v2 import run_hunt
+        console.print(f"[bold red]🔥 BOLA/IDOR Hunt: {args.target}[/bold red]")
+        run_hunt(args.target, discovery_map_path=args.map)
     elif args.target:
         asyncio.run(_run_mission(args.target))
     else:
