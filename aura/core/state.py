@@ -62,14 +62,16 @@ CLOUD_SWARM_MODE = False
 FAST_MODE = False # v14.2: Optimized rapid-fire mode (skips deep audits)
 AUTO_SUBMIT = False # v19.5: Phase 32 Integrated Submission Gate
 
-# Network Stability & Performance Scaling (Hyper-Acceleration Phase 19)
-GLOBAL_CONCURRENCY_LIMIT = 10  # Increased for Protocol Warp parallelization
+# Network Stability & Performance Scaling
+GLOBAL_CONCURRENCY_LIMIT = 3    # Reduced for Intigriti compliance (Max 5 req/sec)
 REQUEST_JITTER_MODE = True      # Forces subtle random delays to avoid triggering system-wide blocks
 NETWORK_TIMEOUT = 30            # v18.1: Shared Framework-Wide Timeout (Single Source of Truth)
 OAST_POLL_INTERVAL = 15         # v38.0: OAST polling frequency (seconds)
 
 # Phase 16.4: Authentication & Firewall Bypass (User-Defined)
-CUSTOM_HEADERS = {}
+CUSTOM_HEADERS = {
+    "X-Intigriti-Username": "mutasem_mk4"
+}
 CUSTOM_COOKIES = {}
 
 # v25.0 Apex Automation: BOLA / IDOR Dual-Session Tokens
@@ -83,6 +85,9 @@ CUSTOM_COMPANY = "Security Assessment Team"
 # Gemini AI Configuration: Primary and Secondary mappings for resilience
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_MODEL = "gemini-2.0-flash" 
+
+# Zero-Cost Local AI Configuration (Ollama)
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST") 
 
 # Zero-Cost AI (OpenRouter Free Tier)
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")

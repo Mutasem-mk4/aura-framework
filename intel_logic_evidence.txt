@@ -1,0 +1,78 @@
+==================================================
+id: 4210
+target_id: 11487
+content: https://intel.com/content/www/us/en/supplier/procurement-and-payment.html -> /checkout/success (State Skip)
+finding_type: Business Logic Violation
+created_at: 2026-03-04T22:16:44.749443
+status: UNREVIEWED
+owasp: A00:2021-Unknown
+mitre: T1592
+severity: MEDIUM
+campaign_id: None
+proof: None
+evidence_url: None
+secret_type: None
+secret_value: None
+cvss_score: None
+cvss_vector: None
+remediation_fix: None
+impact_desc: None
+patch_priority: None
+bounty_estimate: None
+platform_recommendation: None
+poc_link: None
+raw_request: None
+raw_response: None
+
+==================================================
+id: 4211
+target_id: 11487
+content: https://intel.com/content/www/us/en/supplier/videos/support-for-po-invoicing-payment-issue.html -> /checkout/success (State Skip)
+finding_type: Business Logic Violation
+created_at: 2026-03-04T22:16:44.757067
+status: UNREVIEWED
+owasp: A00:2021-Unknown
+mitre: T1592
+severity: MEDIUM
+campaign_id: None
+proof: None
+evidence_url: None
+secret_type: None
+secret_value: None
+cvss_score: None
+cvss_vector: None
+remediation_fix: None
+impact_desc: None
+patch_priority: None
+bounty_estimate: None
+platform_recommendation: None
+poc_link: None
+raw_request: None
+raw_response: None
+
+==================================================
+id: 4212
+target_id: 11487
+content: https://intel.com/content/www/us/en/supplier/videos/check-payment-status.html -> /checkout/success (State Skip)
+finding_type: Business Logic Violation
+created_at: 2026-03-04T22:16:44.763389
+status: UNREVIEWED
+owasp: A00:2021-Unknown
+mitre: T1592
+severity: MEDIUM
+campaign_id: None
+proof: None
+evidence_url: None
+secret_type: None
+secret_value: None
+cvss_score: None
+cvss_vector: None
+remediation_fix: None
+impact_desc: None
+patch_priority: None
+bounty_estimate: None
+platform_recommendation: None
+poc_link: None
+raw_request: None
+raw_response: None
+

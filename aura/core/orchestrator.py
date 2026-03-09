@@ -1249,7 +1249,7 @@ class NeuralOrchestrator:
             if wayback_findings:
                 all_findings.extend(wayback_findings)
                 for wf in wayback_findings:
-                    self.db.save_finding(recon_domain, wf)
+                    self.db.save_finding(recon_domain, wf, "Wayback-Secret")
                 console.print(f"[bold red][[WAYBACK]] {len(wayback_findings)} historical secret(s) found![/bold red]")
         except Exception as e:
             console.print(f"[dim red][Wayback] Skipped: {e}[/dim red]")
@@ -1269,7 +1269,7 @@ class NeuralOrchestrator:
             if bypass_findings:
                 all_findings.extend(bypass_findings)
                 for bf in bypass_findings:
-                    self.db.save_finding(recon_domain, bf)
+                    self.db.save_finding(recon_domain, bf, "403-Bypass")
                 console.print(f"[bold red][[BYPASS]] {len(bypass_findings)} 403 bypass(es) confirmed![/bold red]")
         except Exception as e:
             console.print(f"[dim red][Bypass] Skipped: {e}[/dim red]")
@@ -1283,7 +1283,7 @@ class NeuralOrchestrator:
             if gql_findings:
                 all_findings.extend(gql_findings)
                 for gf in gql_findings:
-                    self.db.save_finding(recon_domain, gf)
+                    self.db.save_finding(recon_domain, gf, "GraphQL-Introspection")
                 console.print(f"[bold yellow][[GraphQL]] {len(gql_findings)} introspection endpoint(s) found![/bold yellow]")
         except Exception as e:
             console.print(f"[dim red][GraphQL] Skipped: {e}[/dim red]")
@@ -1304,7 +1304,7 @@ class NeuralOrchestrator:
             if ssrf_findings:
                 all_findings.extend(ssrf_findings)
                 for sf in ssrf_findings:
-                    self.db.save_finding(recon_domain, sf)
+                    self.db.save_finding(recon_domain, sf, "SSRF-Vulnerability")
                 console.print(f"[bold red][[SSRF]] {len(ssrf_findings)} SSRF finding(s) discovered![/bold red]")
         except Exception as e:
             console.print(f"[dim red][SSRF] Skipped: {e}[/dim red]")
@@ -1324,7 +1324,7 @@ class NeuralOrchestrator:
             if idor_findings:
                 all_findings.extend(idor_findings)
                 for idf in idor_findings:
-                    self.db.save_finding(recon_domain, idf)
+                    self.db.save_finding(recon_domain, idf, "IDOR-Vulnerability")
                 console.print(f"[bold red][[IDOR]] {len(idor_findings)} IDOR(s) confirmed![/bold red]")
         except Exception as e:
             console.print(f"[dim red][IDOR] Skipped: {e}[/dim red]")
@@ -1338,7 +1338,7 @@ class NeuralOrchestrator:
             if oauth_findings:
                 all_findings.extend(oauth_findings)
                 for of in oauth_findings:
-                    self.db.save_finding(recon_domain, of)
+                    self.db.save_finding(recon_domain, of, "OAuth-Vulnerability")
                 console.print(f"[bold red][[OAuth]] {len(oauth_findings)} OAuth flaw(s) found![/bold red]")
         except Exception as e:
             console.print(f"[dim red][OAuth] Skipped: {e}[/dim red]")

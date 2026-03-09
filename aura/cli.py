@@ -135,10 +135,14 @@ def resolve_target(target_input):
 
 @click.group(cls=AuraHelpGroup)
 @click.option('--proxies', type=click.Path(exists=True), help="Path to proxy list.")
-def cli(proxies):
+@click.option('--free-ai', is_flag=True, help="Engage Zero-Cost Multi-Model AI (OpenRouter Free Tier)")
+def cli(proxies, free_ai):
     """[bold magenta]AURA - Vanguard Edition[/bold magenta]"""
     if proxies:
         state.PROXY_FILE = proxies
+    if free_ai:
+        state.OPENROUTER_FREE_MODE = True
+        console.print("[bold cyan][AI] Zero-Cost Multi-Model Engine engaged.[/bold cyan]")
 
 @cli.command()
 @click.option('-f', '--file', type=click.Path(exists=True), help="Analyze data file.")

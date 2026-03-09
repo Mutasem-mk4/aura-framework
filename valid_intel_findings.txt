@@ -1,0 +1,3125 @@
+--- VALID INTEL FINDINGS (FILTERED) ---
+
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/admin
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/manager
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/setup
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/install
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/config
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/.env
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/.git
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/server-status
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/admin.php
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/config.php
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/wp-admin
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/web.config
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/setup.py
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/webpack.config.js
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/tsconfig.json
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/config.yml
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/config.yaml
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/ADMIN$
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/kubeconfig
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/admin.jsp
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/manager.jsp
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/admin.aspx
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/manager.aspx
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/admin.action
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/manager.action
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/admin.do
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/manager.do
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/adminer
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/phpmyadmin
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/dbadmin
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/pgadmin
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/phppgadmin
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/alertmanager
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/directadmin
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/ispconfig
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/ispmanager
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/core-admin
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: https://intel.com/autoconfig
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/admin
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/manager
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/setup
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/install
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/config
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/.env
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/.git
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/server-status
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/admin.php
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/config.php
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/wp-admin
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/web.config
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/setup.py
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/webpack.config.js
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/tsconfig.json
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/config.yml
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/config.yaml
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/ADMIN$
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/kubeconfig
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/admin.jsp
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/manager.jsp
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/admin.aspx
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/manager.aspx
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/admin.action
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/manager.action
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/admin.do
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/manager.do
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/adminer
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/phpmyadmin
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/dbadmin
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/pgadmin
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/phppgadmin
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/alertmanager
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/directadmin
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/ispconfig
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/ispmanager
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/core-admin
+------------------------------
+Type: Web Server Misconfiguration | Severity: CRITICAL
+Content: Hidden Path Discovered: http://intel.com/autoconfig
+------------------------------
+Type: Exposed Secret: AWS Secret Key | Severity: CRITICAL
+Content: {"content": "Exposed AWS Secret Key found at http://intel.com/", "evidence_url": "http://intel.com/", "secret_type": "AWS Secret Key", "secret_value": "/conte****fpga", "impact_desc": "CRITICAL BUSINESS IMPACT: Exposed AWS Secret Key allows direct unauthorized access to the associated service. Attackers can leverage this to impersonate the application, exfiltrate sensitive customer data, or maliciously consume financial/cloud quotas, leading to severe reputational damage and financial loss.", "cvss_score": 9.8, "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H", "owasp": "A02:2021-Cryptographic Failures", "mitre": "T1552 - Unsecured Credentials", "remediation_fix": "1. Immediately REVOKE the exposed AWS Secret Key from the issuing platform's dashboard.\n2. Rotate all related secrets and regenerate access credentials.\n3. Remove the secret from the source code/configuration file.\n4. Add the secret to a secrets manager (AWS Secrets Manager, HashiCorp Vault, or GitHub Encrypted Secrets).\n5. Add pre-commit hooks (e.g., `git-secrets` or `truffleHog`) to prevent future exposure.\n6. Audit access logs for the exposed key to determine if it was previously exploited.", "patch_priority": "IMMEDIATE", "bounty_estimate": "$1,500-$5,000", "platform_recommendation": "HackerOne (H1) \u2014 Critical/High tier. Expected response: 1-3 days. Also report directly to vendor."}
+------------------------------
+Type: Exposed Secret: AWS Secret Key | Severity: CRITICAL
+Content: {"content": "Exposed AWS Secret Key found at http://intel.com/", "evidence_url": "http://intel.com/", "secret_type": "AWS Secret Key", "secret_value": "/conte****fpga", "impact_desc": "CRITICAL BUSINESS IMPACT: Exposed AWS Secret Key allows direct unauthorized access to the associated service. Attackers can leverage this to impersonate the application, exfiltrate sensitive customer data, or maliciously consume financial/cloud quotas, leading to severe reputational damage and financial loss.", "cvss_score": 9.8, "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H", "owasp": "A02:2021-Cryptographic Failures", "mitre": "T1552 - Unsecured Credentials", "remediation_fix": "1. Immediately REVOKE the exposed AWS Secret Key from the issuing platform's dashboard.\n2. Rotate all related secrets and regenerate access credentials.\n3. Remove the secret from the source code/configuration file.\n4. Add the secret to a secrets manager (AWS Secrets Manager, HashiCorp Vault, or GitHub Encrypted Secrets).\n5. Add pre-commit hooks (e.g., `git-secrets` or `truffleHog`) to prevent future exposure.\n6. Audit access logs for the exposed key to determine if it was previously exploited.", "patch_priority": "IMMEDIATE", "bounty_estimate": "$1,500-$5,000", "platform_recommendation": "HackerOne (H1) \u2014 Critical/High tier. Expected response: 1-3 days. Also report directly to vendor."}
+------------------------------
+Type: Exposed Secret: AWS Secret Key | Severity: CRITICAL
+Content: {"content": "Exposed AWS Secret Key found at http://intel.com/", "evidence_url": "http://intel.com/", "secret_type": "AWS Secret Key", "secret_value": "/conte****fpga", "impact_desc": "CRITICAL BUSINESS IMPACT: Exposed AWS Secret Key allows direct unauthorized access to the associated service. Attackers can leverage this to impersonate the application, exfiltrate sensitive customer data, or maliciously consume financial/cloud quotas, leading to severe reputational damage and financial loss.", "cvss_score": 9.8, "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H", "owasp": "A02:2021-Cryptographic Failures", "mitre": "T1552 - Unsecured Credentials", "remediation_fix": "1. Immediately REVOKE the exposed AWS Secret Key from the issuing platform's dashboard.\n2. Rotate all related secrets and regenerate access credentials.\n3. Remove the secret from the source code/configuration file.\n4. Add the secret to a secrets manager (AWS Secrets Manager, HashiCorp Vault, or GitHub Encrypted Secrets).\n5. Add pre-commit hooks (e.g., `git-secrets` or `truffleHog`) to prevent future exposure.\n6. Audit access logs for the exposed key to determine if it was previously exploited.", "patch_priority": "IMMEDIATE", "bounty_estimate": "$1,500-$5,000", "platform_recommendation": "HackerOne (H1) \u2014 Critical/High tier. Expected response: 1-3 days. Also report directly to vendor."}
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/login
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/api
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/v1
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/v2
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/graphql
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/docs
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/swagger
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/openapi
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/metrics
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/health
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/ping
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/status
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/info
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/dashboard
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/transfer
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/account
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/profile
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/settings
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/env
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/.htaccess
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/db
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/database
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/backup
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/bak
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/old
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/test
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/app
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/auth
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/oauth
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/token
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/jwt
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/session
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/users
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/user
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/login.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/index.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/wp-login.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/xmlrpc.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/robots.txt
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/sitemap.xml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/crossdomain.xml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/clientaccesspolicy.xml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/phpinfo.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/info.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/test.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/shell.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/cmd.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/exec.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/system.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/appsettings.json
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/docker-compose.yml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/Dockerfile
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/package.json
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/package-lock.json
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/composer.json
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/composer.lock
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/yarn.lock
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/pom.xml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/build.gradle
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/Gemfile
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/Gemfile.lock
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/Pipfile
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/Pipfile.lock
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/requirements.txt
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/tox.ini
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/pytest.ini
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/karma.conf.js
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/Gruntfile.js
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/gulpfile.js
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/tslint.json
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/eslint.json
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/prettierrc
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/babelrc
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/env.example
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/env.local
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/env.dev
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/env.prod
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/env.staging
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/env.test
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/settings.yml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/settings.yaml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/database.yml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/database.yaml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/secrets.yml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/secrets.yaml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/credentials.yml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/credentials.yaml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/keys.yml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/keys.yaml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/.ssh
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/id_rsa
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/id_dsa
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/id_ecdsa
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/id_ed25519
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/authorized_keys
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/known_hosts
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/.bash_history
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/.zsh_history
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/.mysql_history
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/.psql_history
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/.sqlite_history
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/.rediscli_history
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/.irb_history
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/.node_repl_history
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/.python_history
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/.Rhistory
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/.mongorc.js
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/manage.py
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/artisan
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/console
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/bin
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/sbin
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/usr
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/etc
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/var
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/tmp
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/opt
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/root
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/home
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/mnt
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/media
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/srv
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/sys
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/proc
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/dev
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/lib
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/lib64
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/boot
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/run
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/lost+found
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/C$
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/IPC$
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/print$
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/smb.conf
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/apache2.conf
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/httpd.conf
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/nginx.conf
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/php.ini
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/my.cnf
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/postgresql.conf
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/redis.conf
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/mongodb.conf
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/docker.sock
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/passwd
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/shadow
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/group
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/gshadow
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/sudoers
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/hosts
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/resolv.conf
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/fstab
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/mtab
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/issue
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/os-release
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/motd
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/crontab
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/cron.d
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/cron.daily
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/cron.hourly
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/cron.monthly
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/cron.weekly
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/logs
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/audit.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/secure.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/messages.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/syslog
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/dmesg
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/auth.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/daemon.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/kern.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/mail.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/user.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/xferlog
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/vsftpd.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/proftpd.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/pureftpd.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/mysql.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/mariadb.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/postgresql.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/mongodb.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/redis.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/cassandra.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/elasticsearch.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/kibana.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/logstash.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/nginx-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/nginx-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/apache2-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/apache2-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/httpd-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/httpd-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/tomcat-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/tomcat-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/catalina.out
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/jboss-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/jboss-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/weblogic-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/weblogic-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/websphere-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/websphere-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/glassfish-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/glassfish-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/iis-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/iis-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/exchange-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/exchange-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/owa-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/owa-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/portal
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/login.jsp
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/index.jsp
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/secure.jsp
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/auth.jsp
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/login.aspx
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/index.aspx
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/secure.aspx
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/auth.aspx
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/login.action
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/index.action
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/secure.action
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/auth.action
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/login.do
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/index.do
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/secure.do
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/auth.do
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/ws
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/soap
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/rest
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/graphql.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/graphql.jsp
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/graphql.aspx
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/graphql.action
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/graphql.do
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/swagger.json
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/swagger.yml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/swagger.yaml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/openapi.json
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/openapi.yml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/openapi.yaml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/v3/api-docs
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/v2/api-docs
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/swagger-ui.html
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/redoc.html
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/graphql-playground
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/graphiql
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/altair
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/voyager
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/pma
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/mysql
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/sql
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/rockmongo
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/mongo-express
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/redis-commander
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/kibana
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/grafana
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/prometheus
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/consul
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/nomad
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/vault
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/rabbitmq
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/celery
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/flower
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/supervisor
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/netdata
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/nagios
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/zabbix
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/cacti
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/munin
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/icinga
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/thruk
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/check_mk
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/op5
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/observium
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/librenms
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/snipeit
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/glpi
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/jira
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/confluence
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/bitbucket
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/bamboo
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/crucible
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/fisheye
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/crowd
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/nexus
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/artifactory
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/sonarqube
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/jenkins
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/gitlab
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/gitea
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/gogs
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/phabricator
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/redmine
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/trac
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/bugzilla
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/mantis
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/youtrack
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/mattermost
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/slack
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/discord
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/teams
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/rocketchat
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/zulip
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/matrix
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/synapse
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/riot
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/element
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/jitsi
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/bigbluebutton
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/nextcloud
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/owncloud
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/seafile
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/pydio
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/filecloud
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/ajaxplorer
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/wordpress
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/drupal
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/joomla
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/magento
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/prestashop
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/opencart
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/oscommerce
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/zencart
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/virtuemart
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/woocommerce
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/shopify
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/bigcommerce
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/volusion
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/wix
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/squarespace
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/weebly
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/jimdo
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/strikingly
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/webflow
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/cpanel
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/whm
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/plesk
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/webmin
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/usermin
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/virtualmin
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/cloudmin
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/froxlor
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/ajenti
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/vesta
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/cyberpanel
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/aapanel
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/centos-web-panel
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/interworx
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/sentora
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/zpanel
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/kloxo
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/ehcp
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/dtc
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/gnu-panel
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/syscp
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/vhcs
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/baikal
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/radicale
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/davical
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/sabre-dav
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/horde
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/roundcube
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/squirrelmail
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/rainloop
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/zimbra
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/iredmail
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/mailcow
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/mail-in-a-box
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/poste-io
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/modoboa
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/exim
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/postfix
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/sendmail
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/qmail
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/dovecot
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/courier
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/cyrus
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/spamassassin
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/amavis
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/clamav
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/opendkim
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/opendmarc
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/spf
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/dkim
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/dmarc
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/bimi
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/mta-sts
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/tls-rpt
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/autodiscover
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/wpad
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/isatap
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/dns
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/ns1
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/ns2
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/ns3
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/ns4
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/mx
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/mx1
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/mx2
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/mx3
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/mx4
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/smtp
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/imap
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/pop3
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/webmail
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/extranet
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/intranet
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/partner
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/store
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/shop
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/cart
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/checkout
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/pay
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/billing
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/invoice
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/quote
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/support
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/help
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/faq
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/kb
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/wiki
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/forum
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/board
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/community
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/blog
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/news
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/press
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/events
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/calendar
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/jobs
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/careers
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/about
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/contact
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/privacy
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/terms
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/legal
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/sitemap
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/feed
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/rss
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/atom
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/upload
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/download
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/files
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/images
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/css
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/js
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/assets
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/static
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/public
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/private
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/hidden
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/secret
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/draft
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/pending
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/review
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/approve
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/reject
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/delete
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/login
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/api
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/v1
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/v2
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/graphql
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/docs
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/swagger
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/openapi
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/metrics
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/health
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/ping
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/status
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/info
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/dashboard
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/transfer
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/account
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/profile
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/settings
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/env
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/.htaccess
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/db
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/database
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/backup
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/bak
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/old
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/test
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/app
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/auth
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/oauth
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/token
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/jwt
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/session
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/users
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/user
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/login.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/index.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/wp-login.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/xmlrpc.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/robots.txt
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/sitemap.xml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/crossdomain.xml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/clientaccesspolicy.xml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/phpinfo.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/info.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/test.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/shell.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/cmd.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/exec.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/system.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/appsettings.json
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/docker-compose.yml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/Dockerfile
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/package.json
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/package-lock.json
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/composer.json
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/composer.lock
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/yarn.lock
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/pom.xml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/build.gradle
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/Gemfile
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/Gemfile.lock
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/Pipfile
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/Pipfile.lock
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/requirements.txt
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/tox.ini
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/pytest.ini
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/karma.conf.js
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/Gruntfile.js
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/gulpfile.js
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/tslint.json
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/eslint.json
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/prettierrc
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/babelrc
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/env.example
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/env.local
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/env.dev
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/env.prod
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/env.staging
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/env.test
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/settings.yml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/settings.yaml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/database.yml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/database.yaml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/secrets.yml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/secrets.yaml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/credentials.yml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/credentials.yaml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/keys.yml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/keys.yaml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/.ssh
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/id_rsa
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/id_dsa
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/id_ecdsa
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/id_ed25519
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/authorized_keys
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/known_hosts
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/.bash_history
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/.zsh_history
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/.mysql_history
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/.psql_history
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/.sqlite_history
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/.rediscli_history
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/.irb_history
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/.node_repl_history
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/.python_history
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/.Rhistory
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/.mongorc.js
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/manage.py
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/artisan
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/console
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/bin
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/sbin
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/usr
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/etc
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/var
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/tmp
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/opt
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/root
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/home
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/mnt
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/media
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/srv
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/sys
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/proc
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/dev
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/lib
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/lib64
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/boot
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/run
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/lost+found
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/C$
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/IPC$
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/print$
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/smb.conf
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/apache2.conf
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/httpd.conf
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/nginx.conf
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/php.ini
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/my.cnf
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/postgresql.conf
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/redis.conf
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/mongodb.conf
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/docker.sock
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/passwd
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/shadow
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/group
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/gshadow
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/sudoers
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/hosts
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/resolv.conf
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/fstab
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/mtab
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/issue
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/os-release
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/motd
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/crontab
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/cron.d
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/cron.daily
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/cron.hourly
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/cron.monthly
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/cron.weekly
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/logs
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/audit.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/secure.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/messages.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/syslog
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/dmesg
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/auth.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/daemon.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/kern.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/mail.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/user.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/xferlog
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/vsftpd.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/proftpd.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/pureftpd.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/mysql.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/mariadb.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/postgresql.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/mongodb.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/redis.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/cassandra.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/elasticsearch.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/kibana.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/logstash.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/nginx-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/nginx-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/apache2-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/apache2-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/httpd-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/httpd-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/tomcat-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/tomcat-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/catalina.out
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/jboss-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/jboss-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/weblogic-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/weblogic-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/websphere-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/websphere-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/glassfish-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/glassfish-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/iis-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/iis-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/exchange-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/exchange-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/owa-access.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/owa-error.log
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/portal
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/login.jsp
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/index.jsp
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/secure.jsp
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/auth.jsp
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/login.aspx
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/index.aspx
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/secure.aspx
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/auth.aspx
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/login.action
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/index.action
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/secure.action
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/auth.action
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/login.do
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/index.do
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/secure.do
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/auth.do
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/ws
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/soap
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/rest
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/graphql.php
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/graphql.jsp
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/graphql.aspx
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/graphql.action
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/graphql.do
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/swagger.json
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/swagger.yml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/swagger.yaml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/openapi.json
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/openapi.yml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/openapi.yaml
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/v3/api-docs
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/v2/api-docs
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/swagger-ui.html
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/redoc.html
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/graphql-playground
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/graphiql
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/altair
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/voyager
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/pma
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/mysql
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/sql
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/rockmongo
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/mongo-express
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/redis-commander
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/kibana
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/grafana
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/prometheus
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/consul
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/nomad
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/vault
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/rabbitmq
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/celery
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/flower
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/supervisor
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/netdata
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/nagios
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/zabbix
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/cacti
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/munin
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/icinga
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/thruk
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/check_mk
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/op5
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/observium
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/librenms
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/snipeit
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/glpi
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/jira
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/confluence
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/bitbucket
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/bamboo
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/crucible
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/fisheye
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/crowd
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/nexus
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/artifactory
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/sonarqube
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/jenkins
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/gitlab
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/gitea
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/gogs
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/phabricator
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/redmine
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/trac
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/bugzilla
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/mantis
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/youtrack
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/mattermost
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/slack
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/discord
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/teams
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/rocketchat
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/zulip
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/matrix
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/synapse
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/riot
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/element
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/jitsi
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/bigbluebutton
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/nextcloud
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/owncloud
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/seafile
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/pydio
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/filecloud
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/ajaxplorer
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/wordpress
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/drupal
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/joomla
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/magento
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/prestashop
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/opencart
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/oscommerce
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/zencart
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/virtuemart
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/woocommerce
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/shopify
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/bigcommerce
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/volusion
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/wix
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/squarespace
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/weebly
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/jimdo
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/strikingly
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/webflow
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/cpanel
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/whm
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/plesk
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/webmin
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/usermin
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/virtualmin
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/cloudmin
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/froxlor
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/ajenti
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/vesta
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/cyberpanel
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/aapanel
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/centos-web-panel
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/interworx
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/sentora
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/zpanel
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/kloxo
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/ehcp
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/dtc
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/gnu-panel
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/syscp
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/vhcs
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/baikal
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/radicale
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/davical
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/sabre-dav
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/horde
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/roundcube
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/squirrelmail
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/rainloop
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/zimbra
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/iredmail
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/mailcow
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/mail-in-a-box
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/poste-io
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/modoboa
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/exim
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/postfix
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/sendmail
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/qmail
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/dovecot
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/courier
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/cyrus
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/spamassassin
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/amavis
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/clamav
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/opendkim
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/opendmarc
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/spf
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/dkim
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/dmarc
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/bimi
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/mta-sts
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/tls-rpt
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/autodiscover
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/wpad
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/isatap
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/dns
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/ns1
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/ns2
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/ns3
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/ns4
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/mx
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/mx1
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/mx2
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/mx3
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/mx4
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/smtp
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/imap
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/pop3
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/webmail
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/extranet
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/intranet
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/partner
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/store
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/shop
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/cart
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/checkout
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/pay
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/billing
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/invoice
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/quote
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/support
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/help
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/faq
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/kb
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/wiki
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/forum
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/board
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/community
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/blog
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/news
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/press
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/events
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/calendar
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/jobs
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/careers
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/about
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/contact
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/privacy
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/terms
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/legal
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/sitemap
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/feed
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/rss
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/atom
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/upload
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/download
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/files
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/images
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/css
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/js
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/assets
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/static
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/public
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/private
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/hidden
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/secret
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/draft
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/pending
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/review
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/approve
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/reject
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: http://intel.com/delete
+------------------------------
+Type: Business Logic Violation | Severity: MEDIUM
+Content: https://intel.com/content/www/us/en/supplier/procurement-and-payment.html -> /checkout/success (State Skip)
+------------------------------
+Type: Business Logic Violation | Severity: MEDIUM
+Content: https://intel.com/content/www/us/en/supplier/videos/support-for-po-invoicing-payment-issue.html -> /checkout/success (State Skip)
+------------------------------
+Type: Business Logic Violation | Severity: MEDIUM
+Content: https://intel.com/content/www/us/en/supplier/videos/check-payment-status.html -> /checkout/success (State Skip)
+------------------------------
+Type: Exposed Secret: Broken Social Media Link (Potential Hijack) | Severity: MEDIUM
+Content: {"content": "Exposed Broken Social Media Link (Potential Hijack) found at http://intel.com/", "evidence_url": "http://intel.com/", "secret_type": "Broken Social Media Link (Potential Hijack)", "secret_value": "N/A***", "impact_desc": "CRITICAL BUSINESS IMPACT: Exposed Broken Social Media Link (Potential Hijack) allows direct unauthorized access to the associated service. Attackers can leverage this to impersonate the application, exfiltrate sensitive customer data, or maliciously consume financial/cloud quotas, leading to severe reputational damage and financial loss.", "cvss_score": 7.5, "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H", "owasp": "A02:2021-Cryptographic Failures", "mitre": "T1552 - Unsecured Credentials", "remediation_fix": "1. Revoke the exposed Broken Social Media Link (Potential Hijack).\n2. Remove it from plain text.\n3. Move to a secrets manager (Vault, AWS Secrets Manager).", "patch_priority": "IMMEDIATE", "bounty_estimate": "$100-$500", "platform_recommendation": "HackerOne or direct vendor disclosure."}
+------------------------------
+Type: Exposed Secret: Broken Social Media Link (Potential Hijack) | Severity: MEDIUM
+Content: {"content": "Exposed Broken Social Media Link (Potential Hijack) found at http://intel.com/", "evidence_url": "http://intel.com/", "secret_type": "Broken Social Media Link (Potential Hijack)", "secret_value": "N/A***", "impact_desc": "CRITICAL BUSINESS IMPACT: Exposed Broken Social Media Link (Potential Hijack) allows direct unauthorized access to the associated service. Attackers can leverage this to impersonate the application, exfiltrate sensitive customer data, or maliciously consume financial/cloud quotas, leading to severe reputational damage and financial loss.", "cvss_score": 7.5, "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H", "owasp": "A02:2021-Cryptographic Failures", "mitre": "T1552 - Unsecured Credentials", "remediation_fix": "1. Revoke the exposed Broken Social Media Link (Potential Hijack).\n2. Remove it from plain text.\n3. Move to a secrets manager (Vault, AWS Secrets Manager).", "patch_priority": "IMMEDIATE", "bounty_estimate": "$100-$500", "platform_recommendation": "HackerOne or direct vendor disclosure."}
+------------------------------
+Type: Exposed Secret: Broken Social Media Link (Potential Hijack) | Severity: MEDIUM
+Content: {"content": "Exposed Broken Social Media Link (Potential Hijack) found at http://intel.com/", "evidence_url": "http://intel.com/", "secret_type": "Broken Social Media Link (Potential Hijack)", "secret_value": "N/A***", "impact_desc": "CRITICAL BUSINESS IMPACT: Exposed Broken Social Media Link (Potential Hijack) allows direct unauthorized access to the associated service. Attackers can leverage this to impersonate the application, exfiltrate sensitive customer data, or maliciously consume financial/cloud quotas, leading to severe reputational damage and financial loss.", "cvss_score": 7.5, "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H", "owasp": "A02:2021-Cryptographic Failures", "mitre": "T1552 - Unsecured Credentials", "remediation_fix": "1. Revoke the exposed Broken Social Media Link (Potential Hijack).\n2. Remove it from plain text.\n3. Move to a secrets manager (Vault, AWS Secrets Manager).", "patch_priority": "IMMEDIATE", "bounty_estimate": "$100-$500", "platform_recommendation": "HackerOne or direct vendor disclosure."}
+------------------------------
+Type: Exposed Secret: Broken Social Media Link (Potential Hijack) | Severity: MEDIUM
+Content: {"content": "Exposed Broken Social Media Link (Potential Hijack) found at http://intel.com/", "evidence_url": "http://intel.com/", "secret_type": "Broken Social Media Link (Potential Hijack)", "secret_value": "N/A***", "impact_desc": "CRITICAL BUSINESS IMPACT: Exposed Broken Social Media Link (Potential Hijack) allows direct unauthorized access to the associated service. Attackers can leverage this to impersonate the application, exfiltrate sensitive customer data, or maliciously consume financial/cloud quotas, leading to severe reputational damage and financial loss.", "cvss_score": 7.5, "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H", "owasp": "A02:2021-Cryptographic Failures", "mitre": "T1552 - Unsecured Credentials", "remediation_fix": "1. Revoke the exposed Broken Social Media Link (Potential Hijack).\n2. Remove it from plain text.\n3. Move to a secrets manager (Vault, AWS Secrets Manager).", "patch_priority": "IMMEDIATE", "bounty_estimate": "$100-$500", "platform_recommendation": "HackerOne or direct vendor disclosure."}
+------------------------------
+Type: Exposed Secret: Broken Social Media Link (Potential Hijack) | Severity: MEDIUM
+Content: {"content": "Exposed Broken Social Media Link (Potential Hijack) found at http://intel.com/", "evidence_url": "http://intel.com/", "secret_type": "Broken Social Media Link (Potential Hijack)", "secret_value": "N/A***", "impact_desc": "CRITICAL BUSINESS IMPACT: Exposed Broken Social Media Link (Potential Hijack) allows direct unauthorized access to the associated service. Attackers can leverage this to impersonate the application, exfiltrate sensitive customer data, or maliciously consume financial/cloud quotas, leading to severe reputational damage and financial loss.", "cvss_score": 7.5, "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H", "owasp": "A02:2021-Cryptographic Failures", "mitre": "T1552 - Unsecured Credentials", "remediation_fix": "1. Revoke the exposed Broken Social Media Link (Potential Hijack).\n2. Remove it from plain text.\n3. Move to a secrets manager (Vault, AWS Secrets Manager).", "patch_priority": "IMMEDIATE", "bounty_estimate": "$100-$500", "platform_recommendation": "HackerOne or direct vendor disclosure."}
+------------------------------
+Type: Exposed Secret: Broken Social Media Link (Potential Hijack) | Severity: MEDIUM
+Content: {"content": "Exposed Broken Social Media Link (Potential Hijack) found at http://intel.com/", "evidence_url": "http://intel.com/", "secret_type": "Broken Social Media Link (Potential Hijack)", "secret_value": "N/A***", "impact_desc": "CRITICAL BUSINESS IMPACT: Exposed Broken Social Media Link (Potential Hijack) allows direct unauthorized access to the associated service. Attackers can leverage this to impersonate the application, exfiltrate sensitive customer data, or maliciously consume financial/cloud quotas, leading to severe reputational damage and financial loss.", "cvss_score": 7.5, "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H", "owasp": "A02:2021-Cryptographic Failures", "mitre": "T1552 - Unsecured Credentials", "remediation_fix": "1. Revoke the exposed Broken Social Media Link (Potential Hijack).\n2. Remove it from plain text.\n3. Move to a secrets manager (Vault, AWS Secrets Manager).", "patch_priority": "IMMEDIATE", "bounty_estimate": "$100-$500", "platform_recommendation": "HackerOne or direct vendor disclosure."}
+------------------------------
+Type: Exposed Secret: Broken Social Media Link (Potential Hijack) | Severity: MEDIUM
+Content: {"content": "Exposed Broken Social Media Link (Potential Hijack) found at http://intel.com/", "evidence_url": "http://intel.com/", "secret_type": "Broken Social Media Link (Potential Hijack)", "secret_value": "N/A***", "impact_desc": "CRITICAL BUSINESS IMPACT: Exposed Broken Social Media Link (Potential Hijack) allows direct unauthorized access to the associated service. Attackers can leverage this to impersonate the application, exfiltrate sensitive customer data, or maliciously consume financial/cloud quotas, leading to severe reputational damage and financial loss.", "cvss_score": 7.5, "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H", "owasp": "A02:2021-Cryptographic Failures", "mitre": "T1552 - Unsecured Credentials", "remediation_fix": "1. Revoke the exposed Broken Social Media Link (Potential Hijack).\n2. Remove it from plain text.\n3. Move to a secrets manager (Vault, AWS Secrets Manager).", "patch_priority": "IMMEDIATE", "bounty_estimate": "$100-$500", "platform_recommendation": "HackerOne or direct vendor disclosure."}
+------------------------------
+Type: Exposed Secret: Broken Social Media Link (Potential Hijack) | Severity: MEDIUM
+Content: {"content": "Exposed Broken Social Media Link (Potential Hijack) found at http://intel.com/", "evidence_url": "http://intel.com/", "secret_type": "Broken Social Media Link (Potential Hijack)", "secret_value": "N/A***", "impact_desc": "CRITICAL BUSINESS IMPACT: Exposed Broken Social Media Link (Potential Hijack) allows direct unauthorized access to the associated service. Attackers can leverage this to impersonate the application, exfiltrate sensitive customer data, or maliciously consume financial/cloud quotas, leading to severe reputational damage and financial loss.", "cvss_score": 7.5, "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H", "owasp": "A02:2021-Cryptographic Failures", "mitre": "T1552 - Unsecured Credentials", "remediation_fix": "1. Revoke the exposed Broken Social Media Link (Potential Hijack).\n2. Remove it from plain text.\n3. Move to a secrets manager (Vault, AWS Secrets Manager).", "patch_priority": "IMMEDIATE", "bounty_estimate": "$100-$500", "platform_recommendation": "HackerOne or direct vendor disclosure."}
+------------------------------
+Type: Exposed Secret: Broken Social Media Link (Potential Hijack) | Severity: MEDIUM
+Content: {"content": "Exposed Broken Social Media Link (Potential Hijack) found at http://intel.com/", "evidence_url": "http://intel.com/", "secret_type": "Broken Social Media Link (Potential Hijack)", "secret_value": "N/A***", "impact_desc": "CRITICAL BUSINESS IMPACT: Exposed Broken Social Media Link (Potential Hijack) allows direct unauthorized access to the associated service. Attackers can leverage this to impersonate the application, exfiltrate sensitive customer data, or maliciously consume financial/cloud quotas, leading to severe reputational damage and financial loss.", "cvss_score": 7.5, "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H", "owasp": "A02:2021-Cryptographic Failures", "mitre": "T1552 - Unsecured Credentials", "remediation_fix": "1. Revoke the exposed Broken Social Media Link (Potential Hijack).\n2. Remove it from plain text.\n3. Move to a secrets manager (Vault, AWS Secrets Manager).", "patch_priority": "IMMEDIATE", "bounty_estimate": "$100-$500", "platform_recommendation": "HackerOne or direct vendor disclosure."}
+------------------------------
+Type: Exposed Secret: Broken Social Media Link (Potential Hijack) | Severity: MEDIUM
+Content: {"content": "Exposed Broken Social Media Link (Potential Hijack) found at http://intel.com/", "evidence_url": "http://intel.com/", "secret_type": "Broken Social Media Link (Potential Hijack)", "secret_value": "N/A***", "impact_desc": "CRITICAL BUSINESS IMPACT: Exposed Broken Social Media Link (Potential Hijack) allows direct unauthorized access to the associated service. Attackers can leverage this to impersonate the application, exfiltrate sensitive customer data, or maliciously consume financial/cloud quotas, leading to severe reputational damage and financial loss.", "cvss_score": 7.5, "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H", "owasp": "A02:2021-Cryptographic Failures", "mitre": "T1552 - Unsecured Credentials", "remediation_fix": "1. Revoke the exposed Broken Social Media Link (Potential Hijack).\n2. Remove it from plain text.\n3. Move to a secrets manager (Vault, AWS Secrets Manager).", "patch_priority": "IMMEDIATE", "bounty_estimate": "$100-$500", "platform_recommendation": "HackerOne or direct vendor disclosure."}
+------------------------------
+Type: Exposed Secret: Broken Social Media Link (Potential Hijack) | Severity: MEDIUM
+Content: {"content": "Exposed Broken Social Media Link (Potential Hijack) found at http://intel.com/", "evidence_url": "http://intel.com/", "secret_type": "Broken Social Media Link (Potential Hijack)", "secret_value": "N/A***", "impact_desc": "CRITICAL BUSINESS IMPACT: Exposed Broken Social Media Link (Potential Hijack) allows direct unauthorized access to the associated service. Attackers can leverage this to impersonate the application, exfiltrate sensitive customer data, or maliciously consume financial/cloud quotas, leading to severe reputational damage and financial loss.", "cvss_score": 7.5, "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H", "owasp": "A02:2021-Cryptographic Failures", "mitre": "T1552 - Unsecured Credentials", "remediation_fix": "1. Revoke the exposed Broken Social Media Link (Potential Hijack).\n2. Remove it from plain text.\n3. Move to a secrets manager (Vault, AWS Secrets Manager).", "patch_priority": "IMMEDIATE", "bounty_estimate": "$100-$500", "platform_recommendation": "HackerOne or direct vendor disclosure."}
+------------------------------
+Type: Exposed Secret: Broken Social Media Link (Potential Hijack) | Severity: MEDIUM
+Content: {"content": "Exposed Broken Social Media Link (Potential Hijack) found at http://intel.com/", "evidence_url": "http://intel.com/", "secret_type": "Broken Social Media Link (Potential Hijack)", "secret_value": "N/A***", "impact_desc": "CRITICAL BUSINESS IMPACT: Exposed Broken Social Media Link (Potential Hijack) allows direct unauthorized access to the associated service. Attackers can leverage this to impersonate the application, exfiltrate sensitive customer data, or maliciously consume financial/cloud quotas, leading to severe reputational damage and financial loss.", "cvss_score": 7.5, "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H", "owasp": "A02:2021-Cryptographic Failures", "mitre": "T1552 - Unsecured Credentials", "remediation_fix": "1. Revoke the exposed Broken Social Media Link (Potential Hijack).\n2. Remove it from plain text.\n3. Move to a secrets manager (Vault, AWS Secrets Manager).", "patch_priority": "IMMEDIATE", "bounty_estimate": "$100-$500", "platform_recommendation": "HackerOne or direct vendor disclosure."}
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/.well-known/apple-app-site-association
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://intel.com/.well-known/assetlinks.json
+------------------------------
+Type: Information Disclosure | Severity: MEDIUM
+Content: Hidden Path Discovered: https://api.intel.com/ping
+------------------------------
+Type: Server-Side Template Injection (SSTI) | Severity: MEDIUM
+Content: SSTI CONFIRMED: Smarty template injection
+URL: https://intel.com
+Parameter: `q`
+Probe: {7*7} → Expected: 49
+1-Click PoC: `https://intel.com?q=%7B7%2A7%7D`
+Response Snippet: <HTML><HEAD>
+<TITLE>Access Denied</TITLE>
+</HEAD><BODY>
+<H1>Access Denied</H1>
+ 
+You don't have permission to access "http&#58;&#47;&#47;www&#46;intel&#46;com&#47;&#63;" on this server.<P>
+Reference&#32;&#35;18&#46;f49e1002&#46;1772922447&#46;17e32c01
+<P>https&#58;&#47;&#47;errors&#46;edgesuite&#46;
+
+------------------------------
+Type: HTTP Request Smuggling | Severity: MEDIUM
+Content: HTTP Request Smuggling CONFIRMED (TE.CL)
+Target: https://api.intel.com
+Details: Backend hung for 5.28s — TE.CL desync confirmed.
+
+Impact: Attacker can bypass WAF rules, poison backend queues, and expose other users' requests. This is a CRITICAL vulnerability frequently rated 9.0+ CVSS by HackerOne and Bugcrowd.
+------------------------------
+Type: HTTP Request Smuggling | Severity: MEDIUM
+Content: HTTP Request Smuggling CONFIRMED (TE.CL)
+Target: https://api.intel.com
+Details: Backend hung for 5.38s — TE.CL desync confirmed.
+
+Impact: Attacker can bypass WAF rules, poison backend queues, and expose other users' requests. This is a CRITICAL vulnerability frequently rated 9.0+ CVSS by HackerOne and Bugcrowd.
+------------------------------
+Type: Server-Side Template Injection (SSTI) | Severity: MEDIUM
+Content: SSTI CONFIRMED: Jinja2/Twig/Nunjucks template injection
+URL: https://intel.com
+Parameter: `q`
+Probe: {{7*7}} → Expected: 49
+1-Click PoC: `https://intel.com?q=%7B%7B7%2A7%7D%7D`
+Response Snippet: <HTML><HEAD>
+<TITLE>Access Denied</TITLE>
+</HEAD><BODY>
+<H1>Access Denied</H1>
+ 
+You don't have permission to access "http&#58;&#47;&#47;www&#46;intel&#46;com&#47;&#63;" on this server.<P>
+Reference&#32;&#35;18&#46;f49e1002&#46;1772945956&#46;1980db26
+<P>https&#58;&#47;&#47;errors&#46;edgesuite&#46;
+
+------------------------------
+Type: Server-Side Template Injection (SSTI) | Severity: MEDIUM
+Content: SSTI CONFIRMED: Jinja2/Twig/Nunjucks template injection
+URL: https://intel.com
+Parameter: `q`
+Probe: {{7*7}} → Expected: 49
+1-Click PoC: `https://intel.com?q=%7B%7B7%2A7%7D%7D`
+Response Snippet: <HTML><HEAD>
+<TITLE>Access Denied</TITLE>
+</HEAD><BODY>
+<H1>Access Denied</H1>
+ 
+You don't have permission to access "http&#58;&#47;&#47;www&#46;intel&#46;com&#47;&#63;" on this server.<P>
+Reference&#32;&#35;18&#46;f49e1002&#46;1772947268&#46;1992c74c
+<P>https&#58;&#47;&#47;errors&#46;edgesuite&#46;
+
+------------------------------
+Type: HTTP Request Smuggling | Severity: MEDIUM
+Content: HTTP Request Smuggling CONFIRMED (TE.CL)
+Target: https://api.intel.com
+Details: Backend hung for 5.41s — TE.CL desync confirmed.
+
+Impact: Attacker can bypass WAF rules, poison backend queues, and expose other users' requests. This is a CRITICAL vulnerability frequently rated 9.0+ CVSS by HackerOne and Bugcrowd.
+------------------------------
+Type: Broken Access Control (IDOR) | Severity: High
+Content: {"type": "Broken Access Control (IDOR)", "url": "https://intel.com/content/www/us/en/secure/content-details/820189/competitive-proof-points-nvidia.html?DocID=820190", "severity": "High", "method": "Auto-Incremented ID"}
+------------------------------

@@ -40,19 +40,28 @@ class AuraBrain:
         self.tactical_memory = [] # Phase 18: Tactical Memory
         self.payload_cache = {}  # Initialize payload cache for Level 1 & 2
         self.ai_cache = {} # v19.2: General AI query cache
+        self.active_provider = None
+        
+        # Zero-Cost Local AI (Ollama)
+        if state.OLLAMA_HOST:
+            self.enabled = True
+            self.active_provider = "ollama"
+            logger.info(f"AuraBrain Singularity: Local Ollama Engine online at {state.OLLAMA_HOST}")
         
         # Primary Gemini SDK
-        if state.GEMINI_API_KEY:
+        if state.GEMINI_API_KEY and not self.active_provider:
             try:
                 self.client = genai.Client(api_key=state.GEMINI_API_KEY)
                 self.enabled = True
+                self.active_provider = "gemini"
                 logger.info("AuraBrain Singularity: Gemini Engine online (SDK v1).")
             except Exception as e:
                 logger.error(f"AuraBrain: Failed to initialize Gemini: {e}")
         
         # OpenRouter Free Mode
-        if state.OPENROUTER_API_KEY:
+        if state.OPENROUTER_API_KEY and not self.active_provider:
             self.enabled = True
+            self.active_provider = "openrouter"
             logger.info("AuraBrain Singularity: OpenRouter Free-Tier Engine engaged.")
 
     def _call_ai(self, prompt, system_instruction=None, use_cache=True):
@@ -60,6 +69,11 @@ class AuraBrain:
         if not self.enabled: return None
         if use_cache and prompt in self.ai_cache:
             return self.ai_cache[prompt]
+
+        # 0. Try Local Ollama first (Zero Cost, Infinite Runtime)
+        if self.active_provider == "ollama" or state.OLLAMA_HOST:
+            res = self._call_ollama(prompt, system_instruction, use_cache)
+            if res: return res
 
         # 1. Try Primary Gemini SDK first (if enabled and not in exclusive Free mode)
         if state.GEMINI_API_KEY and not state.OPENROUTER_FREE_MODE:
@@ -94,7 +108,11 @@ class AuraBrain:
                 res_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                 if use_cache: self.ai_cache[prompt] = res_text
                 return res_text
-            except Exception:
+            except Exception as e:
+                # Catch 400 Invalid Argument (Expired/Invalid Key) for failover
+                if "400" in str(e) or "API key not valid" in str(e):
+                    logger.error(f"AuraBrain: Gemini API Key Invalid/Expired (400). Failing over...")
+                    return None
                 if attempt == max_retries - 1: break
                 time.sleep(1 + random.uniform(0.1, 0.5))
         return None
@@ -125,6 +143,28 @@ class AuraBrain:
                     return res_text
         except Exception:
             pass
+        return None
+
+    def _call_ollama(self, prompt, system_instruction=None, use_cache=True):
+        """Local Ollama Engine iteration."""
+        url = f"{state.OLLAMA_HOST}/api/generate"
+        payload = {
+            "model": "llama3.1",
+            "prompt": f"{system_instruction or self.SYSTEM_PROMPT}\n\nUser: {prompt}\nAI:",
+            "stream": False
+        }
+        try:
+            # First inference takes longer as the model loads into RAM/VRAM
+            with httpx.Client(timeout=120) as client:
+                resp = client.post(url, json=payload)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    res_text = data.get('response', '').strip()
+                    res_text = res_text.replace("```json", "").replace("```", "").strip()
+                    if use_cache: self.ai_cache[prompt] = res_text
+                    return res_text
+        except Exception as e:
+            logger.error(f"Ollama inference failed: {e}")
         return None
 
     def autonomous_plan(self, url: str, dom_context: str, network_context: list) -> dict:
@@ -177,20 +217,20 @@ class AuraBrain:
         return "\n\n".join(insights)
 
     def reason_json(self, prompt: str, system_instruction: str = None) -> str:
-        """v5.1 / v19.4: Synchronized JSON reasoning using google-genai SDK (matches _call_ai)."""
+        """v5.1 / v19.4: Synchronized JSON reasoning natively supporting Ollama."""
         if not self.enabled: return "[]"
 
         try:
-            response = self.client.models.generate_content(
-                model=state.GEMINI_MODEL,
-                contents=prompt,
-                config={'system_instruction': system_instruction or self.SYSTEM_PROMPT}
-            )
-            if not response or not response.text:
+            # 1. Use the unified router which now supports Ollama natively
+            raw_response = self._call_ai(prompt, system_instruction=system_instruction)
+            
+            if not raw_response:
                 return "[]"
-            raw = response.text.strip().replace("```json", "").replace("```", "").strip()
+                
+            raw = raw_response.strip().replace("```json", "").replace("```", "").strip()
             if not (raw.startswith("[") or raw.startswith("{")):
                 return "[]"
+                
             # v19.4: Strip invalid JSON escape sequences before parsing
             import re
             raw = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', raw)
