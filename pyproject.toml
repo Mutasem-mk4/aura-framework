@@ -26,10 +26,13 @@ dependencies = [
     "curl_cffi",
     "jinja2",
     "pydantic",
+    "python-dotenv",
+    "httpx",
 ]
 
 [project.scripts]
-aura = "aura.cli:cli"
+aura = "aura.cli_v2:main"
+aura-cli = "aura.cli_v2:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
