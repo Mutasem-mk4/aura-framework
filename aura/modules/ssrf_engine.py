@@ -99,19 +99,21 @@ class InteractSHClient:
         # Since interact.sh API is complex to implement from scratch in python without keys,
         # we will use webhook.site or a dummy fallback for the example.
         
-        # We will generate a unique domain that we can hypothetically check.
-        # For a truly standalone script without third-party dependencies, we use burp collaborator or webhook.site.
-        # For this engine, we will use a generic webhook or prompt user to supply one via .env.
+        # Allow user to supply their Webhook.site / Burp Collaborator via Environment var.
+        # Fallback to a clear prompt/dummy if none is set.
         self.webhook_url = os.getenv("AURA_WEBHOOK_URL")
         self.webhook_domain = ""
         
         if self.webhook_url:
+            if not self.webhook_url.startswith("http"):
+                self.webhook_url = "http://" + self.webhook_url
             self.webhook_domain = urllib.parse.urlparse(self.webhook_url).netloc
             console.print(f"  [cyan]🔗 Using custom OOB webhook: {self.webhook_domain}[/cyan]")
         else:
-            self.webhook_url = "http://x" + self.correlation_id + ".m.pipedream.net"
-            self.webhook_domain = "x" + self.correlation_id + ".m.pipedream.net"
-            console.print(f"  [dim]🔗 No AURA_WEBHOOK_URL set. OOB SSRF will use: {self.webhook_domain} (manual verify)[/dim]")
+            # Replaced pipedream with webhook.site as a more universally understood alternative for the user
+            self.webhook_url = "https://webhook.site/YOUR-UUID-HERE/" + self.correlation_id
+            self.webhook_domain = "webhook.site"
+            console.print(f"  [dim yellow]⚠️ No AURA_WEBHOOK_URL set. Blind SSRF will use: {self.webhook_url} (Please set 'AURA_WEBHOOK_URL' in .env with your Webhook.site link to verify!)[/dim yellow]")
 
     def get_url(self, payload_id: str) -> str:
         if self.webhook_url.endswith("/"):
