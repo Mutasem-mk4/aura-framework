@@ -495,11 +495,27 @@ class ShadowProxyManager:
         if os.path.exists(self.proxy_file):
             try:
                 with open(self.proxy_file, "r", encoding="utf-8") as f:
-                    self.proxies = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+                    raw_proxies = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+                
+                # Pre-flight proxy validation
+                import concurrent.futures
+                import requests
+                console.print(f"[cyan][*] Validating {len(raw_proxies)} proxies from {self.proxy_file}...[/cyan]")
+                
+                def check_proxy(p):
+                    try:
+                        requests.get("http://1.1.1.1", proxies={"http": p, "https": p}, timeout=4)
+                        return p
+                    except:
+                        return None
+                        
+                with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+                    self.proxies = [p for p in executor.map(check_proxy, raw_proxies) if p]
+                    
                 # Add default high-reputation gateways if file provides few
                 if len(self.proxies) < 5:
                     self._add_default_gateways()
-                console.print(f"[bold green][SHADOW PROXY] Loaded {len(self.proxies)} endpoints from {self.proxy_file}[/bold green]")
+                console.print(f"[bold green][SHADOW PROXY] Successfully verified & loaded {len(self.proxies)} active endpoints.[/bold green]")
             except Exception as e:
                 console.print(f"[bold red][!] Shadow Proxy Load Error: {e}[/bold red]")
                 self._add_default_gateways()

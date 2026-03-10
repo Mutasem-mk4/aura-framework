@@ -91,7 +91,7 @@ class ThreatIntel:
     async def query_greynoise(self, target_ip):
         """Query GreyNoise to check if the target is known noise/malicious."""
         if not self.greynoise_api_key:
-            self._warn_missing_key("GreyNoise")
+            # Silent skip, no local equivalent needed
             return None
             
         console.print(f"[blue][*] Querying GreyNoise for: {target_ip}...[/blue]")
@@ -117,7 +117,7 @@ class ThreatIntel:
     async def query_shodan(self, target_ip):
         """Query Shodan for open ports and known vulnerabilities."""
         if not self.shodan_api_key:
-            self._warn_missing_key("Shodan")
+            console.print(f"[dim cyan][*] Shodan API key missing. Relying on local Nmap/TCP-Scanner for port discovery on {target_ip}.[/dim cyan]")
             return None
             
         console.print(f"[blue][*] Querying Shodan for: {target_ip}...[/blue]")
@@ -197,7 +197,7 @@ class ThreatIntel:
     async def query_securitytrails(self, domain):
         """Query SecurityTrails for DNS history and subdomains."""
         if not self.securitytrails_api_key:
-            self._warn_missing_key("SecurityTrails")
+            console.print(f"[dim cyan][*] SecurityTrails API key missing. Relying on local Subfinder/crt.sh for subdomain enumeration on {domain}.[/dim cyan]")
             return None
             
         console.print(f"[blue][*] Querying SecurityTrails for: {domain}...[/blue]")

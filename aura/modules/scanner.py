@@ -582,6 +582,12 @@ class AuraScanner:
            len(base_url.split("/")) > 5:
             console.print(f"[dim yellow][!] DirBuster skipped: Not a root HTTP target: {base_url}[/dim yellow]")
             return []
+            
+        from urllib.parse import urlparse
+        parsed_url = urlparse(base_url if base_url.startswith("http") else "http://" + base_url)
+        if state.is_dns_failed(parsed_url.netloc):
+            console.print(f"[bold red][X] FAST-FAIL: Target {parsed_url.netloc} has global DNS failure. Aborting DirBuster.[/bold red]")
+            return []
         
         if not base_url.startswith("http"):
             base_url = f"http://{base_url}"
@@ -698,6 +704,12 @@ class AuraScanner:
         hits = []
 
         console.print(f"[bold red][FINAL SIEGE][/bold red]: Deploying Blind Path Injection on {base_url}...")
+
+        from urllib.parse import urlparse
+        parsed_url = urlparse(base_url if base_url.startswith("http") else "http://" + base_url)
+        if state.is_dns_failed(parsed_url.netloc):
+            console.print(f"[bold red][X] FAST-FAIL: Target {parsed_url.netloc} has global DNS failure. Aborting Siege.[/bold red]")
+            return []
 
         # v19.6 Siege Fix: Fast-Fail for dead hosts
         siege_baseline_200 = False
