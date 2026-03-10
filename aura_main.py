@@ -54,11 +54,19 @@ def main():
     parser.add_argument("--xss", action="store_true", help="Scan for XSS")
     parser.add_argument("--auth", action="store_true", help="Auth logic scan")
     parser.add_argument("--sqli", action="store_true", help="SQL Injection scan")
-    parser.add_argument("--recon", action="store_true", help="Recon & JS Scraper")
+    parser.add_argument("--web", action="store_true", help="[v2] 🌐 Web Security: CORS + Open Redirect + Rate Limiting + Headers")
+    parser.add_argument("--ssrf", action="store_true", help="[v2] SSRF Engine — OOB, Localhost, Cloud Metadata")
+    parser.add_argument("--lfi", action="store_true", help="[v2] Path Traversal / LFI Engine")
+    parser.add_argument("--recon", action="store_true", help="[v2] Recon & JS Scraper")
+    parser.add_argument("--api", action="store_true", help="API & GraphQL Fuzzer")
     
+    parser.add_argument("--auto", action="store_true", help="🚀 AUTOPILOT: run ALL engines automatically")
+    parser.add_argument("--skip", default="", metavar="PHASES", help="Skip phases by number (e.g. --skip 1,6)")
     parser.add_argument("--victim", action="store_true", help="Use victim session")
     parser.add_argument("--map", help="Path to discovery map")
     parser.add_argument("--model", default="llama3.1", help="Ollama model")
+    parser.add_argument("--proxy-file", default=None, help="[v3] Path to a list of proxies for Phantom Routing (WAF evasion)")
+    parser.add_argument("--targets", action="store_true", help="[v3] 🎯 Target Hunter: Fetch and display fresh, profitable bug bounty programs")
 
     args = parser.parse_args()
 
@@ -66,10 +74,23 @@ def main():
     if args.free_ai: state.OPENROUTER_FREE_MODE = True
     if args.auto_submit: state.AUTO_SUBMIT = True
 
-    if args.nexus:
+    if args.auto and args.target:
+        skip_phases = []
+        if args.skip:
+            try:
+                skip_phases = [int(x.strip()) for x in args.skip.split(",") if x.strip()]
+            except ValueError:
+                console.print("[red]❌ --skip must be comma-separated phase numbers[/red]")
+                return
+        from aura.modules.autopilot import run_autopilot
+        run_autopilot(args.target, skip_phases=skip_phases, proxy_file=args.proxy_file)
+    elif args.nexus:
         from aura.core.orchestrator import NeuralOrchestrator
         from aura.core.nexus import launch_nexus
         launch_nexus(NeuralOrchestrator())
+    elif args.targets:
+        from aura.modules.target_hunter import run_hunter
+        run_hunter()
     elif args.crawl and args.target:
         asyncio.run(_run_crawl(args.target, victim=args.victim))
     elif args.hunt and args.target:
@@ -96,9 +117,24 @@ def main():
     elif args.sqli and args.target:
         from aura.modules.sqli_engine import run_sqli_scan
         run_sqli_scan(args.target, discovery_map_path=args.map)
+    elif args.web and args.target:
+        from aura.modules.web_engine import run_web_scan
+        console.print(f"[bold bright_blue]🛡️  Web Security Scan: {args.target}[/bold bright_blue]")
+        run_web_scan(args.target)
+    elif args.ssrf and args.target:
+        from aura.modules.ssrf_engine import run_ssrf_scan
+        console.print(f"[bold red]📡 SSRF Scan: {args.target}[/bold red]")
+        run_ssrf_scan(args.target, discovery_map_path=args.map)
+    elif args.lfi and args.target:
+        from aura.modules.lfi_engine import run_lfi_scan
+        console.print(f"[bold yellow]📂 Path Traversal (LFI) Scan: {args.target}[/bold yellow]")
+        run_lfi_scan(args.target, discovery_map_path=args.map)
     elif args.recon and args.target:
         from aura.modules.recon_engine import run_recon
         run_recon(args.target)
+    elif args.api and args.target:
+        from aura.modules.api_engine import run_api_scan
+        asyncio.run(run_api_scan(args.target, discovery_map_path=args.map))
     elif args.target:
         asyncio.run(_run_mission(args.target))
     else:

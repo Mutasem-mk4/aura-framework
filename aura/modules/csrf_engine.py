@@ -29,6 +29,7 @@ import urllib.parse
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+import html.parser
 
 import requests
 import urllib3
@@ -215,6 +216,67 @@ class CSRFEngine:
             pass
         return issues
 
+    def _discover_forms_from_html(self) -> list[dict]:
+        """
+        Crawls common pages and extracts <form> elements for CSRF testing.
+        This is the active discovery mode — works WITHOUT a pre-built discovery map.
+        """
+        discovered = []
+        crawl_paths = [
+            "/", "/account", "/account/profile", "/settings", "/account/settings",
+            "/profile", "/checkout", "/cart", "/login", "/register",
+            "/account/password", "/account/email", "/my-account",
+            "/account/addresses", "/account/preferences",
+        ]
+
+        seen_actions = set()
+        for path in crawl_paths:
+            url = self.target + path
+            try:
+                resp = requests.get(
+                    url, cookies=self.cookies, timeout=self.timeout, verify=False,
+                    headers={"User-Agent": "Mozilla/5.0"},
+                    allow_redirects=True
+                )
+                if resp.status_code != 200 or not resp.text:
+                    continue
+
+                # Find all <form> tags
+                form_pattern = re.compile(
+                    r'<form[^>]*method=["\']?post["\']?[^>]*action=["\']?([^"\'>\s]+)["\']?[^>]*>|'
+                    r'<form[^>]*action=["\']?([^"\'>\s]+)["\']?[^>]*method=["\']?post["\']?[^>]*>',
+                    re.IGNORECASE
+                )
+                for m in form_pattern.finditer(resp.text):
+                    action = m.group(1) or m.group(2) or path
+                    if not action or action.startswith("#"):
+                        action = path
+                    if not action.startswith("http"):
+                        action = self.target + "/" + action.lstrip("/")
+                    if action in seen_actions:
+                        continue
+                    seen_actions.add(action)
+
+                    # Extract hidden inputs as post data
+                    inputs = re.findall(
+                        r'<input[^>]+name=["\']([^"\']+)["\'][^>]*value=["\']([^"\']*)["\']',
+                        resp.text, re.IGNORECASE
+                    )
+                    post_body = json.dumps({k: v for k, v in inputs if "csrf" not in k.lower()})
+
+                    print(f"  [+] Discovered form: POST {action}")
+                    discovered.append({
+                        "url": action,
+                        "method": "POST",
+                        "post_data": post_body,
+                        "source": path
+                    })
+
+            except Exception:
+                continue
+
+        return discovered
+
     def test_endpoint(self, endpoint: dict) -> Optional[dict]:
         """
         Tests a single endpoint for CSRF vulnerabilities.
@@ -352,34 +414,36 @@ class CSRFEngine:
         poc_path.write_text(content, encoding="utf-8")
         return poc_path
 
-    def run_from_discovery_map(self, map_path: str) -> list[dict]:
+    def run_from_discovery_map(self, map_path: Optional[str]) -> list[dict]:
         """Loads a discovery map and tests all mutating endpoints for CSRF."""
-        map_path = Path(map_path)
-        if not map_path.exists():
-            print(f"❌ Discovery map not found: {map_path}")
-            print("   Run: aura <target> --crawl  or  aura <target> --burp file.xml  first!")
-            return []
+        
+        mutating = []
+        meta = {"target": self.target}
 
-        with open(map_path, encoding="utf-8-sig") as f:
-            discovery_map = json.load(f)
-
-        mutating = discovery_map.get("mutating_endpoints", [])
-        meta = discovery_map.get("meta", {})
+        if map_path and Path(map_path).exists():
+            with open(map_path, encoding="utf-8-sig") as f:
+                discovery_map = json.load(f)
+            mutating = discovery_map.get("mutating_endpoints", [])
+            meta = discovery_map.get("meta", {"target": self.target})
 
         print(f"\n{'='*65}")
         print(f"🔴 AURA v2 — CSRF Detection Engine")
         print(f"🎯 Target: {meta.get('target', self.target)}")
-        print(f"⚡ Mutating Endpoints to Test: {len(mutating)}")
+        print(f"⚡ Mutating Endpoints from Map: {len(mutating)}")
         print(f"{'='*65}")
 
         if not mutating:
-            print("\n⚠️  No mutating endpoints found in the discovery map!")
-            print("   Tip: CSRF only applies to state-changing endpoints (POST/PATCH/DELETE).")
-            print("   Make sure your crawl captured authenticated API calls.")
-            return []
+            print("\n⚠️  No mutating endpoints in discovery map.")
+            print("   🔍 Switching to Active Form Discovery mode...")
+            mutating = self._discover_forms_from_html()
+            if not mutating:
+                print("   ⚠️  No POST forms found on common pages either.")
+                print("   💡 Tip: This site may require a more specific crawl path.")
+                return []
+            print(f"   ✅ Found {len(mutating)} form(s) to test.")
 
         for ep in mutating:
-            time.sleep(0.5)  # Be polite
+            time.sleep(0.5)
             self.test_endpoint(ep)
 
         return self._finalize(meta)
@@ -419,18 +483,15 @@ def run_csrf_scan(target: str, discovery_map_path: Optional[str] = None) -> list
 
     cookies_str = os.getenv("AUTH_TOKEN_ATTACKER", "")
     if not cookies_str:
-        print("❌ AUTH_TOKEN_ATTACKER not set in .env!")
-        return []
+        print("⚠️  AUTH_TOKEN_ATTACKER not set — running unauthenticated CSRF scan.")
 
-    # Auto-detect discovery map
+    # Auto-detect discovery map (optional — will fallback to form discovery)
     if not discovery_map_path:
         target_slug = target.replace("www.", "").replace(".", "_")
         candidate = Path(f"./reports/discovery_map_{target_slug}.json")
         if candidate.exists():
             discovery_map_path = str(candidate)
-        else:
-            print(f"❌ No discovery map found. Run: aura {target} --crawl  first!")
-            return []
+        # else: proceed with None → active form discovery mode
 
     engine = CSRFEngine(target=target, cookies_str=cookies_str)
     return engine.run_from_discovery_map(discovery_map_path)

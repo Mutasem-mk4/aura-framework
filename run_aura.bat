@@ -43,7 +43,7 @@ if "%~1" == "" (
 :: 2. Launch Mission
 set "ARGS=%*"
 
-echo [🚀] Engaging Zenith Protocol via "!PY_CMD!" for: %1
+echo [^⚡] AURA ^| Target: %1
 "!PY_CMD!" aura_main.py !ARGS!
 if errorlevel 1 (
     echo.

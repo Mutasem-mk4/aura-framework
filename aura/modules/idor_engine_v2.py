@@ -46,6 +46,16 @@ WRITE_METHODS = ["PATCH", "PUT", "DELETE"]
 # Minimum response body length to consider "meaningful"
 MIN_MEANINGFUL_LEN = 50
 
+# Common API path prefixes to probe blindly when no discovery map
+BLIND_PROBE_PATHS = [
+    "/api/v1/user/{id}", "/api/v2/user/{id}", "/api/users/{id}",
+    "/api/v1/orders/{id}", "/api/v2/orders/{id}",
+    "/api/v1/addresses/{id}", "/api/customers/{id}",
+    "/api/v1/profile/{id}", "/api/v1/tickets/{id}",
+    "/api/v1/invoices/{id}", "/api/payments/{id}",
+    "/api/v1/subscriptions/{id}",
+]
+
 
 class BolaTester:
     """
@@ -60,7 +70,7 @@ class BolaTester:
         self,
         target: str,
         attacker_cookies: str,
-        victim_cookies: str,
+        victim_cookies: str = "",
         proxy: Optional[str] = None,
         timeout: int = 20,
     ):
@@ -70,10 +80,11 @@ class BolaTester:
         self.target_domain = urllib.parse.urlparse(self.target).netloc
         self.timeout = timeout
         self.proxy = {"http": proxy, "https": proxy} if proxy else None
-        
+        self.single_account_mode = not bool(victim_cookies)
+
         # Build session headers (cookie strings → cookie dict)
         self.attacker_cookies = self._parse_cookie_string(attacker_cookies)
-        self.victim_cookies = self._parse_cookie_string(victim_cookies)
+        self.victim_cookies = self._parse_cookie_string(victim_cookies) if victim_cookies else {}
 
         # Results
         self.confirmed_idors: list[dict] = []
@@ -135,6 +146,48 @@ class BolaTester:
             return {"status": 0, "length": 0, "body": "", "headers": {}, "error": str(e)[:100]}
         except Exception as e:
             return {"status": 0, "length": 0, "body": "", "headers": {}, "error": str(e)[:100]}
+
+    def _single_account_probe(self, url: str) -> list[dict]:
+        """
+        Single-account IDOR mode: probes neighboring numeric IDs around the
+        attacker's own ID to find predictable/accessible resources without a
+        second account. Flags any 200 OK response as 'needs manual review'.
+        """
+        findings = []
+        # Extract numeric IDs from URL
+        num_ids = re.findall(r'/(\d{3,})(?:/|$|\?)', url)
+        if not num_ids:
+            return []
+
+        base_id = int(num_ids[-1])
+        for delta in [-2, -1, 1, 2, 5]:
+            test_id = base_id + delta
+            test_url = url.replace(f"/{num_ids[-1]}", f"/{test_id}")
+            self.tested_count += 1
+            resp = self._request("GET", test_url, self.attacker_cookies)
+            if resp["status"] == 200 and resp["length"] >= MIN_MEANINGFUL_LEN:
+                body_lower = resp["body"].lower()
+                pii_kw = [kw for kw in ["email", "name", "address", "phone", "order", "payment"]
+                          if kw in body_lower]
+                if pii_kw:
+                    findings.append({
+                        "url": test_url,
+                        "method": "GET",
+                        "type": "BOLA / IDOR",
+                        "reason": f"Single-account probe: neighboring ID {test_id} returned 200 with PII ({', '.join(pii_kw)}). Manual verification required with a second account.",
+                        "attacker_status": resp["status"],
+                        "attacker_len": resp["length"],
+                        "victim_status": 0,
+                        "victim_len": 0,
+                        "victim_body_snippet": resp["body"][:300],
+                        "severity": "MEDIUM",
+                        "cvss_score": 5.3,
+                        "owasp": "A01:2021 — Broken Access Control",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "needs_manual_verify": True,
+                    })
+                    print(f"     ⚠️  Neighboring ID {test_id} returned 200 with PII: {', '.join(pii_kw)}")
+        return findings
 
     def _compare_responses(self, attacker_resp: dict, victim_resp: dict) -> tuple[bool, str]:
         """
@@ -244,7 +297,7 @@ class BolaTester:
             print("   Run: aura <target> --crawl  first!")
             return []
 
-        with open(map_path, "r", encoding="utf-8") as f:
+        with open(map_path, "r", encoding="utf-8-sig") as f:
             discovery_map = json.load(f)
 
         meta = discovery_map.get("meta", {})
@@ -279,17 +332,81 @@ class BolaTester:
             })
 
         if not all_endpoints:
-            print("\n⚠️  No endpoints to test!")
-            print("   The discovery map is empty. Did the crawl authenticate successfully?")
-            print("   Check that AUTH_TOKEN_ATTACKER in .env has a fresh session cookie.")
-            return []
+            if self.single_account_mode:
+                # No discovery map and no victim — try blind probe on common paths
+                print("\n🔍 No IDOR candidates in map. Switching to Single-Account Blind Probe mode...")
+                print("   (For full cross-tenant BOLA testing, add AUTH_TOKEN_VICTIM to .env)")
+                return self._run_blind_probe()
+            else:
+                print("\n⚠️  No endpoints to test!")
+                print("   The discovery map is empty. Did the crawl authenticate successfully?")
+                print("   Check that AUTH_TOKEN_ATTACKER in .env has a fresh session cookie.")
+                return []
 
-        print(f"\n🚀 Starting {len(all_endpoints)} BOLA tests...\n")
+        print(f"\n🚀 Starting {len(all_endpoints)} BOLA tests...") 
+        if self.single_account_mode:
+            print("   ⚠️  Single-account mode (no victim token) — results need manual verification")
 
         for ep in all_endpoints:
-            self.test_endpoint(ep)
+            if self.single_account_mode:
+                # Only probe neighbors; skip cross-tenant compare
+                url = ep.get("url", "")
+                nums = re.findall(r'/(\d{3,})(?:/|$|\?)', url)
+                if nums:
+                    self.confirmed_idors.extend(self._single_account_probe(url))
+            else:
+                self.test_endpoint(ep)
 
         return self._finalize_report(meta)
+
+    def _run_blind_probe(self) -> list[dict]:
+        """Probes common API paths with incrementing IDs — no discovery map required."""
+        # First, get our own user ID from common profile endpoints
+        own_id = None
+        for path in ["/api/v1/me", "/api/me", "/api/v1/profile", "/api/user"]:
+            resp = self._request("GET", self.target + path, self.attacker_cookies)
+            if resp["status"] == 200 and resp["body"]:
+                try:
+                    data = json.loads(resp["body"])
+                    own_id = (data.get("id") or data.get("user_id") or 
+                              data.get("userId") or data.get("uid") or
+                              data.get("customerId"))
+                    if own_id:
+                        own_id = int(str(own_id))
+                        print(f"  ✅ Found own user ID: {own_id}")
+                        break
+                except Exception:
+                    continue
+
+        probe_findings = []
+        for path_template in BLIND_PROBE_PATHS:
+            base_id = own_id or 1000
+            for delta in [-2, -1, 1, 2]:
+                test_id = base_id + delta
+                url = self.target + path_template.replace("{id}", str(test_id))
+                self.tested_count += 1
+                resp = self._request("GET", url, self.attacker_cookies)
+                if resp["status"] == 200 and resp["length"] >= MIN_MEANINGFUL_LEN:
+                    pii_kw = [kw for kw in ["email", "name", "address", "phone", "order"]
+                              if kw in resp["body"].lower()]
+                    if pii_kw:
+                        f = {
+                            "url": url, "method": "GET", "type": "BOLA / IDOR",
+                            "reason": f"Blind probe: {path_template} with ID {test_id} returned 200 with PII ({', '.join(pii_kw)})",
+                            "attacker_status": resp["status"], "attacker_len": resp["length"],
+                            "victim_status": 0, "victim_len": 0,
+                            "victim_body_snippet": resp["body"][:300],
+                            "severity": "MEDIUM", "cvss_score": 5.3,
+                            "owasp": "A01:2021 — Broken Access Control",
+                            "timestamp": datetime.utcnow().isoformat(),
+                            "needs_manual_verify": True,
+                        }
+                        probe_findings.append(f)
+                        self.confirmed_idors.append(f)
+                        print(f"  ⚠️  Potential IDOR: {url} (PII: {', '.join(pii_kw)})")
+
+        self._finalize_report({})
+        return probe_findings
 
     def _finalize_report(self, meta: dict) -> list[dict]:
         """Prints the final summary and saves findings."""
@@ -349,10 +466,11 @@ def run_hunt(target: str, discovery_map_path: Optional[str] = None):
     if not attacker_cookies:
         print("❌ AUTH_TOKEN_ATTACKER not found in .env!")
         return []
+
     if not victim_cookies:
-        print("❌ AUTH_TOKEN_VICTIM not found in .env!")
-        print("   You need TWO accounts to perform cross-tenant BOLA testing.")
-        return []
+        print("⚠️  AUTH_TOKEN_VICTIM not set — running in Single-Account Probe mode.")
+        print("   For full cross-tenant BOLA testing, add AUTH_TOKEN_VICTIM to .env")
+        print("   (Create a second account on the target and paste its cookie)")
 
     # Auto-find discovery map if not specified
     if not discovery_map_path:
@@ -360,17 +478,19 @@ def run_hunt(target: str, discovery_map_path: Optional[str] = None):
         candidate = Path(f"./reports/discovery_map_{target_slug}.json")
         if candidate.exists():
             discovery_map_path = str(candidate)
-        else:
-            print(f"❌ No discovery map found at {candidate}")
-            print(f"   Run `aura {target} --crawl` first to generate it!")
-            return []
+        elif not victim_cookies:
+            print(f"\n  No discovery map either — running Blind Probe on {target}...")
 
     tester = BolaTester(
         target=target,
         attacker_cookies=attacker_cookies,
         victim_cookies=victim_cookies,
     )
-    return tester.run_from_discovery_map(discovery_map_path)
+
+    if discovery_map_path:
+        return tester.run_from_discovery_map(discovery_map_path)
+    else:
+        return tester._run_blind_probe()
 
 
 if __name__ == "__main__":

@@ -27,7 +27,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from playwright.async_api import async_playwright, Page, Dialog
+import httpx
+
+try:
+    from playwright.async_api import async_playwright, Page, Dialog
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
+    print("[XSS] Playwright not installed — using httpx reflection mode only")
 
 
 # ─── XSS Payload Arsenal ──────────────────────────────────────────────────────
@@ -140,6 +147,10 @@ class XSSEngine:
             f"{self.target}/?search=AURA_TEST",
             f"{self.target}/?q=AURA_TEST",
             f"{self.target}/products?name=AURA_TEST",
+            f"{self.target}/?keyword=AURA_TEST",
+            f"{self.target}/?cat=AURA_TEST",
+            f"{self.target}/results?query=AURA_TEST",
+            f"{self.target}/?s=AURA_TEST",
         ]
         for path in test_paths:
             p = urllib.parse.urlparse(path)
@@ -162,6 +173,121 @@ class XSSEngine:
                 unique.append(item)
 
         return unique
+
+    def _discover_urls_from_sitemap(self) -> list[dict]:
+        """
+        Tries to discover injectable URLs from sitemap.xml and robots.txt.
+        Falls back to crawling <a href> links on the homepage.
+        Works WITHOUT a pre-existing discovery map.
+        """
+        discovered_urls = []
+        seen_paths = set()
+
+        # Try sitemap.xml
+        for sitemap_url in [f"{self.target}/sitemap.xml", f"{self.target}/sitemap_index.xml"]:
+            try:
+                r = httpx.get(sitemap_url, timeout=8, verify=False,
+                              headers={"User-Agent": "Mozilla/5.0"}, follow_redirects=True)
+                if r.status_code == 200:
+                    locs = re.findall(r'<loc>([^<]+)</loc>', r.text)
+                    for loc in locs:
+                        parsed = urllib.parse.urlparse(loc)
+                        if self.target_domain not in parsed.netloc:
+                            continue
+                        params = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
+                        for pname, vals in params.items():
+                            if pname.lower() in SKIP_PARAMS:
+                                continue
+                            if not vals[0].isdigit():  # Only text params
+                                key = (parsed.path, pname)
+                                if key not in seen_paths:
+                                    seen_paths.add(key)
+                                    discovered_urls.append({
+                                        "url": loc, "param": pname,
+                                        "original_value": vals[0], "parsed": parsed
+                                    })
+            except Exception:
+                continue
+
+        # Crawl homepage links if sitemap empty
+        if not discovered_urls:
+            try:
+                r = httpx.get(self.target, timeout=10, verify=False,
+                              headers={"User-Agent": "Mozilla/5.0"}, follow_redirects=True)
+                hrefs = re.findall(r'href=["\']([^"\'>]+\?[^"\'>]+)["\']', r.text)
+                for href in hrefs[:50]:
+                    if href.startswith("/"):
+                        href = self.target + href
+                    elif not href.startswith("http"):
+                        continue
+                    parsed = urllib.parse.urlparse(href)
+                    if self.target_domain not in parsed.netloc:
+                        continue
+                    params = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
+                    for pname, vals in params.items():
+                        if pname.lower() in SKIP_PARAMS:
+                            continue
+                        key = (parsed.path, pname)
+                        if key not in seen_paths:
+                            seen_paths.add(key)
+                            discovered_urls.append({
+                                "url": href, "param": pname,
+                                "original_value": vals[0], "parsed": parsed
+                            })
+            except Exception:
+                pass
+
+        return discovered_urls
+
+    def _httpx_reflection_check(self, url: str, param: str, original_value: str) -> Optional[dict]:
+        """
+        Fast httpx-based XSS reflection check (NO browser required).
+        Injects a unique marker and checks if it appears in the raw HTML response.
+        Not a confirmed XSS (just reflection), but guides Playwright for real confirmation.
+        """
+        marker = "AuraXssMarker7x7"
+        test_payloads = [
+            f'">{marker}<svg',
+            f"'>{{{{marker}}}}",
+            f"{marker}<img src=x>",
+            marker,  # Bare marker to detect any reflection
+        ]
+
+        parsed = urllib.parse.urlparse(url)
+        params = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
+
+        for payload in test_payloads:
+            params[param] = [payload]
+            new_query = urllib.parse.urlencode(params, doseq=True)
+            test_url = parsed._replace(query=new_query).geturl()
+
+            try:
+                r = httpx.get(test_url, timeout=8, verify=False,
+                              headers={"User-Agent": "Mozilla/5.0"},
+                              cookies={k: v for k, v in
+                                       [p.split("=", 1) for p in self.cookies_str.split(";")
+                                        if "=" in p]},
+                              follow_redirects=True)
+                if marker in r.text:
+                    # Check if it's reflected unencoded (potential XSS)
+                    raw_reflected = marker in r.text and "&lt;" not in r.text
+                    return {
+                        "type": "Reflected XSS (Unconfirmed — HTML Reflection)",
+                        "url": url,
+                        "injected_url": test_url,
+                        "param": param,
+                        "payload": payload,
+                        "reflected": True,
+                        "encoded": not raw_reflected,
+                        "severity": "HIGH" if raw_reflected else "INFO",
+                        "cvss_score": 7.4 if raw_reflected else 0,
+                        "note": "Marker reflected unencoded — confirm with Playwright or manual browser test" if raw_reflected else "Marker reflected but HTML-encoded — lower risk",
+                        "owasp": "A03:2021 — Injection",
+                        "timestamp": datetime.utcnow().isoformat(),
+                    }
+            except Exception:
+                continue
+        return None
 
     async def _test_injection(
         self,
@@ -279,22 +405,56 @@ class XSSEngine:
             pass
         return findings
 
-    async def run(self, discovery_map: dict) -> list[dict]:
+    async def run(self, discovery_map: Optional[dict] = None) -> list[dict]:
         """Main async XSS scan runner."""
-        injectable_urls = self._extract_injectable_urls(discovery_map)
-        meta = discovery_map.get("meta", {})
+        # Step 1: Extract injectable URLs from discovery map (if available)
+        injectable_urls = []
+        if discovery_map:
+            injectable_urls = self._extract_injectable_urls(discovery_map)
+
+        # Step 2: If no injection points from map, try sitemap/homepage discovery
+        if not injectable_urls:
+            print("\n🔰 No discovery map provided — running Sitemap/Homepage URL Discovery...")
+            injectable_urls = self._discover_urls_from_sitemap()
+            if injectable_urls:
+                print(f"   ✅ Discovered {len(injectable_urls)} injectable URL(s) from sitemap/homepage")
+            else:
+                # Last resort: use common test params on target
+                print("   ⚠️  No injectable URLs found from sitemap either.")
+                print("   🔰 Falling back to common parameter probes...")
+                injectable_urls = self._extract_injectable_urls({})
+
+        meta = discovery_map.get("meta", {}) if discovery_map else {}
 
         print(f"\n{'='*65}")
         print(f"🟡 AURA v2 — XSS Detection Engine")
         print(f"🎯 Target: {meta.get('target', self.target)}")
-        print(f"💉 Injectable Parameters Found: {len(injectable_urls)}")
+        print(f"💩 Injectable Parameters Found: {len(injectable_urls)}")
         print(f"🔫 Payloads per Parameter: {len(MARKED_PAYLOADS)}")
         print(f"{'='*65}")
 
-        if not injectable_urls:
-            print("\n⚠️  No injectable URL parameters found in discovery map.")
-            print("   The XSS engine works best when the crawler captures pages with ?param=value URLs.")
-            return []
+        # Phase 1: Fast httpx reflection check (no browser needed)
+        print(f"\n⚡ Phase 1: HTTP Reflection Check ({ len(injectable_urls)} params)...")
+        reflection_hits = []
+        for target_info in injectable_urls:
+            result = self._httpx_reflection_check(
+                target_info["url"], target_info["param"], target_info["original_value"]
+            )
+            if result:
+                if result["severity"] in ("HIGH", "MEDIUM"):
+                    print(f"  🚨 REFLECTION: [{target_info['param']}] in {target_info['url'][:70]}")
+                    print(f"     Note: {result['note']}")
+                    self.findings.append(result)
+                    reflection_hits.append(target_info)
+                else:
+                    print(f"  ⚠️  Encoded reflection: [{target_info['param']}] (HTML-encoded, lower risk)")
+
+        # Phase 2: Playwright confirmation on reflection hits (if available)
+        if not PLAYWRIGHT_AVAILABLE:
+            print(f"\n⚠️  Playwright not installed — skipping browser-based XSS confirmation.")
+            print("   Install: pip install playwright && playwright install chromium")
+            print(f"   📊 {len(reflection_hits)} URL(s) need manual browser confirmation.")
+            return self._finalize()
 
         async with async_playwright() as pw:
             browser = await pw.chromium.launch(headless=self.headless)
@@ -309,7 +469,7 @@ class XSSEngine:
                 await context.add_cookies(cookies)
 
             # Scan DOM sinks on key pages
-            print("\n🔍 Phase 1: DOM Sink Analysis...")
+            print("\n🔍 Phase 2: DOM Sink Analysis...")
             dom_page = await context.new_page()
             key_pages = [self.target, f"{self.target}/search", f"{self.target}/products"]
             for kp in key_pages:
@@ -319,11 +479,12 @@ class XSSEngine:
                     self.findings.append(df)
             await dom_page.close()
 
-            # Reflected XSS testing
-            print(f"\n💉 Phase 2: Reflected XSS Injection ({len(injectable_urls)} params × {len(MARKED_PAYLOADS)} payloads)...")
+            # Phase 3: Playwright confirmation on reflection hits first, then all injectable
+            all_to_test = reflection_hits or injectable_urls
+            print(f"\n💩 Phase 3: Browser XSS Confirmation ({len(all_to_test)} targets)...")
             page = await context.new_page()
 
-            for target_info in injectable_urls:
+            for target_info in all_to_test:
                 print(f"\n  🎯 [{target_info['param']}] in {target_info['url'][:70]}")
                 confirmed = False
                 for payload in MARKED_PAYLOADS:
@@ -335,7 +496,7 @@ class XSSEngine:
                         self.findings.append(finding)
                         confirmed = True
                 if not confirmed:
-                    print(f"     ✅ No XSS detected on this parameter")
+                    print(f"     ✅ No XSS confirmed on this parameter")
 
             await page.close()
             await browser.close()
@@ -382,21 +543,22 @@ def run_xss_scan(
 
     cookies_str = os.getenv("AUTH_TOKEN_ATTACKER", "")
     if not cookies_str:
-        print("❌ AUTH_TOKEN_ATTACKER not set in .env!")
-        return []
+        print("⚠️  AUTH_TOKEN_ATTACKER not set — running unauthenticated XSS scan.")
 
-    # Auto-detect discovery map
+    # Auto-detect discovery map (optional — engine will self-discover URLs)
+    discovery_map = None
     if not discovery_map_path:
         target_slug = target.replace("www.", "").replace(".", "_")
         candidate = Path(f"./reports/discovery_map_{target_slug}.json")
         if candidate.exists():
             discovery_map_path = str(candidate)
-        else:
-            print(f"❌ No discovery map found. Run: aura {target} --crawl  first!")
-            return []
 
-    with open(discovery_map_path, encoding="utf-8-sig") as f:
-        discovery_map = json.load(f)
+    if discovery_map_path:
+        try:
+            with open(discovery_map_path, encoding="utf-8-sig") as f:
+                discovery_map = json.load(f)
+        except Exception:
+            discovery_map = None
 
     engine = XSSEngine(target=target, cookies_str=cookies_str, headless=headless)
     return asyncio.run(engine.run(discovery_map))
