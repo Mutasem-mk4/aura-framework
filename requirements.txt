@@ -4,6 +4,12 @@
 #  Then:    playwright install chromium
 # ═══════════════════════════════════════════════════
 
+# ── Distributed Swarm (Phase 7) ─────────────────────
+celery>=5.3.0
+psycopg2-binary>=2.9.0
+SQLAlchemy>=2.0.0
+prometheus-client>=0.19.0
+
 # ── Core HTTP & Networking ──────────────────────────
 aiohttp>=3.13.0
 aiofiles>=25.0.0
@@ -72,6 +78,9 @@ curl_cffi>=0.14.0
 
 # ── Environment & Config ────────────────────────────
 python-dotenv>=1.2.0
+
+# ── Static Analysis (v38.0) ───────────────────────────
+esprima>=4.0
 
 # ── OSINT API Integrations ──────────────────────────
 shodan>=1.31.0

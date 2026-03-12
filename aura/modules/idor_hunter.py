@@ -30,8 +30,9 @@ class IDORHunter:
     Tests every ID-bearing URL for horizontal privilege escalation.
     """
 
-    def __init__(self, session=None):
+    def __init__(self, session=None, session_b=None):
         self.session = session
+        self.session_b = session_b  # Elite Logic: Dual-Credential User B
 
     # ─── ID Parameter Discovery ───────────────────────────────────────────
     @staticmethod
@@ -60,6 +61,8 @@ class IDORHunter:
         for i, part in enumerate(path_parts):
             if part.isdigit() and len(part) <= 9:
                 found.append((f"__path_segment_{i}", part, "numeric"))
+            elif UUID_RE.fullmatch(part):
+                found.append((f"__path_segment_{i}", part, "uuid"))
 
         return found
 
@@ -103,10 +106,12 @@ class IDORHunter:
 
         return tampered
 
-    async def _probe(self, url: str) -> tuple[int, str, int]:
+    async def _probe(self, url: str, use_session_b: bool = False) -> tuple[int, str, int]:
         """Returns (status_code, content_snippet, content_length)."""
         try:
-            res = await self.session.get(url, timeout=state.NETWORK_TIMEOUT)
+            sess = self.session_b if use_session_b and self.session_b else self.session
+            if not sess: return 0, "", 0
+            res = await sess.get(url, timeout=state.NETWORK_TIMEOUT)
             if res:
                 text = res.text or ""
                 return res.status_code, text[:500], len(text)
@@ -115,24 +120,26 @@ class IDORHunter:
         return 0, "", 0
 
     @staticmethod
-    def _is_idor_confirmed(orig_status, orig_len, orig_snip, test_status, test_len, test_snip) -> tuple[bool, str]:
+    def _is_idor_confirmed(orig_status, orig_len, orig_snip, test_status, test_len, test_snip, dual_auth=False) -> tuple[bool, str]:
         """
         Determines if the response difference indicates an IDOR.
-        Returns (is_confirmed, reason).
         """
-        # Both must return 200
         if orig_status != 200 or test_status != 200:
             return False, f"Non-200 response (orig:{orig_status}, test:{test_status})"
+
+        if dual_auth:
+            # In dual_auth, User B accesses User A's ID. If lengths/content are identical, it's BOLA!
+            if orig_len == test_len or abs(orig_len - test_len) < 50:
+                return True, "User B successfully accessed User A's data (Dual-Credential BOLA Confirmed)"
+            return False, "User B received different or no data"
 
         # Content must differ (same content = same public resource)
         if orig_len == test_len and orig_snip == test_snip:
             return False, "Identical responses — likely public resource"
 
-        # Meaningful content difference
         if abs(orig_len - test_len) > 50:
             return True, f"Content length differs: {orig_len} vs {test_len} bytes — different object returned"
 
-        # Check for different identifiable data in response
         if orig_snip != test_snip and test_len > 100:
             return True, "Response content differs with same length — different object data returned"
 
@@ -150,14 +157,42 @@ class IDORHunter:
         findings = []
         console.print(f"[cyan][IDOR] Testing {len(id_params)} ID param(s) on {url}...[/cyan]")
 
-        # Get baseline response
         orig_status, orig_snip, orig_len = await self._probe(url)
         if orig_status == 0:
             return []
 
         for param_name, original_val, param_type in id_params:
-            tampered = self._build_tampered_urls(url, param_name, original_val, param_type)
+            
+            # ELITE LOGIC: Dual-Credential Audit
+            if self.session_b:
+                test_status, test_snip, test_len = await self._probe(url, use_session_b=True)
+                is_confirmed, reason = self._is_idor_confirmed(
+                    orig_status, orig_len, orig_snip,
+                    test_status, test_len, test_snip, dual_auth=True
+                )
+                if is_confirmed:
+                    console.print(f"[bold red][BOLA CONFIRMED] {param_name}: User B accessed User A's id={original_val}[/bold red]")
+                    findings.append({
+                        "type": f"BOLA (Dual-Credential): {param_name} Parameter",
+                        "severity": "CRITICAL",
+                        "cvss_score": 9.1,
+                        "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:N",
+                        "owasp": "A01:2021-Broken Access Control",
+                        "mitre": "T1530 - Data from Cloud Storage Object",
+                        "content": (f"BOLA confirmed via Dual-Credential audit on `{param_name}`.\n"
+                                    f"User B successfully accessed User A's object ({url}).\n"
+                                    f"Proof: {reason}"),
+                        "remediation_fix": "Implement strict object-level ownership checks mapping the session user to the requested ID.",
+                        "impact_desc": "Full horizontal privilege escalation allowing any authenticated user to access all other user's data.",
+                        "evidence_url": url,
+                        "param_name": param_name,
+                        "original_id": original_val,
+                        "confirmed": True
+                    })
+                    break
 
+            # Fallback: Single-Credential Substitution
+            tampered = self._build_tampered_urls(url, param_name, original_val, param_type)
             for tampered_url, test_id in tampered:
                 test_status, test_snip, test_len = await self._probe(tampered_url)
                 is_confirmed, reason = self._is_idor_confirmed(

@@ -47,6 +47,13 @@ SECRET_PATTERNS = {
     "Google Storage":     r"([a-z0-9.-]+\.storage\.googleapis\.com)",
 }
 
+# ─── JS Secret Blacklist (Noise Reduction) ──────────────────────────────────
+SECRET_BLACKLIST = [
+    "amplitude", "google-analytics", "ga_", "utm_", "device_id", 
+    "session_id", "client_id", "fbp", "_fbc", "hotjar", "hubspot", 
+    "mixpanel", "segment", "traceparent", "persona", "fingerprint"
+]
+
 # ─── Ports to Scan ───────────────────────────────────────────────────────────
 COMMON_PORTS = [80, 443, 8080, 8443, 3000, 5000, 8000, 8888, 9000, 9090, 21, 22, 25, 53, 111, 445, 3306, 5432, 6379, 27017]
 
@@ -158,11 +165,19 @@ class ReconEngine:
                 for match in matches:
                     match_val = match[0] if isinstance(match, tuple) else match
                     if not any(s['value'] == match_val for s in self.secrets):
+                        # --- Anti-FP Check: Blacklist Filter ---
+                        if any(b in match_val.lower() or b in name.lower() for b in SECRET_BLACKLIST):
+                            continue
+
+                        severity = "INFO" # Default to INFO for reconnaissance
+                        if any(k in name for k in ["Access Key", "Secret", "Token", "GitHub", "Stripe"]):
+                            severity = "MEDIUM" # Escalate ONLY for real credentials
+
                         self.secrets.append({
                             "type": name,
                             "value": match_val,
                             "source": url,
-                            "severity": "HIGH" if "Key" in name or "Secret" in name else "MEDIUM"
+                            "severity": severity
                         })
                         if name in ["Internal Endpoint", "S3 Bucket URL", "Azure Blob", "Google Storage"]:
                             self.cloud_buckets.add(match_val)
@@ -297,7 +312,76 @@ class ReconEngine:
                 self._check_all_takeovers(requester)
             )
 
+            # Phase 3: Nuclei Vanguard on all discovered subdomains
+            await self._run_nuclei_vanguard()
+
         return self._finalize()
+
+    async def _run_nuclei_vanguard(self):
+        """Phase 5.0: Vanguard Template Scanning using Nuclei over all live targets"""
+        if not self.subdomains:
+            return
+            
+        console.print(Panel(f"[bold cyan]🔍 Recon Engine: Initiating Nuclei Vanguard against {len(self.subdomains)} targets[/bold cyan]", box=box.ROUNDED))
+        
+        # Write subdomains to a temp file for Nuclei
+        targets_file = self.output_dir / "nuclei_targets.txt"
+        targets_file.write_text("\n".join(self.subdomains), encoding="utf-8")
+        output_file = self.output_dir / "nuclei_output.json"
+
+        try:
+            with Progress(
+                SpinnerColumn("dots12"),
+                TextColumn("[cyan]Running Nuclei Templates (CVEs, Misconfigs) on discovered subdomains...[/cyan]"),
+                console=console
+            ) as progress:
+                task = progress.add_task("nuclei", total=None)
+                
+                # Execute Nuclei silently, outputting JSON to a file
+                process = await asyncio.create_subprocess_exec(
+                    "nuclei", "-l", str(targets_file), "-json-export", str(output_file), "-silent", "-severity", "low,medium,high,critical",
+                    "-c", "50", "-bs", "25", # Concurrency limits to prevent crashing
+                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+                )
+                await process.communicate()
+            
+            # Parse Findings
+            if output_file.exists():
+                findings_count = 0
+                from aura.core.storage import AuraStorage
+                db = AuraStorage()
+                
+                with open(output_file, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        try:
+                            finding = json.loads(line)
+                            severity = finding.get("info", {}).get("severity", "info").upper()
+                            name = finding.get("info", {}).get("name", "Unknown Vuln")
+                            url = finding.get("matched-at", self.target)
+                            
+                            # Only log actionable items to DB
+                            if severity in ["LOW", "MEDIUM", "HIGH", "CRITICAL"]:
+                                details = json.dumps(finding, indent=2)
+                                db.add_finding(self.target, details, f"Nuclei: {name}", severity)
+                                console.print(f"[bold red]► {severity}:[/bold red] [white]{name}[/white] at [yellow]{url}[/yellow]")
+                                findings_count += 1
+                        except json.JSONDecodeError:
+                            continue
+                
+                if findings_count == 0:
+                    console.print("[dim green]✅ Nuclei Vanguard: No immediate low-hanging fruit found.[/dim green]")
+                else:
+                    console.print(f"[bold orange3]⚠️ Nuclei Vanguard recorded {findings_count} template findings.[/bold orange3]")
+            else:
+                 console.print("[dim green]✅ Nuclei Vanguard: No findings file generated (Target Secure).[/dim green]")
+
+        except FileNotFoundError:
+            console.print("[yellow]⚠️ Nuclei binary not found. Skipping template vanguard.[/yellow]")
+        except Exception as e:
+            console.print(f"[red]❌ Nuclei Execution Error: {e}[/red]")
+        finally:
+            if targets_file.exists(): targets_file.unlink()
+            if output_file.exists(): output_file.unlink()
 
     def run(self):
         """Wrapper to call async from sync code."""

@@ -1,0 +1,18 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: 'aura_orchestrator'
+    static_configs:
+      - targets: ['aura:8000']
+
+  - job_name: 'aura_workers'
+    # In a real dynamic environment we'd use service discovery like DNS SD or Docker SD
+    # For docker-compose, we can just point to the service name and Prometheus will 
+    # DNS round-robin, OR we can scrape multiple static IPs if we scale locally.
+    # docker-compose DNS resolves 'celery-worker' to all IPs of that scaled service.
+    dns_sd_configs:
+      - names:
+          - 'celery-worker'
+        type: 'A'
+        port: 8000

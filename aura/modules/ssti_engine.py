@@ -75,35 +75,65 @@ class SSTIEngine:
     def __init__(self, session=None):
         self.session = session
 
-    async def _probe_param(self, client, url: str, param: str, probe: str,
-                           expected: str, engine: str) -> dict | None:
-        """Injects a single probe into a URL parameter.
-        v23.0: Uses baseline comparison to eliminate false positives.
-        """
+    async def _probe_param(self, client, url: str, param: str, probe_template: str,
+                           engine: str) -> dict | None:
+        """v25.0 OMEGA: Deterministic SSTI Proof with WAF-Reflection Guard."""
+        import random
+        a, b = random.randint(10, 99), random.randint(10, 99)
+        expected = str(a * b)
+        probe = probe_template.replace("7*7", f"{a}*{b}")
+
+        # WAF/Noise Signatures to avoid FPs from reflected parameters in error pages
+        WAF_SIGS = ["cloudflare", "attention required", "ray id", "security challenge", 
+                    "captcha", "blocked", "incident id", "firewall", "403 forbidden"]
+
         try:
-            # --- Baseline: fetch without payload ---
-            baseline_r = await client.get(url, params={param: "aura_baseline_test_xyz"}, timeout=8)
-            baseline_text = baseline_r.text
-            # If the expected value is ALREADY in the baseline, skip — not injectable
-            if expected in baseline_text:
-                return None
-
-            # --- GET injection ---
-            r = await client.get(url, params={param: probe}, timeout=8)
+            # GET injection
+            r = await client.get(url, params={param: probe}, timeout=10)
+            text_lower = r.text.lower()
+            
+            # --- Anti-FP Check: WAF Reflection Guard ---
             if expected in r.text:
-                return {"url": url, "param": param, "probe": probe,
-                        "expected": expected, "engine": engine,
-                        "response_snippet": r.text[:300]}
+                if any(sig in text_lower for sig in WAF_SIGS):
+                    return None # Likely a reflected parameter in a WAF block page
 
-            # --- POST injection ---
-            r = await client.post(url, data={param: probe}, timeout=8)
-            if expected in r.text:
-                # Also check POST baseline
-                baseline_post = await client.post(url, data={param: "aura_baseline_test_xyz"}, timeout=8)
-                if expected not in baseline_post.text:
+                # DOUBLE-BLIND VERIFICATION
+                c, d = random.randint(10, 99), random.randint(10, 99)
+                expected_v = str(c * d)
+                probe_v = probe_template.replace("7*7", f"{c}*{d}")
+                
+                rv = await client.get(url, params={param: probe_v}, timeout=10)
+                if expected_v in rv.text:
+                    if any(sig in rv.text.lower() for sig in WAF_SIGS):
+                        return None
+
+                    # REFLECTION CHECK
+                    if probe_v in rv.text:
+                        # If raw payload is reflected literally, it's not execution
+                        return None
+
                     return {"url": url, "param": param, "probe": probe,
                             "expected": expected, "engine": engine,
-                            "response_snippet": r.text[:300], "method": "POST"}
+                            "response_snippet": r.text[:500]}
+
+            # POST injection
+            r = await client.post(url, data={param: probe}, timeout=10)
+            text_lower = r.text.lower()
+            if expected in r.text:
+                if any(sig in text_lower for sig in WAF_SIGS): return None
+
+                c, d = random.randint(10, 99), random.randint(10, 99)
+                expected_v = str(c * d)
+                probe_v = probe_template.replace("7*7", f"{c}*{d}")
+                rv = await client.post(url, data={param: probe_v}, timeout=10)
+                
+                if expected_v in rv.text:
+                    if any(sig in rv.text.lower() for sig in WAF_SIGS): return None
+                    if probe_v in rv.text: return None
+
+                    return {"url": url, "param": param, "probe": probe,
+                            "expected": expected, "engine": engine,
+                            "response_snippet": r.text[:500], "method": "POST"}
         except Exception:
             pass
         return None

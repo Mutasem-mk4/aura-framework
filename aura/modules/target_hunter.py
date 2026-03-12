@@ -13,9 +13,8 @@ from pathlib import Path
 
 from rich.console import Console
 from rich.table import Table
-from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich import box
+from aura.ui.zenith_ui import ZenithUI
 
 console = Console()
 
@@ -29,12 +28,7 @@ class TargetHunter:
 
     def fetch_index(self):
         """Downloads the latest Chaos index JSON."""
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            transient=True,
-            console=console
-        ) as progress:
+        with ZenithUI.create_progress() as progress:
             progress.add_task("[cyan]📡 Downloading live Chaos Bug Bounty Index...", total=None)
             try:
                 # Using standard sync httpx since this is a quick single download run from CLI directly
@@ -60,30 +54,45 @@ class TargetHunter:
             console.print("[red]No data to process.[/red]")
             return
 
-        console.print(Panel(
-            "[bold white]🎯 AURA OMNI — Target Hunter[/bold white]\n"
-            "[cyan]Scanning global bug bounty indices for the hottest targets...[/cyan]\n"
-            "[dim]Filters: Bounty=Yes, Platform=Any, Ordered by: Most recently updated[/dim]",
-            box=box.DOUBLE_EDGE,
-            style="bright_blue",
-        ))
+        ZenithUI.banner("AURA OMNI — Target Hunter", "Scanning global bug bounty indices for the hottest targets...")
+
+        console.print("[dim]Press Enter to see all platforms, or type part of the platform name.[/dim]")
+        platform_filter_input = console.input("[bold yellow]Filter by Platform (e.g., hackerone, intigriti, yeswehack, bugcrowd, independent): [/bold yellow]").strip().lower()
 
         # Filter logic
         filtered_programs = []
         for program in data:
             if program.get("bounty") is True:
+                prog_platform = str(program.get("platform", "independent")).lower()
+                if platform_filter_input and platform_filter_input not in prog_platform:
+                    continue
                 filtered_programs.append(program)
 
-        # Sort by latest change (change in count or created at etc, using change url timestamp approximation if needed, 
-        # or just random. We don't have exact timestamp in standard chaos index beyond the domain updates, but we can sort by name for now, 
-        # or just display top 50 to avoid clutter)
-        # Assuming the list might be somewhat chronologically ordered or we just grab the first matches with massive scope.
-        
-        # We prefer programs with a high count of subdomains (wide scope)
-        filtered_programs.sort(key=lambda x: x.get("count", 0), reverse=True)
+        console.print("[dim]Press Enter for Fresh/New targets, or type 'massive' for huge saturated targets.[/dim]")
+        sort_preference = console.input("[bold yellow]Sort Preference (fresh/massive): [/bold yellow]").strip().lower()
+
+        # Sort logic
+        if sort_preference == "massive":
+            # We prefer programs with a high count of subdomains (wide scope)
+            filtered_programs.sort(key=lambda x: x.get("count", 0), reverse=True)
+            sort_title = "Massive Scope"
+        else:
+            # Sort primarily by `change` descending (number of new subdomains discovered today).
+            # If changes are equal, favor smaller scopes (-count descending = smaller count first).
+            # Also filter out programs with 0 subdomains UNLESS it's a known Web3 platform.
+            filtered_programs = [
+                p for p in filtered_programs 
+                if p.get("count", 0) > 0 or p.get("platform", "").lower() in ["hackenproof", "immunefi"]
+            ]
+            
+            filtered_programs.sort(key=lambda x: (
+                x.get("change", 0),
+                -x.get("count", 0)
+            ), reverse=True)
+            sort_title = "Fresh Changes & New"
 
         table = Table(
-            title="🔥 Top Fresh Wide-Scope Bounty Programs",
+            title=f"🔥 Top {sort_title} Bounty Programs {'(Platform: ' + platform_filter_input.capitalize() + ')' if platform_filter_input else ''}",
             box=box.ROUNDED,
             show_header=True,
             header_style="bold white on dark_blue",
@@ -101,20 +110,30 @@ class TargetHunter:
             if count_displayed >= 25: break
             
             name = p.get("name", "Unknown")
+            if p.get("is_new"):
+                name = f"[bold green][NEW][/bold green] {name}"
+                
             platform = p.get("platform", "Unknown")
             # Some platforms might be blank, default to Independent
             if not platform: platform = "Independent"
             
             subdomain_count = p.get("count", 0)
-            if subdomain_count < 100: continue # Skip very small scoped programs
+            # For Fresh sorting, we don't skip small scopes. For massive, we skip < 100
+            if sort_preference == "massive" and subdomain_count < 100: continue 
             
             # Create a quick start command
-            slug = name.lower().replace(" ", "").replace(".com", "")
-            cmd = f"aura {slug}.com --auto" # Simplified guess, user can refine
+            slug = name.replace(" ", "").replace(".com", "").replace("'", "")
+            slug_lower = slug.lower()
+            
+            # If Web3 platform, recommend --web3. Otherwise, regular --auto domain
+            if platform.lower() in ["hackenproof", "immunefi"] and subdomain_count == 0:
+                cmd = f"aura --web3 {slug_lower}"
+            else:
+                cmd = f"aura {slug_lower}.com --auto" # Simplified guess, user can refine
             
             table.add_row(
                 name,
-                platform,
+                platform.capitalize(),
                 f"{subdomain_count:,}",
                 "💰 Yes",
                 cmd

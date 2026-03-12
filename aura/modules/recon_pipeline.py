@@ -209,9 +209,18 @@ class ReconPipeline:
 
     # ─── Stage 3: Port Scanning & Banner Grabbing ─────────────────────────────
 
-    async def stage3_nmap(self, ip: str, ports: list[int] = None) -> list[dict]:
-        """Port scanning using nmap CLI or raw TCP scanner fallback."""
+    async def stage3_nmap(self, ip: str, ports: list[int] = None, stealth_mode: bool = False, passive_ports: list[int] = None) -> list[dict]:
+        """Port scanning using nmap CLI or raw TCP scanner fallback. Utilizes passive ports if available."""
         ports = ports or self.COMMON_PORTS
+
+        if passive_ports:
+            console.print(f"[cyan][🌐 Recon] Stage 3: Discovered {len(passive_ports)} passive ports via OSINT.[/cyan]")
+            if stealth_mode:
+                console.print(f"[bold yellow][!] Stealth Mode Active: Skipping active Nmap scan. Relying ONLY on passive OSINT ports.[/bold yellow]")
+                return [{"port": p, "service": "unknown", "version": "passive-intel"} for p in passive_ports]
+            else:
+                console.print(f"[green][+] Accelerating Nmap scan using precisely {len(passive_ports)} known OSINT ports.[/green]")
+                ports = passive_ports # Overwrite COMMON_PORTS to only scan known open ports
 
         if self._has_nmap:
             console.print(f"[cyan][🌐 Recon] Stage 3: Nmap → {ip}...[/cyan]")
@@ -262,7 +271,7 @@ class ReconPipeline:
     # ─── Stage 4: Katana Deep Crawling (v21.0 Go-Arsenal) ─────────────────────
 
     async def stage4_katana(self, target_urls: list[str]) -> list[str]:
-        """Runs ProjectDiscovery's Katana crawler for high-speed endpoint discovery."""
+        """v25.0 OMEGA: Resilient Katana execution with deep error tracking."""
         if not self._has_katana or not target_urls:
             return []
 
@@ -270,21 +279,31 @@ class ReconPipeline:
         discovered_endpoints = set()
         
         try:
-            # We pass the URLs through stdin to katana
             input_hosts = "\n".join(target_urls)
             # -jc: json output, -kf: known files, -d: depth 3
             proc = await asyncio.create_subprocess_exec(
                 self.katana_path, "-silent", "-jc", "-kf", "all", "-d", "3",
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.DEVNULL
+                stderr=asyncio.subprocess.PIPE # Capture stderr for debugging
             )
             
-            stdout, _ = await asyncio.wait_for(
-                proc.communicate(input=input_hosts.encode()), timeout=180
-            )
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    proc.communicate(input=input_hosts.encode()), timeout=300 # Increased timeout for OMEGA
+                )
+            except asyncio.TimeoutError:
+                if proc.returncode is None:
+                    try: proc.kill()
+                    except: pass
+                console.print("[dim red][!] Katana: Process timed out after 300s. Partial results may be lost.[/dim red]")
+                return []
+
+            if proc.returncode != 0:
+                err_msg = stderr.decode('utf-8', 'ignore').strip()
+                console.print(f"[dim red][!] Katana: Process exited with code {proc.returncode}. Error: {err_msg}[/dim red]")
             
-            for line in stdout.decode().splitlines():
+            for line in stdout.decode('utf-8', 'ignore').splitlines():
                 try:
                     data = json.loads(line)
                     req_url = data.get("request", {}).get("endpoint")
@@ -294,17 +313,22 @@ class ReconPipeline:
                 
             console.print(f"[bold red][🔥] Katana Complete: Discovered {len(discovered_endpoints)} deep endpoints/files![/bold red]")
             return list(discovered_endpoints)
+        except FileNotFoundError:
+            console.print(f"[dim red][!] Katana: Binary not found at {self.katana_path}[/dim red]")
         except Exception as e:
-            console.print(f"[yellow][!] Katana execution failed: {e}[/yellow]")
-            return []
+            console.print(f"[yellow][!] Katana: Systemic execution error: {e}[/yellow]")
+            
+        return []
 
     # ─── Full Pipeline ────────────────────────────────────────────────────────
 
-    async def run(self, domain: str, target_ip: str = None) -> dict:
+    async def run(self, domain: str, target_ip: str = None, intel_data: dict = None, stealth_mode: bool = False) -> dict:
         """
         Runs the full Stage1→Stage2→Stage3 recon pipeline.
+        Merges passive data (Shodan, VirusTotal, SecurityTrails) into active checks.
         Returns a structured dict for the 'Reconnaissance' section of the report.
         """
+        intel_data = intel_data or {}
         console.print(f"\n[bold cyan][🌐 RECON PIPELINE] Starting 3-stage pipeline for {domain}...[/bold cyan]")
 
         # v22.1: Pre-flight DNS Check
@@ -316,6 +340,21 @@ class ReconPipeline:
 
         # Stage 1
         subdomains = await self.stage1_subfinder(domain)
+        
+        # Merge Passive Subdomains
+        passive_subs = set()
+        if "securitytrails" in intel_data:
+            for sub in intel_data["securitytrails"].get("subdomains", []):
+                passive_subs.add(f"{sub}.{domain}")
+        if "virustotal" in intel_data:
+            vt_subs = intel_data["virustotal"].get("stats", {})
+            # VT endpoint used in threat_intel doesn't return full subdomain list cleanly in 'stats', 
+            # but usually it's fetched via subdomains endpoint. Assuming we have them in intel_data if added later.
+            pass
+            
+        if passive_subs:
+            console.print(f"[green][+] Aggregating {len(passive_subs)} passive subdomains from SecurityTrails/OSINT...[/green]")
+            subdomains = list(set(subdomains) | passive_subs)
 
         # Stage 2
         all_hosts = [domain] + subdomains
@@ -327,7 +366,16 @@ class ReconPipeline:
             if not target_ip:
                 ip = socket.gethostbyname(domain)
         except: pass
-        nmap_data = await self.stage3_nmap(ip)
+        
+        passive_ports = []
+        if "shodan" in intel_data:
+            passive_ports.extend(intel_data["shodan"].get("ports", []))
+        if "censys" in intel_data:
+            for srv in intel_data["censys"].get("services", []):
+                if srv.get("port"): passive_ports.append(srv.get("port"))
+        passive_ports = list(set(passive_ports))
+
+        nmap_data = await self.stage3_nmap(ip, stealth_mode=stealth_mode, passive_ports=passive_ports)
 
         # Stage 4: Katana Deep Crawl
         active_http_urls = [h.get("url") for h in http_data if h.get("url")]

@@ -1,0 +1,71 @@
+402 |16|                 try:
+403 |20|                     resp = await asyncio.to_thread(curlr.request, method, url, **req_kwargs)
+404 |16|                 except Exception as e:
+405 |20|                     # v16.2 Stealth Hardening: Fallback Mechanism for ImpersonateError
+406 |20|                     err_msg = str(e).lower()
+407 |20|                     if "impersonate" in err_msg or "not supported" in err_msg:
+408 |24|                         print(f"[bold yellow][🩹] Stealth Fallback: '{req_kwargs.get('impersonate')}' failed. Retrying with 'chrome110'...[/bold yellow]")
+409 |24|                         req_kwargs["impersonate"] = "chrome110"
+410 |24|                         try:
+411 |28|                             resp = await asyncio.to_thread(curlr.request, method, url, **req_kwargs)
+412 |24|                         except Exception as inner_e:
+413 |28|                             print(f"[bold red][!] Session Error (Fallback failed): {inner_e}[/bold red]")
+414 |28|                             if attempt == (self.retries + (3 if self.stealth.active_waf else 0) - 1): return None
+415 |28|                             continue
+416 |20|                     else:
+417 |24|                         print(f"[bold red][!] Session Error ({type(e).__name__}): {e}[/bold red]")
+418 |24|                         if attempt == (self.retries + (3 if self.stealth.active_waf else 0) - 1):
+419 |28|                             return None
+420 |24|                         continue
+421 |20|                     
+422 |20|                     if resp is None:
+423 |24|                         # Should rarely happen with curl_cffi but safety first
+424 |24|                         print(f"[bold red][!] Critical Network Error: Received null response for {url}[/bold red]")
+425 |24|                         if attempt < self.retries + (3 if self.stealth.active_waf else 0) - 1:
+426 |28|                             continue
+427 |24|                         return None # Or a mock response object
+428 | 0| 
+429 |20|                     waf = self.stealth.detect_waf(resp.headers, resp.text)
+430 |20|                     if resp.status_code in [403, 429]:
+431 |24|                         self.stats["blocked_requests"] += 1
+432 |24|                         if current_proxy: self.stealth.swarm.report_failure(current_proxy)
+433 |24|                         self.base_delay = min(self.base_delay * 1.5, 20.0) # Adaptive Backoff Trigger
+434 |24|                         
+435 |24|                         # v16.0 Omni-Sovereign: Self-Healing Loop Activation
+436 |24|                         if brain.enabled:
+437 |29|                              self.stats["mutated_requests"] += 1
+438 |29|                              print(f"[bold yellow][🩹] Self-Heal: Block detected ({resp.status_code}). Mutating payload...[/bold yellow]")
+439 |29|                              # Mutate POST data if string
+440 |29|                              if "data" in req_kwargs and isinstance(req_kwargs["data"], str):
+441 |33|                                  req_kwargs["data"] = brain.self_heal_mutation(
+442 |37|                                      req_kwargs["data"], 
+443 |37|                                      resp.status_code, 
+444 |37|                                      resp.text, 
+445 |37|                                      attempt
+446 |33|                                  )
+447 |29|                              # Mutate GET parameters
+448 |29|                              if "params" in req_kwargs and isinstance(req_kwargs["params"], dict):
+449 |33|                                  for k, v in req_kwargs["params"].items():
+450 |37|                                      req_kwargs["params"][k] = brain.self_heal_mutation(
+451 |41|                                          str(v), 
+452 |41|                                          resp.status_code, 
+453 |41|                                          resp.text, 
+454 |41|                                          attempt
+455 |37|                                      )
+456 |33|                                  
+457 |24|                         if attempt < self.retries + (3 if self.stealth.active_waf else 0) - 1: continue
+458 |20|                     
+459 |20|                     # v15.0: On Success, gradually increase speed
+460 |20|                     if resp.status_code < 400:
+461 |24|                         self.stats["successful_requests"] += 1
+462 |24|                         self.base_delay = max(self.base_delay * 0.95, 0.3)
+463 |24|                         
+464 |20|                     if current_proxy: self.stealth.swarm.report_success(current_proxy)
+465 |20|                     return resp
+466 |16|                 except Exception as e:
+467 |20|                     print(f"[bold red][!] Session Error ({type(e).__name__}): {e}[/bold red]")
+468 |20|                     if attempt == (self.retries + (3 if self.stealth.active_waf else 0) - 1):
+469 |24|                         # Return a mock response or re-raise
+470 |24|                         return None
+471 |20|                     continue
+472 | 0| 

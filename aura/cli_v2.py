@@ -13,11 +13,11 @@ from rich.console import Console
 console = Console()
 
 
-async def _run_mission(target: str):
+async def _run_mission(target: str, swarm: bool = False):
     from aura.core.orchestrator import NeuralOrchestrator
     orchestrator = NeuralOrchestrator()
     console.print(f"[bold cyan]🚀 Initializing Omni-Sovereign Mission on: {target}[/bold cyan]")
-    await orchestrator.execute_advanced_chain(target)
+    await orchestrator.execute_advanced_chain(target, swarm_mode=swarm)
 
 
 async def _run_crawl(target: str, victim: bool = False):
@@ -86,6 +86,11 @@ Examples:
     parser.add_argument("--model", default="llama3.1", help="[v2] Ollama model name (default: llama3.1)")
     parser.add_argument("--proxy-file", default=None, help="[v3] Path to a list of proxies for Phantom Routing (WAF evasion)")
     parser.add_argument("--targets", action="store_true", help="[v3] 🎯 Target Hunter: Fetch and display fresh, profitable bug bounty programs")
+    parser.add_argument("--web3", action="store_true", help="[v4] 🕸️ Web3 Engine: Audit Smart Contracts (Solidity/Rust) via AI and SAST tools")
+    parser.add_argument("--ast", action="store_true", help="[v38] 🔬 Semantic AST Taint Analysis (Zero-FP JS auditing)")
+    parser.add_argument("--logic-fuzz", action="store_true", help="[v38] 🧠 Stateful Logic Fuzzer (DAG-based API testing)")
+    parser.add_argument("--workflow", default=None, metavar="JSON_FILE", help="[v38] Load workflow from JSON file for the Logic Fuzzer")
+    parser.add_argument("--swarm", action="store_true", help="[Phase 7] 🌩️ DISTRIBUTED SWARM: Dispatch tasks to RabbitMQ/Celery cluster")
 
     args = parser.parse_args()
 
@@ -98,16 +103,42 @@ Examples:
         state.AUTO_SUBMIT = True
         console.print("[bold red][!] Autonomous Submission Protocol enabled.[/bold red]")
 
-    if args.auto and args.target:
-        skip_phases = []
-        if args.skip:
+    if args.target and os.path.isfile(args.target):
+        targets = []
+        # v25.1: Robust encoding detection for Windows-generated target files
+        content = ""
+        for enc in ['utf-8-sig', 'utf-16', 'latin-1']:
             try:
-                skip_phases = [int(x.strip()) for x in args.skip.split(",") if x.strip()]
-            except ValueError:
-                console.print("[red]❌ --skip must be a comma-separated list of phase numbers (e.g. --skip 1,6)[/red]")
-                return
-        from aura.modules.autopilot import run_autopilot
-        run_autopilot(args.target, skip_phases=skip_phases, proxy_file=args.proxy_file)
+                with open(args.target, "r", encoding=enc) as f:
+                    content = f.read()
+                    if content: break
+            except Exception:
+                continue
+        
+        if content:
+            # Clean null bytes and non-printable artifacts common in UTF-16 mismatches
+            lines = content.splitlines()
+            for line in lines:
+                clean_line = line.strip().replace('\x00', '')
+                if clean_line and not clean_line.startswith("#"):
+                    # Double-check for non-ASCII artifacts at start
+                    clean_line = "".join(filter(lambda x: x.isprintable(), clean_line))
+                    targets.append(clean_line)
+
+        console.print(f"[bold green]🎯 Mass Ingestion Mode: Processing {len(targets)} targets from {args.target}[/bold green]")
+        for t in targets:
+            if args.auto:
+                console.print(f"\n[bold magenta]🚀 Mission Start: {t}[/bold magenta]")
+                asyncio.run(_run_mission(t, swarm=args.swarm))
+            else:
+                # Handle other flags if needed, or default to standard mission
+                asyncio.run(_run_mission(t, swarm=args.swarm))
+        return
+
+    if args.auto and args.target:
+        # Re-route the standard `--auto` flag to Zenith Absolute Singularity Mode
+        console.print("[bold red][!] RE-ROUTING --auto TO ZENITH PROTOCOL...[/bold red]")
+        asyncio.run(_run_mission(args.target, swarm=args.swarm))
     elif args.nexus:
         from aura.core.orchestrator import NeuralOrchestrator
         from aura.core.nexus import launch_nexus
@@ -176,8 +207,80 @@ Examples:
         from aura.modules.api_engine import run_api_scan
         console.print(f"[bold bright_magenta]🎯 API & GraphQL Scan: {args.target}[/bold bright_magenta]")
         asyncio.run(run_api_scan(args.target, discovery_map_path=args.map))
+    elif args.web3 and args.target:
+        from aura.modules.web3_engine import run_web3_audit
+        console.print(f"[bold purple]🕸️  Web3 Smart Contract Audit: {args.target}[/bold purple]")
+        asyncio.run(run_web3_audit(args.target))
+    elif args.ast and args.target:
+        from aura.modules.semantic_ast_engine import SemanticASTAnalyzer
+        import httpx
+        from bs4 import BeautifulSoup
+        
+        async def run_ast():
+            console.print(f"[bold cyan]🔬 Semantic AST Taint Analysis: {args.target}[/bold cyan]")
+            analyzer = SemanticASTAnalyzer(strict_mode=True)
+            async with httpx.AsyncClient(verify=False) as session:
+                try:
+                    target_url = args.target if args.target.startswith("http") else f"https://{args.target}"
+                    resp = await session.get(target_url, timeout=15)
+                    
+                    content_type = resp.headers.get('content-type', '').lower()
+                    scripts = []
+                    
+                    if 'javascript' in content_type:
+                        scripts.append(resp.text)
+                    else:
+                        soup = BeautifulSoup(resp.text, 'html.parser')
+                        for script in soup.find_all('script'):
+                            if script.string and script.string.strip():
+                                scripts.append(script.string.strip())
+                            if script.get('src'):
+                                console.print(f"[dim]Note: external script {script.get('src')} ignored (fetch directly if needed).[/dim]")
+                        
+                    if not scripts:
+                        console.print("[yellow]No JavaScript found to analyze![/yellow]")
+                        return
+                        
+                    for i, code in enumerate(scripts):
+                        console.print(f"\n[bold green]Analyzing Script Block #{i+1}...[/bold green]")
+                        findings = await analyzer.analyze(code, source=f"{args.target} (Block #{i+1})")
+                        console.print(analyzer.generate_report())
+                        
+                except Exception as e:
+                    console.print(f"[bold red]Failed to fetch target JS: {e}[/bold red]")
+        asyncio.run(run_ast())
+        
+    elif args.logic_fuzz and args.target:
+        from aura.modules.stateful_logic_fuzzer import StatefulLogicFuzzer, WorkflowBuilder
+        import json
+        
+        async def run_logic():
+            console.print(f"[bold cyan]🧠 Stateful Logic Fuzzer: {args.target}[/bold cyan]")
+            
+            if args.workflow:
+                try:
+                    with open(args.workflow, 'r') as f:
+                        workflow_json = json.load(f)
+                except Exception as e:
+                    console.print(f"[bold red]Failed to load workflow JSON: {e}[/bold red]")
+                    return
+            else:
+                # Default tiny workflow piece if nothing supplied
+                workflow_json = [{"method": "GET", "path": "/"}]
+                
+            target_base = args.target if args.target.startswith("http") else f"https://{args.target}"
+            fuzzer = StatefulLogicFuzzer(base_url=target_base)
+            steps = fuzzer.define_workflow("cli_test", workflow_json)
+            result = await fuzzer.execute_workflow(steps)
+            
+            if result.findings:
+                console.print(f"[bold red]Found {len(result.findings)} Logic Vulnerabilities![/bold red]")
+            else:
+                console.print("[green]No specific logic findings located dynamically.[/green]")
+                
+        asyncio.run(run_logic())
     elif args.target:
-        asyncio.run(_run_mission(args.target))
+        asyncio.run(_run_mission(args.target, swarm=args.swarm))
     else:
         parser.print_help()
 

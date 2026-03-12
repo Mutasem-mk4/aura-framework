@@ -70,10 +70,15 @@ class IntigritiSubmitter:
         self.password = password or os.getenv("INTIGRITI_PASSWORD", "")
         self.program_id = program_id or os.getenv("INTIGRITI_PROGRAM_ID", "")
         self.dry_run = dry_run
-        self.token: Optional[str] = None
+        # MFA Bypass: Load token directly from environment if available
+        self.token: Optional[str] = os.getenv("INTIGRITI_API_TOKEN", "")
 
     def _authenticate(self) -> bool:
-        """Logs in to Intigriti and stores the Bearer token."""
+        """Logs in to Intigriti OR returns True if a token already exists (MFA Bypass)."""
+        if self.token:
+            print("  ⚡ Using existing INTIGRITI_API_TOKEN (MFA Bypass active)")
+            return True
+
         if not self.email or not self.password:
             print("❌ INTIGRITI_EMAIL or INTIGRITI_PASSWORD not set in .env")
             return False

@@ -603,7 +603,79 @@ class AuraScanner:
                 console.print(f"[bold red][⚡] v21.0 GO-ARSENAL DETECTED: Utilizing FFUF for 10x Fuzzing Speed...[/bold red]")
                 return await ffuf.run_fuzz(base_url, tech_stack=tech_stack, fast_mode=state.FAST_MODE, swarm_mode=swarm_mode)
         except Exception as e:
-            console.print(f"[dim yellow][!] Ffuf Engine unavailable ({e}). Falling back to Native Python Scanner.[/dim yellow]")
+            console.print(f"[dim yellow][!] Ffuf Engine unavailable ({e}).[/dim yellow]")
+            
+        # v25.0 Omni-Core: Seamless integration of the Aura-Turbo-Fuzzer (ATF) Go binary
+        console.print(f"[bold red][🚀] v25.0 HYPER-CONCURRENCY: Handing over to Aura-Turbo-Fuzzer (ATF) Go Engine...[/bold red]")
+        import subprocess
+        import json
+        import os
+        from urllib.parse import urlparse
+        import tempfile
+        
+        target_slug = urlparse(base_url).netloc.replace(":", "_")
+        wordlist_path = os.path.join(os.path.dirname(__file__), "..", "resources", "wordlists", "raft-large-directories.txt")
+        if not os.path.exists(wordlist_path):
+            # Fallback to creating a temporary wordlist if SecLists is missing
+            core_words = self._get_top_500_words()
+            tmp_fd, wordlist_path = tempfile.mkstemp(suffix=".txt")
+            with os.fdopen(tmp_fd, 'w') as f:
+                f.write("\n".join(core_words))
+            
+        # Build the ATF command
+        atf_binary = os.path.join(os.path.dirname(__file__), "..", "..", "aura_fuzzer.exe")
+        if not os.path.exists(atf_binary):
+            # Try finding it relative to execution dir
+            atf_binary = "aura_fuzzer.exe"
+            
+        threads = "50" if state.FAST_MODE else "200"
+        proxy_arg = ["-p", state.PROXY_FILE] if state.PROXY_FILE and os.path.exists(state.PROXY_FILE) else []
+        
+        cmd = [atf_binary, "-u", base_url, "-w", wordlist_path, "-t", threads, "-mc", "200,204,301,302,307,401,403"] + proxy_arg
+        
+        # P0 QA Fix: Prevent IPC Deadlocks and Zombie Processes
+        # Route stdout straight to a temp file, read after execution
+        tmp_out_fd, tmp_out_path = tempfile.mkstemp(suffix=".jsonl")
+        process = None
+        try:
+            with os.fdopen(tmp_out_fd, 'w') as out_f:
+                process = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=out_f,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                await process.communicate()
+                
+            # Parse results safely
+            with open(tmp_out_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line: continue
+                    try:
+                        res = json.loads(line)
+                        url = res.get("URL")
+                        status = res.get("StatusCode")
+                        if url:
+                            console.print(f"[bold magenta][ATF 🔥] Hit: {url} (Status: {status})[/bold magenta]")
+                            discovered_urls.append(url)
+                    except json.JSONDecodeError:
+                        pass
+            return discovered_urls
+
+        except FileNotFoundError:
+            console.print(f"[bold red][X] ATF Binary not found at {atf_binary}. Is it compiled? Falling back to native.[/bold red]")
+        finally:
+            # Strict zombie process prevention
+            if process and process.returncode is None:
+                try:
+                    process.kill()
+                except Exception:
+                    pass
+            if os.path.exists(tmp_out_path):
+                try:
+                    os.remove(tmp_out_path)
+                except Exception:
+                    pass
         
         # v20.0 SecLists Integration Scaling
         if swarm_mode:

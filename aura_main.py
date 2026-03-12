@@ -59,6 +59,7 @@ def main():
     parser.add_argument("--lfi", action="store_true", help="[v2] Path Traversal / LFI Engine")
     parser.add_argument("--recon", action="store_true", help="[v2] Recon & JS Scraper")
     parser.add_argument("--api", action="store_true", help="API & GraphQL Fuzzer")
+    parser.add_argument("--web3", action="store_true", help="[v3] Web3 Smart Contract Auditing Engine")
     
     parser.add_argument("--auto", action="store_true", help="🚀 AUTOPILOT: run ALL engines automatically")
     parser.add_argument("--skip", default="", metavar="PHASES", help="Skip phases by number (e.g. --skip 1,6)")
@@ -75,15 +76,8 @@ def main():
     if args.auto_submit: state.AUTO_SUBMIT = True
 
     if args.auto and args.target:
-        skip_phases = []
-        if args.skip:
-            try:
-                skip_phases = [int(x.strip()) for x in args.skip.split(",") if x.strip()]
-            except ValueError:
-                console.print("[red]❌ --skip must be comma-separated phase numbers[/red]")
-                return
-        from aura.modules.autopilot import run_autopilot
-        run_autopilot(args.target, skip_phases=skip_phases, proxy_file=args.proxy_file)
+        console.print(f"[bold red][!] AUTO FLAG DETECTED - ENGAGING ZENITH PROTOCOL[/bold red]")
+        asyncio.run(_run_mission(args.target))
     elif args.nexus:
         from aura.core.orchestrator import NeuralOrchestrator
         from aura.core.nexus import launch_nexus
@@ -135,6 +129,9 @@ def main():
     elif args.api and args.target:
         from aura.modules.api_engine import run_api_scan
         asyncio.run(run_api_scan(args.target, discovery_map_path=args.map))
+    elif args.web3 and args.target:
+        from aura.modules.web3_engine import run_web3_audit
+        asyncio.run(run_web3_audit(args.target))
     elif args.target:
         asyncio.run(_run_mission(args.target))
     else:

@@ -4,8 +4,8 @@ from abc import ABC, abstractmethod
 class AuraPlugin(ABC):
     """Base class for all Aura Forge plugins."""
     
-    def __init__(self, name, version="1.0.0"):
-        self.name = name
+    def __init__(self, name=None, version="1.0.0"):
+        self.name = name or self.__class__.__name__
         self.version = version
 
     @abstractmethod

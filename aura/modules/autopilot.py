@@ -126,7 +126,9 @@ class AuraAutopilot:
             # Recon findings are informational — collect any secrets and takeovers found
             secrets = report.get("secrets", [])
             takeovers = report.get("takeover_findings", [])
-            findings = [{"type": "JS Secret", **s} for s in secrets] if secrets else []
+            findings = [{"type": "JS Secret", "url": s.get("source", self.target), **s} for s in secrets] if secrets else []
+            for t in takeovers:
+                if "url" not in t: t["url"] = t.get("subdomain", self.target)
             findings.extend(takeovers)
             return findings
         except Exception as e:

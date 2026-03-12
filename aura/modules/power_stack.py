@@ -159,11 +159,13 @@ class PowerStack:
                                 version = service.get("version", "")
                                 extra   = service.get("extrainfo", "")
                                 full    = f"{name} {product} {version} {extra}".strip()
+                                severity = "INFO"
+
                                 findings.append({
                                     "type":         f"Open Service: Port {portid}/{name.upper()}",
                                     "finding_type": f"Open Service: Port {portid}/{name.upper()}",
                                     "content":      f"[Nmap -sV] Port {portid} open — {full} on {target_ip}",
-                                    "severity":     "MEDIUM",
+                                    "severity":     severity,
                                     "owasp":        "A05:2021",
                                     "mitre":        "T1046 — Network Service Scanning",
                                     "remediation_fix": f"Restrict access to port {portid} via firewall if not publicly required. Upgrade {product} to latest version.",

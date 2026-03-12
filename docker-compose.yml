@@ -1,10 +1,69 @@
 version: '3.8'
 
 services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: aura_rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: aura_postgres
+    environment:
+      POSTGRES_USER: aura_db_admin
+      POSTGRES_PASSWORD: aura_db_password
+      POSTGRES_DB: aura_intel
+    ports:
+      - "5432:5432"
+    volumes:
+      - aura_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U aura_db_admin -d aura_intel" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  celery-worker:
+    build: .
+    env_file: .env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    command: celery -A aura.core.swarm_celery worker --loglevel=info -c 4
+    ports:
+      - "8000-8010:8000" # Expose metrics port range for multiple workers
+    volumes:
+      - ./:/app:ro
+      - ./reports:/app/reports
+      - ./screenshots:/app/screenshots
+    environment:
+      - C_FORCE_ROOT=true
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+      - DATABASE_URL=postgresql://aura_db_admin:aura_db_password@postgres:5432/aura_intel
+
   aura:
     build: .
     container_name: aura_sandbox
     env_file: .env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8000" # Expose main orchestrator metrics port
     # Drop all capabilities for extra security
     cap_drop:
       - ALL
@@ -19,12 +78,38 @@ services:
       - ./.aura_state:/app/.aura_state
       - ./aura.db:/app/aura.db
       - ./aura_intel.db:/app/aura_intel.db
-    # Network mode default (bridge) creates an isolated network
-    # We could restrict external access entirely, but the tool needs internet.
-    # We will let it access internet but we should rely on Aura's own code to block localhost targeting.
+    environment:
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+      - DATABASE_URL=postgresql://aura_db_admin:aura_db_password@postgres:5432/aura_intel
     command: [ "--help" ]
-    # --- SWARM MODE (SCALING) ---
-    # To run in swarm/distributed mode, uncomment the following block:
-    # deploy:
-    #   mode: replicated
-    #   replicas: 3
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: aura_prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - aura_promdata:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: aura_grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - aura_grafanadata:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=aura_admin
+    depends_on:
+      - prometheus
+
+volumes:
+  aura_pgdata:
+  aura_promdata:
+  aura_grafanadata:
