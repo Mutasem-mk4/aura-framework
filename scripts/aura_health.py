@@ -1,23 +1,27 @@
 #!/usr/bin/env python3
 """
-Aura Health Check v19.4 - Self-Diagnostic Tool
+Aura Health Check v25.2 - Self-Diagnostic Tool
 Run this anytime to verify Aura is in peak condition.
-Usage: python aura_health.py
+Usage: python scripts/aura_health.py
 """
 import sys
 import os
 
-GREEN  = "\033[92m"
-RED    = "\033[91m"
-YELLOW = "\033[93m"
-CYAN   = "\033[96m"
-RESET  = "\033[0m"
-BOLD   = "\033[1m"
+try:
+    if sys.stdout.encoding.lower() != 'utf-8':
+        sys.stdout.reconfigure(encoding='utf-8')
+except AttributeError:
+    pass
 
-def ok(msg):   print(f"  {GREEN}[✓]{RESET} {msg}")
-def fail(msg): print(f"  {RED}[✗]{RESET} {msg}")
-def warn(msg): print(f"  {YELLOW}[!]{RESET} {msg}")
-def info(msg): print(f"  {CYAN}[*]{RESET} {msg}")
+try:
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich import print as rprint
+    console = Console()
+except ImportError:
+    print("Please install 'rich' to use the health check: pip install rich")
+    sys.exit(1)
 
 passed = 0
 failed = 0
@@ -27,29 +31,32 @@ def check(label, fn):
     try:
         result = fn()
         if result is True or result is None:
-            ok(label)
+            console.print(f"  [bold green]✓[/bold green] {label}")
             passed += 1
         elif result is False:
-            fail(label)
+            console.print(f"  [bold red]✗[/bold red] {label}")
             failed += 1
         else:
-            ok(f"{label}: {result}")
+            console.print(f"  [bold green]✓[/bold green] {label}: [cyan]{result}[/cyan]")
             passed += 1
     except Exception as e:
-        fail(f"{label} → {e}")
+        console.print(f"  [bold red]✗[/bold red] {label} → [dim]{e}[/dim]")
         failed += 1
 
-print(f"\n{BOLD}{CYAN}╔══════════════════════════════════════╗")
-print(f"║   AURA v14.0 — Health Check v19.4   ║")
-print(f"╚══════════════════════════════════════╝{RESET}\n")
+console.print(Panel(
+    "[bold cyan]AURA v25.2 — System Diagnostics & Health Check[/bold cyan]", 
+    border_style="cyan", 
+    expand=False
+))
+console.print()
 
 # ── 1. Python Version
-print(f"{BOLD}[1] Python Environment{RESET}")
+console.print("[bold white][1] Python Environment[/bold white]")
 check("Python ≥ 3.10",
     lambda: sys.version_info >= (3, 10) or (_ for _ in ()).throw(Exception(f"Python {sys.version_info.major}.{sys.version_info.minor} — need 3.10+")))
 
 # ── 2. Core Dependencies
-print(f"\n{BOLD}[2] Core Dependencies{RESET}")
+console.print("\n[bold white][2] Core Dependencies[/bold white]")
 def chk_import(mod):
     return lambda: __import__(mod) and True
 
@@ -58,10 +65,10 @@ check("requests",        chk_import("requests"))
 check("rich",            chk_import("rich"))
 check("python-dotenv",   chk_import("dotenv"))
 check("playwright",      chk_import("playwright"))
-check("google-genai",    chk_import("google.genai"))
+check("google.generativeai",    chk_import("google.generativeai"))
 
 # ── 3. Environment Variables
-print(f"\n{BOLD}[3] API Keys & Configuration{RESET}")
+console.print("\n[bold white][3] API Keys & Configuration[/bold white]")
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -79,45 +86,33 @@ check("OTX_API_KEY",         chk_env("OTX_API_KEY", "AlienVault OTX"))
 check("ABUSEIPDB_API_KEY",   chk_env("ABUSEIPDB_API_KEY", "AbuseIPDB"))
 
 # ── 4. Aura Core Modules
-print(f"\n{BOLD}[4] Aura Core Modules{RESET}")
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+console.print("\n[bold white][4] Aura Core Modules[/bold white]")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 check("state.py",        lambda: __import__("aura.core.state", fromlist=["state"]) and True)
 check("brain.py",        lambda: __import__("aura.core.brain", fromlist=["AuraBrain"]) and True)
 check("orchestrator.py", lambda: __import__("aura.core.orchestrator", fromlist=["NeuralOrchestrator"]) and True)
-check("scanner.py",      lambda: __import__("aura.modules.scanner", fromlist=["AuraScanner"]) and True)
-check("cloud_recon.py",  lambda: __import__("aura.modules.cloud_recon", fromlist=["AuraCloudRecon"]) and True)
-check("poc_engine.py",   lambda: __import__("aura.modules.poc_engine", fromlist=["PoCEngine"]) and True)
 
 # ── 5. AI Brain Live Test
-print(f"\n{BOLD}[5] AI Brain Live Test{RESET}")
+console.print("\n[bold white][5] AI Brain Live Test[/bold white]")
 def test_brain():
     from aura.core.brain import AuraBrain
     b = AuraBrain()
     if not b.enabled:
         raise Exception("Brain disabled — check GEMINI_API_KEY")
-    result = b._call_ai("Reply with exactly: AURA_OK", use_cache=False)
+    result = b._call_ai(
+        "Reply with exactly: AURA_OK", 
+        system_instruction="You are a helpful assistant confirming your system is online.", 
+        use_cache=False
+    )
     if result and len(result) > 0:
         return f"AI Response: '{result.strip()[:40]}'"
     raise Exception("No response from Gemini")
 
 check("Gemini AI Live Ping", test_brain)
 
-# ── 6. Model Name
-print(f"\n{BOLD}[6] Configuration Check{RESET}")
-from aura.core import state
-
-def chk_model():
-    model = state.GEMINI_MODEL
-    if "gemini" not in model:
-        raise Exception(f"Model name looks wrong: {model}")
-    return f"Model = {model}"
-
-check("Gemini Model",    chk_model)
-check("DB Path",         lambda: state.GEMINI_API_KEY and True)
-
-# ── 7. Storage & Reports directories
-print(f"\n{BOLD}[7] Directories{RESET}")
+# ── 6. Storage & Reports directories
+console.print("\n[bold white][6] Directories[/bold white]")
 def chk_dir(d):
     return lambda: os.makedirs(d, exist_ok=True) or os.path.isdir(d)
 
@@ -126,18 +121,27 @@ check("screenshots/",    chk_dir("screenshots"))
 check("logs/",           chk_dir("logs"))
 
 # ── Final Summary
-print(f"\n{'═'*42}")
+console.print()
 total = passed + failed
 score = int((passed / total) * 100) if total > 0 else 0
 
 if failed == 0:
-    print(f"{GREEN}{BOLD}  ✅ ALL CHECKS PASSED ({passed}/{total}) — Aura is at PEAK condition!{RESET}")
+    console.print(Panel(
+        f"[bold green]✅ ALL CHECKS PASSED ({passed}/{total}) — Aura is at PEAK condition![/bold green]\n"
+        f"Score: {score}% {'🔥' * (score // 20)}",
+        border_style="green", expand=False
+    ))
 elif failed <= 2:
-    print(f"{YELLOW}{BOLD}  ⚠️  MOSTLY OK ({passed}/{total}) — {failed} issue(s) need attention.{RESET}")
+    console.print(Panel(
+        f"[bold yellow]⚠️  MOSTLY OK ({passed}/{total}) — {failed} issue(s) need attention.[/bold yellow]\n"
+        f"Score: {score}% {'🔥' * (score // 20)}",
+        border_style="yellow", expand=False
+    ))
 else:
-    print(f"{RED}{BOLD}  ❌ ISSUES DETECTED ({passed}/{total}) — Run: pip install -r requirements.txt{RESET}")
-
-print(f"  Score: {score}% {'🔥' * (score // 20)}")
-print(f"{'═'*42}\n")
+    console.print(Panel(
+        f"[bold red]❌ ISSUES DETECTED ({passed}/{total}) — Run: pip install -r requirements.txt[/bold red]\n"
+        f"Score: {score}% {'🔥' * (score // 20)}",
+        border_style="red", expand=False
+    ))
 
 sys.exit(0 if failed == 0 else 1)

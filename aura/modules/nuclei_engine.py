@@ -15,11 +15,21 @@ class NucleiEngine:
     """
     
     def __init__(self):
-        self.is_installed = bool(shutil.which("nuclei"))
+        self.nuclei_path = self._find_nuclei()
+        self.is_installed = bool(self.nuclei_path)
         if not self.is_installed:
-            console.print("[bold red][!] Nuclei Engine: 'nuclei' binary not found in PATH. CVE scanning will be disabled.[/bold red]")
+            console.print("[bold red][!] Nuclei Engine: 'nuclei' binary not found in PATH or ~/go/bin. CVE scanning will be disabled.[/bold red]")
             console.print("[dim yellow]    Hint: Install it with: go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest[/dim yellow]")
             
+    def _find_nuclei(self) -> str | None:
+        path = shutil.which("nuclei")
+        if path: return path
+        go_path = os.path.expanduser("~/go/bin/nuclei.exe")
+        if os.path.exists(go_path): return go_path
+        go_path_unix = os.path.expanduser("~/go/bin/nuclei")
+        if os.path.exists(go_path_unix): return go_path_unix
+        return None
+
     async def scan(self, target: str) -> list:
         if not self.is_installed:
             return []
@@ -32,14 +42,33 @@ class NucleiEngine:
         
         findings = []
         try:
+            from aura.core import state
+            
+            # Base stealth flags
+            stealth_flags = [
+                "-rl", "5",       # Rate limit to 5 req/sec
+                "-c", "2",        # Max concurrency 2
+                "-timeout", "10", # 10s connection timeout
+                "-delay", "2"     # 2 second delay between requests
+            ]
+            
+            # Apply dynamic User-Agent via custom headers or random agent
+            # We'll use Nuclei's built in header flag or random-agent
+            stealth_flags.extend(["-random-agent"])
+            for header, val in state.CUSTOM_HEADERS.items():
+                stealth_flags.extend(["-H", f"{header}: {val}"])
+
             cmd = [
-                "nuclei",
+                self.nuclei_path,
                 "-u", target,
                 # Limiting to high impact templates to keep scans fast and relevant for bounty
                 "-t", "cves,vulnerabilities,misconfiguration,exposures",
                 "-jsonl", "-silent",
                 "-o", tmp_path
             ]
+            
+            if not state.FAST_MODE:
+                cmd.extend(stealth_flags)
             
             proc = await asyncio.create_subprocess_exec(
                 *cmd,

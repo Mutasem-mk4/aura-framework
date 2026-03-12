@@ -2,6 +2,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
 from rich.status import Status
+from rich.align import Align
+from rich.text import Text
 from rich import box
 import asyncio
 
@@ -11,6 +13,31 @@ class ZenithUI:
     """The visual soul of Aura: Gemini-style high-fidelity UI components."""
     
     @staticmethod
+    def show_startup_banner():
+        """Displays the massive, cool AURA ASCII banner."""
+        banner_text = """
+    █████╗ ██╗   ██╗██████╗  █████╗ 
+   ██╔══██╗██║   ██║██╔══██╗██╔══██╗
+   ███████║██║   ██║██████╔╝███████║
+   ██╔══██║██║   ██║██╔══██╗██╔══██║
+   ██║  ██║╚██████╔╝██║  ██║██║  ██║
+   ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
+        """
+        
+        banner_panel = Panel(
+            Align.center(
+                Text(banner_text, style="bold cyan") + 
+                Text("\nTHE SENTIENT OFFENSIVE ENGINE", style="bold magenta") +
+                Text("\n\n[ v25.2 - OMEGA PROTOCOL ACTIVE ]", style="dim white")
+            ),
+            box=box.HEAVY,
+            border_style="blue",
+            padding=(1, 4)
+        )
+        console.print(banner_panel)
+        console.print()
+
+    @staticmethod
     def banner(title: str, subtitle: str = "Sentient Offensive Engine"):
         """Displays the main mission header."""
         console.print(Panel(
@@ -19,6 +46,17 @@ class ZenithUI:
             border_style="bright_magenta",
             padding=(1, 2),
             expand=False
+        ))
+
+    @staticmethod
+    def phase_banner(phase_name: str, target: str, icon: str = "⚡"):
+        """Displays a beautiful, wide banner for each new phase."""
+        console.print(Panel(
+            f"[bold white]{icon} {phase_name}[/bold white]  [dim]⯈[/dim]  [bold cyan]{target}[/bold cyan]",
+            box=box.MINIMAL_DOUBLE_HEAD,
+            border_style="blue",
+            padding=(0, 2),
+            expand=True
         ))
 
     @staticmethod
@@ -43,4 +81,12 @@ class ZenithUI:
     def finding(vuln_type: str, severity: str, target: str):
         """Prints a high-visibility discovery alert."""
         color = "red" if severity.upper() == "CRITICAL" else "yellow"
-        console.print(f"[bold {color}]🚨 {severity.upper()} DISCOVERED: {vuln_type} on {target}![/bold {color}]")
+        console.print(Panel(
+            f"[bold {color}]🚨 {severity.upper()} DISCOVERED![/bold {color}]\n"
+            f"[white]Vulnerability:[/white] [cyan]{vuln_type}[/cyan]\n"
+            f"[white]Target:[/white] [dim]{target}[/dim]",
+            box=box.ROUNDED,
+            border_style=color,
+            padding=(0, 2),
+            expand=False
+        ))

@@ -3,7 +3,13 @@ import re
 import dns.resolver
 import asyncio
 import aiohttp
+import yaml
+import os
+import json
+import random
 import uuid
+import requests
+import urllib3
 from urllib.parse import urlparse, urljoin
 from rich.console import Console
 from aura.modules.threat_intel import ThreatIntel
@@ -240,6 +246,7 @@ class AuraScanner:
         ENDPOINT_PATTERNS = [
             r'["\']/(api/[^"\'\\s]+)["\']',
             r'["\']/(v[0-9]+/[^"\'\\s]+)["\']',
+            r'["\']/(rest/[^"\'\\s]+)["\']', # Common in SPAs like Juice Shop
             r'["\'](/[a-zA-Z0-9_-]+\.(php|asp|aspx|jsp|json|xml|txt|cfg|conf|ini|bak|sql|log))["\']',
             r'fetch\s*\(\s*["\']([^"\']+)["\']',
             r'axios\.[a-z]+\s*\(\s*["\']([^"\']+)["\']',
@@ -249,6 +256,10 @@ class AuraScanner:
             r'path\s*[:=]\s*["\'](/[^"\']+)["\']',
             r'window\.location\s*=\s*["\']([^"\']+)["\']',
             r'href\s*[:=]\s*["\'](/[^"\']+)["\']',
+            # v38.0: SPA Routing Patterns (Angular/React)
+            r'path\s*:\s*["\']([\w/.-]+)["\']',
+            r'redirectTo\s*:\s*["\']([\w/.-]+)["\']',
+            r'loadChildren\s*:\s*["\']([^"\']+)["\']'
         ]
         
         # v7.4 Velocity Focus: Concurrency for resource fetching
@@ -287,6 +298,47 @@ class AuraScanner:
         
         console.print(f"[bold green][+] JS/CSS Extraction: {len(all_endpoints)} hidden endpoints found.[/bold green]")
         return all_endpoints
+
+    async def _get_spa_baseline(self, base_url: str):
+        """v38.0: Establishes a baseline for nonexistent paths on a potential SPA."""
+        try:
+            r1 = await self.stealth_session.get(f"{base_url}/rnd_{uuid.uuid4().hex[:8]}", allow_redirects=False, timeout=10)
+            if r1 and r1.status_code == 200:
+                # v38.0: Deep Hunter Fuzzy Hashing
+                import hashlib
+                # We hash the structural part of the body (tags only) to create a fingerprint
+                structure = re.sub(r'>[^<]+<', '><', r1.text)
+                fingerprint = hashlib.md5(structure.encode()).hexdigest()
+                return {
+                    "status": 200,
+                    "length": len(r1.text),
+                    "fingerprint": fingerprint,
+                    "prefix": r1.text[:512]
+                }
+        except: pass
+        return None
+
+    def _is_valid_hit(self, res, baseline):
+        """v38.0: Determines if a 200 response is a real hit or just an SPA fallback."""
+        if not baseline:
+            return res.status_code in [200, 204, 301, 302, 307, 401, 403]
+        if res.status_code != 200:
+            return res.status_code in [204, 301, 302, 307, 401, 403]
+            
+        import hashlib
+        # Compare structural fingerprints
+        structure = re.sub(r'>[^<]+<', '><', res.text)
+        current_fingerprint = hashlib.md5(structure.encode()).hexdigest()
+        
+        if current_fingerprint == baseline["fingerprint"]:
+            return False # Structural match to 404-baseline
+            
+        # Fallback to length and content prefix similarity
+        current_len = len(res.text)
+        if abs(current_len - baseline["length"]) < 50:
+            if res.text[:256] == baseline["prefix"][:256]:
+                return False
+        return True
 
     # ──────────────────────────────────────────────
     # v7.2: Enhanced DirBuster (Professional Wordlist)
@@ -688,21 +740,10 @@ class AuraScanner:
             console.print(f"[bold red][🔥] v20.0 Deep Scan: Unleashing 5000+ top paths from SecLists![/bold red]")
             words = self._get_top_500_words()[:5000]  
         
-        # v19.4: Catch-all detection — probe 2 random nonexistent paths
-        baseline_200 = False
-        b_len = 0
-        b_len2 = 0
-        try:
-            r1 = await self.stealth_session.get(f"{base_url}/rnd_{uuid.uuid4().hex[:8]}", allow_redirects=False, timeout=state.NETWORK_TIMEOUT)
-            r2 = await self.stealth_session.get(f"{base_url}/rnd_{uuid.uuid4().hex[:8]}", allow_redirects=False, timeout=state.NETWORK_TIMEOUT)
-            b_len = len(r1.text) if r1 else 0
-            b_len2 = len(r2.text) if r2 else 0
-            # If BOTH random paths return 200, server is a catch-all (SPA/Angular/React routing)
-            if r1 and r2 and r1.status_code == 200 and r2.status_code == 200:
-                baseline_200 = True
-                console.print(f"[dim yellow][!] Catch-All Detected: Server returns 200 for all paths. Filtering 200s — only 301/302/403 accepted as real hits.[/dim yellow]")
-        except:
-            pass
+        # v38.0: Deep Hunter Catch-all Detection
+        baseline = await self._get_spa_baseline(base_url)
+        if baseline:
+            console.print(f"[dim yellow][!] SPA Detected: Baseline length {baseline['length']}. Enabling Similarity Filter.[/dim yellow]")
 
         # v12.1 Persistence Check
         from aura.core.storage import AuraStorage
@@ -723,26 +764,10 @@ class AuraScanner:
                 headers = {'User-Agent': random.choice(user_agents)}
                 res = await self.stealth_session.get(url, timeout=state.NETWORK_TIMEOUT, allow_redirects=False, headers=headers)
 
-                if baseline_200:
-                    if res and res.status_code == 403:
-                        console.print(f"[green][+] Predator Hit: {url} (403 Forbidden — exists)[/green]")
-                        try: db_logger.log_operation(url, "StealthPredator", 403)
-                        except: pass
-                        return url
-                    return None  # Skip 200/301/302 on catch-all servers
-
-                # Normal mode: filter if content length matches baseline (same page served)
-                if res and b_len > 0 and abs(len(res.text) - b_len) < 200 and abs(len(res.text) - b_len2) < 200:
-                    return None
-
-                if res and res.status_code == 200:
-                    console.print(f"[green][+] Predator Hit: {url} (200 OK)[/green]")
-                    try: db_logger.log_operation(url, "StealthPredator", 200)
-                    except: pass
-                    return url
-                elif res and res.status_code == 403:
-                    console.print(f"[green][+] Predator Hit: {url} (403 Forbidden)[/green]")
-                    try: db_logger.log_operation(url, "StealthPredator", 403)
+                if res and self._is_valid_hit(res, baseline):
+                    status_color = "green" if res.status_code < 400 else "yellow"
+                    console.print(f"[{status_color}][+] Predator Hit: {url} ({res.status_code})[/{status_color}]")
+                    try: db_logger.log_operation(url, "StealthPredator", res.status_code)
                     except: pass
                     return url
             except:
@@ -946,7 +971,10 @@ class AuraScanner:
                 
                 # ── Extract all <a href> links ──
                 hrefs = re.findall(r'<a[^>]+href=["\']([^"\'#]+)["\']', html, re.IGNORECASE)
-                for href in hrefs:
+                # v38.0: Extract SPA Routes from HTML/JS content
+                spa_routes = re.findall(r'path\s*:\s*["\']([\w/.-]+)["\']', html, re.IGNORECASE)
+                
+                for href in hrefs + spa_routes:
                     full = urljoin(curl, href)
                     parsed = urlparse(full)
                     if parsed.netloc != base_domain: continue

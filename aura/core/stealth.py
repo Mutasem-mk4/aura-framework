@@ -3,7 +3,9 @@ import random
 import time
 import asyncio
 import os
+import httpx
 import requests
+from urllib.parse import urlparse, urljoin
 import concurrent.futures
 from typing import Dict, Optional, List
 from aura.core import state
@@ -36,6 +38,27 @@ class StealthEngine:
     
     IMPERSONATE_TYPES = ["chrome110", "chrome116", "chrome119", "chrome124", "safari15_5", "safari17_0", "safari18_0", "edge101"]
     
+    MOBILE_IMPERSONATE = {
+        "ios_iphone15": {
+            "impersonate": "safari17_0",
+            "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+            "headers": {
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+                "X-Requested-With": "com.apple.mobilesafari"
+            }
+        },
+        "android_pixel8": {
+            "impersonate": "chrome119",
+            "ua": "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36",
+            "headers": {
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "en-US,en;q=0.9",
+                "X-Requested-With": "com.google.android.apps.messaging"
+            }
+        }
+    }
+
     USER_AGENTS = [
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -45,6 +68,7 @@ class StealthEngine:
     def __init__(self, proxy_list: Optional[list] = None, proxy_file: Optional[str] = None):
         self.proxy_list = proxy_list or []
         self.active_waf = None
+        self.mobile_mode = getattr(state, "MOBILE_MODE", False) # Enable via GLOBAL_STATE
         
         final_proxy_file = proxy_file or state.PROXY_FILE
         if final_proxy_file:
@@ -103,6 +127,24 @@ class StealthEngine:
         return random.uniform(0.5, 2.0)
 
     def get_stealth_params(self, force_rotate: bool = False) -> Dict:
+        if self.mobile_mode:
+            # 👻 MOBILE GHOST HUNTER MODE
+            profile_name = random.choice(list(self.MOBILE_IMPERSONATE.keys()))
+            profile = self.MOBILE_IMPERSONATE[profile_name]
+            
+            headers = profile["headers"].copy()
+            headers.update({
+                "User-Agent": profile["ua"],
+                "Sec-Ch-Ua-Mobile": "?1",
+                "Sec-Ch-Ua-Platform": "\"iOS\"" if "iphone" in profile_name else "\"Android\""
+            })
+            
+            return {
+                "impersonate": profile["impersonate"],
+                "headers": headers,
+                "proxies": self.get_proxy_dict()
+            }
+
         headers = {
             "User-Agent": random.choice(self.USER_AGENTS),
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
@@ -199,6 +241,10 @@ class ShadowProxyManager:
                 console.print(f"[bold yellow][🕒] Node {proxy} moved to 10-min cooldown.[/bold yellow]")
             except: pass
 
+    def report_success(self, proxy: str):
+        """v38.0: Resets failure counter on successful node usage."""
+        self.failed_proxies[proxy] = 0
+
 class AuraSession:
     """v25.0 OMEGA: High-stealth async session with JA3 impersonation."""
     _semaphore = asyncio.Semaphore(state.GLOBAL_CONCURRENCY_LIMIT)
@@ -210,6 +256,12 @@ class AuraSession:
         self.shadow_manager = ShadowProxyManager()
         self.latency_log = []
         self.stats = {"total": 0, "blocked": 0, "success": 0}
+        self.consecutive_blocks = 0
+        self.evasion_lock = asyncio.Lock()
+        
+        # Ghost profile state
+        self.active_ua = self.stealth.USER_AGENTS[0]
+        self.active_impersonate = self.stealth.IMPERSONATE_TYPES[0]
 
     async def aclose(self):
         """Placeholder for async cleanup."""
@@ -235,12 +287,13 @@ class AuraSession:
                 params = self.stealth.get_stealth_params()
                 req_kwargs = kwargs.copy()
                 req_kwargs.setdefault("proxies", {"http": shadow_node, "https": shadow_node})
-                req_kwargs.setdefault("impersonate", params["impersonate"])
+                req_kwargs.setdefault("impersonate", self.active_impersonate)
                 req_kwargs.setdefault("verify", False)
                 req_kwargs.setdefault("timeout", 30) # Increased for Akamai latencies
                 
                 # Merge Headers
-                headers = params["headers"]
+                headers = params["headers"].copy()
+                headers["User-Agent"] = self.active_ua # Preserve active ghost UA
                 if "headers" in req_kwargs:
                     headers.update(req_kwargs["headers"])
                 req_kwargs["headers"] = headers
@@ -252,6 +305,7 @@ class AuraSession:
                     
                     if resp and resp.status_code < 400:
                         self.stats["success"] += 1
+                        self.consecutive_blocks = 0 # Reset on success
                         self.shadow_manager.report_success(shadow_node)
                         return resp
                     
@@ -259,9 +313,26 @@ class AuraSession:
                     waf = self.stealth.detect_waf(resp.headers if resp else {}, resp.text if resp else "")
                     if resp and (resp.status_code in [403, 429] or waf):
                         self.stats["blocked"] += 1
+                        self.consecutive_blocks += 1
                         self.shadow_manager.report_failure(shadow_node)
                         
-                        console.print(f"[bold red][🛡️ WAF] Blocked on node {shadow_node} ({resp.status_code}/{waf}). Attempting Distributed Burst...[/bold red]")
+                        console.print(f"[bold red][🛡️ WAF] Blocked on node {shadow_node} ({resp.status_code}/{waf}). Attempt {attempt+1}/{max_attempts}[/bold red]")
+                        
+                        # Sentient Behavioral Evasion: 3 consecutive blocks
+                        if self.consecutive_blocks >= 3:
+                            async with self.evasion_lock:
+                                if self.consecutive_blocks >= 3:
+                                    console.print("[bold purple][👻 GHOST] Behavioral Evasion Triggered: Heavy blocking detected. Entering Deceptive Cooling Loop...[/bold purple]")
+                                    
+                                    # 1. Rotate Fingerprint & UA
+                                    self._rotate_ghost_profile()
+                                    
+                                    # 2. Random Benign Request
+                                    await self._perform_benign_request(url)
+                                    
+                                    # 3. Circuit Breaker Cooling
+                                    await asyncio.sleep(random.uniform(10, 20))
+                                    self.consecutive_blocks = 0
                         
                         # Circuit Breaker: If attempt 2 fails, wait longer
                         if attempt == 1:
@@ -278,3 +349,26 @@ class AuraSession:
 
     async def get(self, url, **kwargs): return await self.request("GET", url, **kwargs)
     async def post(self, url, **kwargs): return await self.request("POST", url, **kwargs)
+
+    def _rotate_ghost_profile(self):
+        """v38.0: Forces a hard rotation of TLS/UA fingerprints."""
+        params = self.stealth.get_stealth_params()
+        self.active_ua = params["headers"]["User-Agent"]
+        self.active_impersonate = params["impersonate"]
+        console.print(f"[dim purple][*] Ghost Profile shifted: {self.active_impersonate} mimicry enabled.[/dim purple]")
+
+    async def _perform_benign_request(self, original_url: str):
+        """v38.0: Injects a random 'safe' request to mimic real user behavior."""
+        try:
+            parsed = urlparse(original_url)
+            base = f"{parsed.scheme}://{parsed.netloc}"
+            benign_paths = ["/", "/robots.txt", "/favicon.ico", "/assets/app.css", "/api/v1/health"]
+            target = urljoin(base, random.choice(benign_paths))
+            
+            console.print(f"[dim blue][🎭] Deception: Fetching benign {target} to clear behavioral profile...[/dim blue]")
+            
+            # Use raw httpx or low-level request to avoid recursion
+            async with httpx.AsyncClient(verify=False, timeout=10) as client:
+                await client.get(target, headers={"User-Agent": random.choice(self.stealth.USER_AGENTS)})
+        except Exception:
+            pass

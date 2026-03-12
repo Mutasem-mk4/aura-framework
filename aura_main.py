@@ -68,6 +68,7 @@ def main():
     parser.add_argument("--model", default="llama3.1", help="Ollama model")
     parser.add_argument("--proxy-file", default=None, help="[v3] Path to a list of proxies for Phantom Routing (WAF evasion)")
     parser.add_argument("--targets", action="store_true", help="[v3] 🎯 Target Hunter: Fetch and display fresh, profitable bug bounty programs")
+    parser.add_argument("--experimental-orchestrator", action="store_true", help="[Dev] Run the new decoupled Mission Pipeline")
 
     args = parser.parse_args()
 
@@ -77,7 +78,17 @@ def main():
 
     if args.auto and args.target:
         console.print(f"[bold red][!] AUTO FLAG DETECTED - ENGAGING ZENITH PROTOCOL[/bold red]")
-        asyncio.run(_run_mission(args.target))
+        if args.experimental_orchestrator:
+            from aura.core.context import MissionContext
+            from aura.core.pipeline import MissionPipeline
+            async def _run_pipeline():
+                context = MissionContext(target=args.target, args=args)
+                pipeline = MissionPipeline(context)
+                # phases to be added
+                await pipeline.execute_all()
+            asyncio.run(_run_pipeline())
+        else:
+            asyncio.run(_run_mission(args.target))
     elif args.nexus:
         from aura.core.orchestrator import NeuralOrchestrator
         from aura.core.nexus import launch_nexus

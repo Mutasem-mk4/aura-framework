@@ -14,9 +14,10 @@ console = Console()
 
 
 async def _run_mission(target: str, swarm: bool = False):
+    from aura.ui.zenith_ui import ZenithUI
     from aura.core.orchestrator import NeuralOrchestrator
     orchestrator = NeuralOrchestrator()
-    console.print(f"[bold cyan]🚀 Initializing Omni-Sovereign Mission on: {target}[/bold cyan]")
+    ZenithUI.banner(f"OMNI-SOVEREIGN MISSION", f"Target: {target} | Swarm Mode: {swarm}")
     await orchestrator.execute_advanced_chain(target, swarm_mode=swarm)
 
 
@@ -40,6 +41,13 @@ async def _run_crawl(target: str, victim: bool = False):
 
 
 def main():
+    import sys
+    try:
+        if sys.stdout.encoding.lower() != 'utf-8':
+            sys.stdout.reconfigure(encoding='utf-8')
+    except AttributeError:
+        pass
+
     parser = argparse.ArgumentParser(
         prog="aura",
         description="AURA v2 — Professional Bug Bounty & Pentest Framework",
@@ -93,6 +101,9 @@ Examples:
     parser.add_argument("--swarm", action="store_true", help="[Phase 7] 🌩️ DISTRIBUTED SWARM: Dispatch tasks to RabbitMQ/Celery cluster")
 
     args = parser.parse_args()
+
+    from aura.ui.zenith_ui import ZenithUI
+    ZenithUI.show_startup_banner()
 
     from aura.core import state
     if args.free_ai:
@@ -161,7 +172,7 @@ Examples:
     elif args.burp:
         from aura.modules.burp_reader import run_burp_import
         console.print(f"[bold yellow]📊 Importing Burp XML: {args.burp}[/bold yellow]")
-        target = args.target or (self.target_filter if hasattr(args, 'target_filter') else None)
+        target = getattr(args, 'target', None)
         run_burp_import(args.burp, target=args.target)
     elif args.submit:
         from aura.modules.submitter_v2 import run_submit
@@ -184,9 +195,9 @@ Examples:
         console.print(f"[bold bright_red]🔐 Auth Logic Scan: {args.target}[/bold bright_red]")
         run_auth_scan(args.target)
     elif args.sqli and args.target:
-        from aura.modules.sqli_engine import run_sqli_scan
+        from aura.modules.sqli_engine import run_deep_sqli_scan
         console.print(f"[bold yellow]🟠 SQLi Scan: {args.target}[/bold yellow]")
-        run_sqli_scan(args.target, discovery_map_path=args.map)
+        run_deep_sqli_scan(args.target)
     elif args.web and args.target:
         from aura.modules.web_engine import run_web_scan
         console.print(f"[bold bright_blue]🛡️  Web Security Scan: {args.target}[/bold bright_blue]")

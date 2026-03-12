@@ -26,6 +26,7 @@ import urllib.parse
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+import typing
 
 import requests
 from requests.exceptions import ConnectionError, Timeout
@@ -102,6 +103,62 @@ class BolaTester:
                 cookies[name.strip()] = value.strip()
         return cookies
 
+    def _extract_context(self) -> dict:
+        """
+        [Auth Matrix Core]
+        Extracts known IDs (UUIDs, user IDs, emails) belonging to the Attacker
+        and the Victim to enable strategic parameter swapping.
+        """
+        context = {
+            "attacker": {"ids": [], "emails": []},
+            "victim": {"ids": [], "emails": []}
+        }
+        
+        # Helper to extract from common profile endpoints
+        def _fetch_profile(cookies, role):
+            for path in ["/api/v1/me", "/api/me", "/api/v1/profile", "/api/user", "/profile"]:
+                resp = self._request("GET", self.target + path, cookies)
+                if resp["status"] == 200 and resp["body"]:
+                    try:
+                        data = json.loads(resp["body"])
+                        # Extract IDs
+                        for key in ["id", "user_id", "userId", "uid", "customerId", "uuid", "account_id"]:
+                            val = data.get(key)
+                            if val and str(val) not in context[role]["ids"]:
+                                context[role]["ids"].append(str(val))
+                                print(f"  [Matrix] Extracted {role} ID: {val}")
+                        # Extract Emails
+                        for key in ["email", "emailAddress", "username"]:
+                            val = data.get(key)
+                            if val and str(val) not in context[role]["emails"]:
+                                context[role]["emails"].append(str(val))
+                    except Exception:
+                        pass
+
+        print("\n[🎯] Initializing Auth Matrix Context...")
+        _fetch_profile(self.attacker_cookies, "attacker")
+        if not self.single_account_mode:
+            _fetch_profile(self.victim_cookies, "victim")
+            
+        return context
+
+    def _swap_payload(self, original_data: str, attacker_ids: list, victim_ids: list) -> str:
+        """
+        Replaces attacker's known IDs/emails in the payload with the victim's
+        to attempt unauthorized cross-tenant data modification.
+        """
+        if not original_data or not attacker_ids or not victim_ids:
+            return original_data
+            
+        swapped = original_data
+        # Replace first attacker ID with first victim ID (most common BOLA case)
+        # e.g. {"user_id": 901} -> {"user_id": 902}
+        if len(attacker_ids) > 0 and len(victim_ids) > 0:
+             swapped = swapped.replace(str(attacker_ids[0]), str(victim_ids[0]))
+             
+        # Can scale this to swap emails or UUIDs later
+        return swapped
+
     def _request(
         self,
         method: str,
@@ -109,7 +166,7 @@ class BolaTester:
         cookies: dict,
         body: Optional[str] = None,
         extra_headers: Optional[dict] = None,
-    ) -> dict:
+    ) -> dict[str, typing.Any]:
         """Makes a single HTTP request and returns a structured result."""
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -233,11 +290,12 @@ class BolaTester:
 
         return False, f"No clear BOLA signal (victim status: {v_status}, length: {v_len})"
 
-    def test_endpoint(self, endpoint: dict) -> Optional[dict]:
+    def test_endpoint(self, endpoint: dict, context: dict = None) -> Optional[dict]:
         """
         Tests a single endpoint for BOLA by:
         1. Making the request as ATTACKER → baseline
         2. Replaying as VICTIM → check unauthorized access
+        [Auth Matrix Edition] - Swaps attacker's payload IDs with victim's IDs during replay.
         """
         url = endpoint["url"]
         method = endpoint.get("method", "GET")
@@ -253,37 +311,65 @@ class BolaTester:
             print(f"     ⚠️  Skipping — Attacker didn't get 2xx (got {attacker_resp['status']})")
             return None
 
-        # Step 2: Victim request (using EXACT same URL/body as attacker)
-        self.tested_count += 1
-        victim_resp = self._request(method, url, self.victim_cookies, body=post_data)
-        print(f"     👥 Victim:   HTTP {victim_resp['status']} ({victim_resp['length']} bytes)")
+        # [Auth Matrix] Prepare malicious request (Swapping logic)
+        malicious_url = url
+        malicious_body = post_data
+        
+        if context and not self.single_account_mode:
+            # Swap in the URL (e.g. /api/users/901 -> /api/users/902)
+            if context["attacker"]["ids"] and context["victim"]["ids"]:
+                a_id = context["attacker"]["ids"][0]
+                v_id = context["victim"]["ids"][0]
+                malicious_url = malicious_url.replace(a_id, v_id)
+                
+            # Swap in the body (e.g. {"user_id": 901} -> {"user_id": 902})
+            if post_data:
+                malicious_body = self._swap_payload(
+                    post_data, 
+                    context["attacker"]["ids"], 
+                    context["victim"]["ids"]
+                )
+                if malicious_body != post_data:
+                    print(f"     [Matrix] Injected Victim ID/Data into payload.")
 
-        # Step 3: Compare
-        is_bola, reason = self._compare_responses(attacker_resp, victim_resp)
+        # Step 2: Victim request (Attempting to touch Attacker's resource or Attacker touching Victim's)
+        # Note: The classic IDOR is Attacker reaching Victim's data. 
+        # Here we use Attacker's token, but request Victim's ID (malicious_url/body).
+        # We need to test if Attacker (using their own cookie) can access Victim's data.
+        self.tested_count += 1
+        
+        # Send using ATTACKER cookies, but aiming at VICTIM'S ID
+        # (This is horizontal privilege escalation / BOLA)
+        victim_data_resp = self._request(method, malicious_url, self.attacker_cookies, body=malicious_body)
+        print(f"     🦹 Attacker (targeting Victim ID): HTTP {victim_data_resp['status']} ({victim_data_resp['length']} bytes)")
+
+        # Step 3: Compare Attacker's success vs Attacker attempting to hit Victim's scope
+        # If the attacker successfully modified or retrieved the victim's data, we have a critical finding.
+        is_bola, reason = self._compare_responses(attacker_resp, victim_data_resp)
 
         if is_bola:
             print(f"     🚨 {reason}")
             finding = {
-                "url": url,
+                "url": malicious_url,
                 "method": method,
-                "reason": reason,
+                "reason": f"Auth Matrix Injection: {reason}",
                 "attacker_status": attacker_resp["status"],
                 "attacker_len": attacker_resp["length"],
-                "victim_status": victim_resp["status"],
-                "victim_len": victim_resp["length"],
-                "victim_body_snippet": victim_resp["body"][:300],
+                "victim_status": victim_data_resp["status"],
+                "victim_len": victim_data_resp["length"],
+                "victim_body_snippet": victim_data_resp["body"][:300],
                 "ids_in_url": endpoint.get("ids", []),
                 "source_page": endpoint.get("source_page", ""),
                 "timestamp": datetime.utcnow().isoformat(),
-                "severity": "HIGH",
-                "cvss_score": 8.1,
-                "owasp": "A01:2021 — Broken Access Control",
+                "severity": "CRITICAL" if method in ["POST", "PUT", "PATCH", "DELETE"] else "HIGH",
+                "cvss_score": 9.1 if method in ["POST", "PUT", "PATCH", "DELETE"] else 8.1,
+                "owasp": "A01:2021 — Broken Access Control (BOLA)",
                 "type": "BOLA / IDOR",
             }
             self.confirmed_idors.append(finding)
             return finding
         else:
-            print(f"     ✅ {reason}")
+            print(f"     ✅ Secure (Denied or Not Applicable)")
             return None
 
     def run_from_discovery_map(self, map_path: str) -> list[dict]:
@@ -291,13 +377,13 @@ class BolaTester:
         Main entry point: loads a Discovery Map from the Crawler
         and runs BOLA tests on all IDOR candidates.
         """
-        map_path = Path(map_path)
-        if not map_path.exists():
+        map_file = Path(map_path)
+        if not map_file.exists():
             print(f"❌ Discovery map not found: {map_path}")
             print("   Run: aura <target> --crawl  first!")
             return []
 
-        with open(map_path, "r", encoding="utf-8-sig") as f:
+        with open(map_file, "r", encoding="utf-8-sig") as f:
             discovery_map = json.load(f)
 
         meta = discovery_map.get("meta", {})
@@ -346,6 +432,8 @@ class BolaTester:
         print(f"\n🚀 Starting {len(all_endpoints)} BOLA tests...") 
         if self.single_account_mode:
             print("   ⚠️  Single-account mode (no victim token) — results need manual verification")
+            
+        context = self._extract_context()
 
         for ep in all_endpoints:
             if self.single_account_mode:
@@ -355,7 +443,7 @@ class BolaTester:
                 if nums:
                     self.confirmed_idors.extend(self._single_account_probe(url))
             else:
-                self.test_endpoint(ep)
+                self.test_endpoint(ep, context)
 
         return self._finalize_report(meta)
 
@@ -380,7 +468,7 @@ class BolaTester:
 
         probe_findings = []
         for path_template in BLIND_PROBE_PATHS:
-            base_id = own_id or 1000
+            base_id = int(own_id) if own_id is not None else 1000
             for delta in [-2, -1, 1, 2]:
                 test_id = base_id + delta
                 url = self.target + path_template.replace("{id}", str(test_id))

@@ -138,14 +138,38 @@ class ReconPipeline:
 
     # ─── Stage 2: HTTP Probing ────────────────────────────────────────────────
 
-    async def stage2_httpx(self, hosts: list[str]) -> list[dict]:
+    async def stage2_httpx(self, hosts: list[str], stealth_mode: bool = False) -> list[dict]:
         """Probes hosts for live HTTP services using httpx CLI or aiohttp fallback."""
         if self._has_httpx:
             console.print(f"[cyan][🌐 Recon] Stage 2: HTTPX → probing {len(hosts)} hosts...[/cyan]")
             try:
                 input_hosts = "\n".join(hosts)
+                
+                # Base httpx command
+                cmd_args = ["-silent", "-json", "-title", "-tech-detect", "-status-code", "-k"]
+                
+                if stealth_mode:
+                    console.print("[yellow][!] Stealth Mode: Adding randomized browsers headers and rate limiting to HTTPX.[/yellow]")
+                    import random
+                    user_agents = [
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15",
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0"
+                    ]
+                    # Add jitter, rate limits, and custom headers
+                    cmd_args.extend([
+                        "-H", f"User-Agent: {random.choice(user_agents)}",
+                        "-H", "Accept-Language: en-US,en;q=0.9",
+                        "-H", "Sec-Fetch-Dest: document",
+                        "-H", "Sec-Fetch-Mode: navigate",
+                        "-H", "Sec-Fetch-Site: none",
+                        "-rl", "5",        # 5 requests per second
+                        "-c", "2",         # Low concurrency
+                        "-delay", "2s"     # Delay between requests
+                    ])
+                
                 proc = await asyncio.create_subprocess_exec(
-                    self.httpx_path, "-silent", "-json", "-title", "-tech-detect", "-status-code", "-k",
+                    self.httpx_path, *cmd_args,
                     stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.DEVNULL
@@ -268,57 +292,52 @@ class ReconPipeline:
                 console.print(f"[green]  [+] {ip}:{r['port']} open → {r['version'][:60]}[/green]")
         return services
 
-    # ─── Stage 4: Katana Deep Crawling (v21.0 Go-Arsenal) ─────────────────────
+    # ─── Stage 4: Katana Deep Crawling (v25.0 Go-Arsenal) ─────────────────────
 
     async def stage4_katana(self, target_urls: list[str]) -> list[str]:
-        """v25.0 OMEGA: Resilient Katana execution with deep error tracking."""
+        """v38.0 OMEGA: Resilient Katana execution with deep-crawl fallback."""
         if not self._has_katana or not target_urls:
             return []
 
         console.print(f"[cyan][🌐 Recon] Stage 4: Katana → Deep crawling {len(target_urls)} HTTP services...[/cyan]")
-        discovered_endpoints = set()
-        
         try:
-            input_hosts = "\n".join(target_urls)
-            # -jc: json output, -kf: known files, -d: depth 3
-            proc = await asyncio.create_subprocess_exec(
-                self.katana_path, "-silent", "-jc", "-kf", "all", "-d", "3",
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE # Capture stderr for debugging
-            )
+            discovered_links = await self._run_katana_core(target_urls, depth=3)
+            if not discovered_links and target_urls:
+                console.print("[bold yellow][!] Katana: No results. Triggering Deep-Dive Headless Fallback...[/bold yellow]")
+                discovered_links = await self._run_katana_core(target_urls, depth=5, extra_args=["-js-lu", "-js-crawl", "-automatic-form-fill"])
             
-            try:
-                stdout, stderr = await asyncio.wait_for(
-                    proc.communicate(input=input_hosts.encode()), timeout=300 # Increased timeout for OMEGA
-                )
-            except asyncio.TimeoutError:
-                if proc.returncode is None:
-                    try: proc.kill()
-                    except: pass
-                console.print("[dim red][!] Katana: Process timed out after 300s. Partial results may be lost.[/dim red]")
-                return []
+            console.print(f"[bold red][🔥] Katana Complete: Discovered {len(discovered_links)} deep endpoints/files![/bold red]")
+            return discovered_links
+        except Exception as e:
+            console.print(f"[yellow][!] Katana: Systemic execution error: {e}[/yellow]")
+        return []
 
-            if proc.returncode != 0:
-                err_msg = stderr.decode('utf-8', 'ignore').strip()
-                console.print(f"[dim red][!] Katana: Process exited with code {proc.returncode}. Error: {err_msg}[/dim red]")
+    async def _run_katana_core(self, target_urls: list[str], depth: int = 3, extra_args: list[str] = None) -> list[str]:
+        """v38.0: Core Katana execution logic with JSON parsing."""
+        discovered = set()
+        input_hosts = "\n".join(target_urls)
+        cmd = [self.katana_path, "-silent", "-jc", "-kf", "all", "-d", str(depth), "-hl"]
+        if extra_args:
+            cmd.extend(extra_args)
             
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        try:
+            stdout, _ = await asyncio.wait_for(proc.communicate(input=input_hosts.encode()), timeout=400)
             for line in stdout.decode('utf-8', 'ignore').splitlines():
                 try:
                     data = json.loads(line)
                     req_url = data.get("request", {}).get("endpoint")
-                    if req_url:
-                        discovered_endpoints.add(req_url)
+                    if req_url: discovered.add(req_url)
                 except: pass
-                
-            console.print(f"[bold red][🔥] Katana Complete: Discovered {len(discovered_endpoints)} deep endpoints/files![/bold red]")
-            return list(discovered_endpoints)
-        except FileNotFoundError:
-            console.print(f"[dim red][!] Katana: Binary not found at {self.katana_path}[/dim red]")
-        except Exception as e:
-            console.print(f"[yellow][!] Katana: Systemic execution error: {e}[/yellow]")
-            
-        return []
+        except asyncio.TimeoutError:
+            try: proc.kill()
+            except: pass
+        return list(discovered)
 
     # ─── Full Pipeline ────────────────────────────────────────────────────────
 
@@ -358,7 +377,7 @@ class ReconPipeline:
 
         # Stage 2
         all_hosts = [domain] + subdomains
-        http_data = await self.stage2_httpx(all_hosts)
+        http_data = await self.stage2_httpx(all_hosts, stealth_mode=stealth_mode)
 
         # Stage 3
         ip = target_ip or domain

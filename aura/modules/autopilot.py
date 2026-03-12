@@ -50,7 +50,12 @@ PHASES = [
     {"id": 8, "name": "BOLA / IDOR Hunt",      "icon": "🎯", "flag": "hunt",   "color": "magenta"},
     {"id": 9, "name": "API & GraphQL",         "icon": "🔮", "flag": "api",    "color": "bright_magenta"},
     {"id": 10, "name": "SQL Injection",        "icon": "🟠", "flag": "sqli",   "color": "orange1"},
-    {"id": 11, "name": "Report Generation",    "icon": "📋", "flag": "report", "color": "green"},
+    {"id": 11, "name": "Race Conditions",      "icon": "⚡", "flag": "race",   "color": "red_violet"},
+    {"id": 12, "name": "JWT & ATO",            "icon": "🎟",  "flag": "jwt",    "color": "bright_cyan"},
+    {"id": 13, "name": "HTTP Smuggling",       "icon": "📦", "flag": "smuggle","color": "orange3"},
+    {"id": 14, "name": "Template Injection",   "icon": "🧨", "flag": "ssti",   "color": "red1"},
+    {"id": 15, "name": "Prototype Pollution",  "icon": "🧬", "flag": "prototype","color":"bright_magenta"},
+    {"id": 16, "name": "Report Generation",    "icon": "📋", "flag": "report", "color": "green"},
 ]
 
 
@@ -137,13 +142,22 @@ class AuraAutopilot:
     def _run_phase_web(self) -> list:
         try:
             from aura.modules.web_engine import WebSecurityEngine
+            from aura.modules.frontend_deconstructor import FrontendDeconstructor
+            findings = []
+            
+            # Professional Tier: Frontend Deconstructor
+            fe_deconstructor = FrontendDeconstructor(target=self.target)
+            fe_findings = asyncio.run(fe_deconstructor.run()) or []
+            findings.extend(fe_findings)
+            
             engine = WebSecurityEngine(
                 target=self.target,
                 cookies_str=self.attacker_cookies,
                 output_dir=str(self.output_dir),
                 proxy_file=self.proxy_file
             )
-            return engine.run()
+            findings.extend(engine.run() or [])
+            return findings
         except Exception as e:
             raise RuntimeError(f"Web: {e}")
 
@@ -239,12 +253,65 @@ class AuraAutopilot:
     def _run_phase_api(self) -> list:
         try:
             from aura.modules.api_engine import APIEngine
-            # APIEngine loads its own cookies from .env and has no cookies_str/output_dir args
-            engine = APIEngine(
+            from aura.modules.graphql_engine import GraphQLBreaker
+            from aura.modules.api_reaper import APIReaper
+            from aura.modules.graphql_reaper import GraphQLReaper
+            from aura.modules.stateful_logic_fuzzer import StatefulLogicFuzzer
+            findings = []
+            
+            # 1. Professional Tier: API Reaper
+            api_reaper = APIReaper(target=self.target)
+            reaper_findings = asyncio.run(api_reaper.run()) or []
+            findings.extend(reaper_findings)
+            
+            # 2. Professional Tier: GraphQL Reaper
+            gql_reaper = GraphQLReaper(target=self.target)
+            gql_reaper_findings = asyncio.run(gql_reaper.run()) or []
+            findings.extend(gql_reaper_findings)
+            
+            # 3. Standard API Engine
+            api_engine = APIEngine(
                 target=self.target,
                 discovery_map_path=self.discovery_map_path,
             )
-            return asyncio.run(engine.run()) or []
+            api_findings = asyncio.run(api_engine.run()) or []
+            findings.extend(api_findings)
+            
+            # 4. Standard GraphQL Breaker
+            gql_engine = GraphQLBreaker(target=self.target)
+            gql_findings = asyncio.run(gql_engine.run()) or []
+            findings.extend(gql_findings)
+            
+            # 5. Stateful Logic Fuzzer targeting found API endpoints
+            endpoints_to_fuzz = []
+            for ep in getattr(api_reaper, 'endpoints', []):
+                params_dict = {str(k): 1 for k in ep.get("params", {}).keys()}
+                fuzz_param_names = list(params_dict.keys())
+                if fuzz_param_names or ep.get("method") in ["POST", "PUT"]:
+                    endpoints_to_fuzz.append({
+                        "method": ep.get("method", "GET"),
+                        "path": ep.get("path", "/"),
+                        "params": params_dict,
+                        "data": params_dict if ep.get("method") != "GET" else {},
+                        "fuzz_params": fuzz_param_names,
+                        "fuzz_types": ["sqli", "xss", "path_traversal", "negative", "boolean_toggle"]
+                    })
+                    
+            if endpoints_to_fuzz:
+                console.print(f"  [⚡] Initiating Stateful Logic Fuzzer on {len(endpoints_to_fuzz)} endpoints...")
+                fuzzer = StatefulLogicFuzzer(base_url=self.target)
+                workflow = fuzzer.define_workflow("API_Fuzzing_Workflow", endpoints_to_fuzz)
+                asyncio.run(fuzzer.execute_workflow(workflow, mutate_only=True))
+                for finding in fuzzer.findings:
+                    findings.append({
+                        "type": finding.vuln_type, 
+                        "severity": finding.severity,
+                        "url": finding.evidence.get("path", self.target),
+                        "content": finding.description,
+                        "evidence": finding.evidence
+                    })
+            
+            return findings
         except Exception as e:
             raise RuntimeError(f"API: {e}")
 
@@ -264,14 +331,125 @@ class AuraAutopilot:
         except Exception as e:
             raise RuntimeError(f"SQLi: {e}")
 
+    def _run_phase_race(self) -> list:
+        try:
+            from aura.modules.race_hunter import RaceConditionHunter
+            engine = RaceConditionHunter()
+            
+            # RaceHunter needs URLs. We'll extract them from the discovery map.
+            targets = []
+            if self.discovery_map_path and Path(self.discovery_map_path).exists():
+                with open(self.discovery_map_path, encoding="utf-8-sig") as f:
+                    discovery_map = json.load(f)
+                    
+                # Extract URLs from the discovery map (which is usually a dict of endpoints or list)
+                if isinstance(discovery_map, dict):
+                    if "endpoints" in discovery_map:
+                        targets = [ep.get("url") for ep in discovery_map["endpoints"] if ep.get("url")]
+                    elif "spider_links" in discovery_map:
+                        targets = discovery_map["spider_links"]
+                elif isinstance(discovery_map, list):
+                    targets = discovery_map
+            
+            if not targets:
+                # Fallback to base URL
+                targets = [self.target]
+                
+            return asyncio.run(engine.scan_urls(targets))
+        except Exception as e:
+            raise RuntimeError(f"Race: {e}")
+
+    def _run_phase_jwt(self) -> list:
+        try:
+            from aura.modules.jwt_engine import TokenBreaker
+            token = os.getenv("AUTH_TOKEN_ATTACKER", "")
+            if not token:
+                return []
+                
+            engine = TokenBreaker(target=self.target, token=token)
+            
+            # Extract endpoints from discovery map
+            targets = []
+            if self.discovery_map_path and Path(self.discovery_map_path).exists():
+                with open(self.discovery_map_path, encoding="utf-8-sig") as f:
+                    discovery_map = json.load(f)
+                    
+                if isinstance(discovery_map, dict):
+                    eps = discovery_map.get("mutating_endpoints", []) + discovery_map.get("idor_candidates", [])
+                    targets = [ep for ep in eps if "url" in ep]
+            
+            if not targets:
+                targets = [{"url": f"{self.target}/api/v1/profile", "method": "GET"}]
+                
+            return asyncio.run(engine.scan_urls(targets))
+        except Exception as e:
+            raise RuntimeError(f"JWT: {e}")
+
+    def _run_phase_smuggle(self) -> list:
+        try:
+            from aura.modules.smuggle_engine import SmuggleHunter
+            engine = SmuggleHunter(
+                target=self.target,
+                output_dir=str(self.output_dir),
+            )
+            return asyncio.run(engine.run()) or []
+        except Exception as e:
+            raise RuntimeError(f"Smuggle: {e}")
+
+    def _run_phase_ssti(self) -> list:
+        try:
+            from aura.modules.ssti_engine import SSTIReaper
+            engine = SSTIReaper(
+                target=self.target,
+                output_dir=str(self.output_dir),
+            )
+            
+            # Extract endpoints from discovery map
+            targets = []
+            if self.discovery_map_path and Path(self.discovery_map_path).exists():
+                with open(self.discovery_map_path, encoding="utf-8-sig") as f:
+                    discovery_map = json.load(f)
+                    
+                if isinstance(discovery_map, dict):
+                    return asyncio.run(engine.run(discovery_map)) or []
+                    
+            # Fallback
+            dummy_map = {"all_api_calls": [{"url": self.target, "method": "GET"}]}
+            return asyncio.run(engine.run(dummy_map)) or []
+        except Exception as e:
+            raise RuntimeError(f"SSTI: {e}")
+
+    def _run_phase_prototype(self) -> list:
+        try:
+            from aura.modules.prototype_engine import PrototypeEngine
+            engine = PrototypeEngine(
+                target=self.target,
+                output_dir=str(self.output_dir),
+            )
+            
+            targets = []
+            if self.discovery_map_path and Path(self.discovery_map_path).exists():
+                with open(self.discovery_map_path, encoding="utf-8-sig") as f:
+                    discovery_map = json.load(f)
+                if isinstance(discovery_map, dict):
+                    return asyncio.run(engine.run(discovery_map)) or []
+                    
+            dummy_map = {"all_api_calls": [{"url": self.target, "method": "GET"}]}
+            return asyncio.run(engine.run(dummy_map)) or []
+        except Exception as e:
+            raise RuntimeError(f"Prototype: {e}")
+
     def _run_phase_report(self, findings: list) -> list:
-        """Generates professional reports for all confirmed findings."""
+        """Generates professional reports AND PoCs for all confirmed findings."""
         if not findings:
             console.print("  [dim]No findings to report — all clean![/dim]")
             return []
         try:
             from aura.modules.ai_analyst import ProfessionalReportGenerator
+            from aura.core.brain import AuraBrain
+            
             gen = ProfessionalReportGenerator(output_dir=str(self.output_dir))
+            brain = AuraBrain()
             generated = []
             for finding in findings:
                 try:
@@ -284,6 +462,17 @@ class AuraAutopilot:
                     console.print(f"  ✅ [green]Report:{severity}[/green] {title[:65]}")
                     console.print(f"     💾 {out_path}")
                     generated.append({"title": title, "severity": severity, "path": str(out_path)})
+                    
+                    # Autonomous PoC Generation for HIGH/CRITICAL
+                    if severity.upper() in ["CRITICAL", "HIGH", "MEDIUM"]:
+                        try:
+                            console.print(f"  [⚡] Generating Autonomous PoC script for {title}...")
+                            script = brain.generate_exploit_script(finding.get("type", "vuln"), finding.get("content", ""), self.target_domain)
+                            poc_path = self.output_dir / f"poc_{slug}_{ts}.py"
+                            poc_path.write_text(script, encoding="utf-8")
+                            console.print(f"     🔥 PoC Extracted: {poc_path}")
+                        except Exception as p_e:
+                            console.print(f"     [dim red]PoC generation failed: {p_e}[/dim red]")
                 except Exception:
                     continue
             return generated
@@ -320,6 +509,11 @@ class AuraAutopilot:
             "hunt":   self._run_phase_hunt,
             "api":    self._run_phase_api,
             "sqli":   self._run_phase_sqli,
+            "race":   self._run_phase_race,
+            "jwt":    self._run_phase_jwt,
+            "smuggle": self._run_phase_smuggle,
+            "ssti":   self._run_phase_ssti,
+            "prototype": self._run_phase_prototype,
         }
 
         all_collected_findings = []

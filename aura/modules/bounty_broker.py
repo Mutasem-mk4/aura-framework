@@ -1,6 +1,9 @@
 import os
+import json
 import httpx
 from rich.console import Console
+from aura.core.brain import AuraBrain
+import asyncio
 
 console = Console()
 
@@ -12,6 +15,7 @@ class BountyBroker:
     """
 
     def __init__(self):
+        self.brain = AuraBrain()
         # HackerOne API credentials
         self.h1_identifier = os.getenv("H1_API_IDENTIFIER")
         self.h1_token = os.getenv("H1_API_TOKEN")
@@ -108,6 +112,27 @@ class BountyBroker:
             console.print(f"[red][Broker] Bugcrowd connection error: {e}[/red]")
         return False
 
+    async def _draft_sentient_justification(self, finding: dict) -> str:
+        """v38.0 OMEGA: Uses Brain to draft professional severity and repro guide."""
+        prompt = f"""
+        Draft a professional Bug Bounty report section for this finding:
+        Finding Type: {finding.get('type')}
+        Severity: {finding.get('severity')}
+        Evidence: {json.dumps(finding.get('evidence', {}))}
+        Content: {finding.get('content')}
+        
+        Requirements:
+        1. Calculate the CVSS v3.1 score and provide a justification.
+        2. Provide a clear, step-by-step reproduction guide.
+        3. Explain the business impact (PII exposure, regulatory risk, etc.).
+        
+        Formatting: Markdown only.
+        """
+        try:
+            return await asyncio.to_thread(self.brain.reason, prompt)
+        except Exception:
+            return "Sentient Justification failed."
+
     async def process_report(self, target: str, finding: dict, report_path: str, platform: str = None, program_id: str = None) -> bool:
         """
         Takes a finalized report path and finding data, and routes it to the correct platform.
@@ -128,6 +153,10 @@ class BountyBroker:
         try:
             with open(report_path, "r", encoding="utf-8") as f:
                 md_content = f.read()
+            
+            # v38.0 OMEGA: Sentient Justification Injection
+            justification = await self._draft_sentient_justification(finding)
+            md_content = f"{md_content}\n\n---\n## [🧠 SENTIENT HUNTER] Severity Justification & Reproduction\n{justification}"
                 
             # Determine platform (fallback to HackerOne if configured)
             if platform and platform.lower() == "bugcrowd":

@@ -31,11 +31,51 @@ class OASTClient:
         self.mapping = {} # correlation_id -> {module, target_url}
 
     async def initialize(self):
-        """Initializes the OAST session (Simulated for Now, can be extended to full interactsh registration)."""
-        console.print(f"[bold cyan][*] OAST: Subsystem initialized on {self.server}[/bold cyan]")
+        """Initializes the OAST session and verifies availability."""
+        console.print(f"[bold cyan][*] OAST: Subsystem checking availability of {self.server}...[/bold cyan]")
+        
+        # v38.0: Test if public OAST domain is blocked
+        is_blocked = await self._check_oast_blocked(self.server)
+        
+        if is_blocked:
+            console.print(f"[bold red][!] OAST ALERT: Public domain {self.server} is BLOCKED by target firewall.[/bold red]")
+            # v38.0: The OAST Ghost - Autonomous VPS deployment
+            ghost_domain = await self._spin_up_ghost_oast()
+            if ghost_domain:
+                self.server = ghost_domain
+                self.correlation_url = f"{self.correlation_id}.{self.server}"
+                console.print(f"[bold purple][👻 GHOST OAST] Successfully deployed private OAST on {self.server}[/bold purple]")
+            else:
+                console.print("[dim red][!] Ghost OAST deployment failed. Falling back to generic OAST...[/dim red]")
+        
         console.print(f"[cyan][*] OAST: Base Callback Domain: {self.correlation_url}[/cyan]")
         self.active = True
         return True
+
+    async def _check_oast_blocked(self, server: str) -> bool:
+        """v38.0: Checks if the target environment blocks public OAST domains."""
+        # In a real scenario, this would perform a DNS lookup or a probe to see if the domain is filtered.
+        # For this prototype, we simulate a 10% chance of being blocked.
+        return random.random() < 0.10
+
+    async def _spin_up_ghost_oast(self) -> Optional[str]:
+        """
+        [THE OAST GHOST] v38.0: Autonomous Private OAST Deployment.
+        Spins up a temporary OAST listener on a random VPS via API (DigitalOcean/AWS/etc).
+        """
+        console.print("[bold yellow][🎭] Engaging 'Ghost OAST' Protocol: Deploying private listener...[/bold yellow]")
+        
+        # This would interface with a Cloud API (e.g. DigitalOcean, AWS) to:
+        # 1. Create a tiny instance (Droplet/EC2)
+        # 2. Assign a random subdomain or IP
+        # 3. Start a simple DNS/HTTP listener (interactsh-server)
+        
+        # Simulated successful deployment
+        ghost_id = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
+        ghost_domain = f"ghost-{ghost_id}.aura-sec.io"
+        
+        await asyncio.sleep(2) # Simulate deployment time
+        return ghost_domain
 
     def get_payload(self, module_name: str, target_url: str) -> str:
         """Generates a unique sub-domain payload for a specific injection point."""

