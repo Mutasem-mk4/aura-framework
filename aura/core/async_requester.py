@@ -114,9 +114,11 @@ class AsyncRequester:
         """
         tasks = []
         for req in requests:
-            method = req.pop("method", "GET")
-            url = req.pop("url")
-            tasks.append(self.fetch(method, url, **req))
+            # v38.0: Create a copy to avoid mutating the original request dict
+            r_copy = req.copy()
+            method = r_copy.pop("method", "GET")
+            url = r_copy.pop("url")
+            tasks.append(self.fetch(method, url, **r_copy))
             
         return await asyncio.gather(*tasks, return_exceptions=True)
 

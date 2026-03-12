@@ -52,7 +52,7 @@ from aura.modules.open_redirect_engine import OpenRedirectEngine
 from aura.modules.file_upload_engine import FileUploadEngine
 from aura.modules.deserialize_engine import DeserializationEngine
 from aura.modules.ws_oauth_engine import WSAndOAuthEngine
-from aura.modules.ssti_engine import SSTIReaper
+from aura.modules.ssti_engine import SSTIEngine
 from aura.modules.smuggling_engine import SmugglingEngine
 from aura.modules.exploit_radar import ExploitRadar
 from aura.modules.dorks_intel import DorksIntel
@@ -243,6 +243,9 @@ class NeuralOrchestrator:
         from aura.modules.profit_engine import ProfitEngine
         self.profit_engine   = ProfitEngine()
         self.weapon_engine   = WeaponizationEngine(self.brain)
+        self.ssti_engine     = SSTIEngine(target="") # Target will be set or passed during run
+        self.smuggling_engine = SmugglingEngine(self.session)
+        self.ws_oauth_engine = WSAndOAuthEngine(self.session)
         from aura.modules.cloud_swarm import CloudSwarm
         self.cloud_swarm = CloudSwarm()
         self.plugins = []
@@ -576,6 +579,31 @@ class NeuralOrchestrator:
             all_findings.extend(graphql_findings)
         except Exception as e: console.print(f"[dim red]GraphQL Reaper error: {e}[/dim red]")
         
+        # 4. SSTI Reaper (SSTIEngine)
+        try:
+            self.ssti_engine.target = target_url
+            ssti_findings = await self.ssti_engine.run({"all_api_calls": [{"url": target_url}]}) # Passing minimal map if needed
+            all_findings.extend(ssti_findings)
+            for f in ssti_findings:
+                self.db.add_finding(recon_domain, f, f["type"], f["severity"], campaign_id)
+        except Exception as e: console.print(f"[dim red]SSTI Engine error: {e}[/dim red]")
+
+        # 5. HTTP Smuggling Engine
+        try:
+            smuggling_findings = await self.smuggling_engine.scan_target(target_url)
+            all_findings.extend(smuggling_findings)
+            for f in smuggling_findings:
+                self.db.add_finding(recon_domain, f, f["type"], f["severity"], campaign_id)
+        except Exception as e: console.print(f"[dim red]Smuggling Engine error: {e}[/dim red]")
+
+        # 6. WebSocket & OAuth Engine
+        try:
+            ws_oauth_findings = await self.ws_oauth_engine.scan_target(target_url)
+            all_findings.extend(ws_oauth_findings)
+            for f in ws_oauth_findings:
+                self.db.add_finding(recon_domain, f, f["type"], f["severity"], campaign_id)
+        except Exception as e: console.print(f"[dim red]WS+OAuth Engine error: {e}[/dim red]")
+
         # Neural-Chain: Feed to StatefulLogicFuzzer
         if endpoints_to_fuzz:
             status.update(f"[bold red][⛓️] Neural-Chain: Feeding {len(endpoints_to_fuzz)} precise routes to StatefulLogicFuzzer...")
@@ -623,6 +651,14 @@ class NeuralOrchestrator:
         status.update(f"[bold green]Generating strategic reports and submitting bugs...")
         stack_name = tech_stack[0].split("/")[0] if (isinstance(tech_stack, list) and tech_stack) else "Generic"
         report_paths = await self.reporter.finalize_mission(recon_domain, vulns, tech_stack=stack_name)
+        
+        if report_paths:
+            console.print(f"\n[bold green][✓] Reports generated successfully:[/bold green]")
+            for path in report_paths:
+                console.print(f"  [cyan]↳ {path}[/cyan]")
+        else:
+            console.print(f"\n[bold yellow][!] No confirmed high-severity findings for reporting.[/bold yellow]")
+            
         self.db.save_target({"target": recon_domain, "status": "COMPLETED"})
         return report_paths
 

@@ -122,6 +122,7 @@ class CloudHunter:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.timeout = timeout
         self.findings: list[dict] = []
+        self.tested: set[str] = set()
         self.oob = OOBClient()
 
     @staticmethod
@@ -304,7 +305,11 @@ class CloudHunter:
             tasks.append(self._test_localhost_bypass(target_info))
             tasks.append(self._test_blind_oob(target_info))
 
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        try:
+            results = await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=120)
+        except asyncio.TimeoutError:
+            console.print("[yellow]⚠️  SSRF scan timed out (120s limit reached). Processing partial results...[/yellow]")
+            results = []
         
         for result in results:
             if result and not isinstance(result, Exception):
@@ -341,15 +346,25 @@ class CloudHunter:
             console.print(f"\n  ✅ No direct Cloud SSRF discovered.")
 
 
-def run_ssrf_scan(target: str):
+def run_ssrf_scan(target: str, discovery_map_path: str = None):
     """CLI runner for direct execution."""
     import httpx
     engine = CloudHunter(target=target)
-    # Give it a dummy map for standalone testing
-    dummy_map = {
-         "all_api_calls": [{"url": target + "/proxy?url=test", "method": "GET"}]
-    }
-    return asyncio.run(engine.run(dummy_map))
+    
+    discovery_map = {}
+    if discovery_map_path and os.path.exists(discovery_map_path):
+        try:
+            with open(discovery_map_path, "r", encoding="utf-8") as f:
+                discovery_map = json.load(f)
+        except Exception as e:
+            console.print(f"[dim red]Error loading discovery map: {e}[/dim red]")
+
+    if not discovery_map:
+        # Give it a dummy map for standalone testing
+        discovery_map = {
+             "all_api_calls": [{"url": target + "/proxy?url=test", "method": "GET"}]
+        }
+    return asyncio.run(engine.run(discovery_map))
 
 if __name__ == "__main__":
     import sys

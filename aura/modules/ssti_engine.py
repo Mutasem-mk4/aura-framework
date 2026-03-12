@@ -92,7 +92,7 @@ WAF_SIGS = ["cloudflare", "attention required", "ray id", "security challenge",
             "captcha", "blocked", "incident id", "firewall", "403 forbidden"]
 
 
-class SSTIReaper:
+class SSTIEngine:
     """v34.0: Code Execution & Template Injection Hunter."""
 
     def __init__(self, target: str, cookies_str: str = "", output_dir: str = "./reports", timeout: int = 15):
@@ -194,9 +194,13 @@ class SSTIReaper:
                     if any(sig in text for sig in WAF_SIGS):
                         continue # WAF block
 
-                    # Strict Reflection Check (if input literal is in output, it's not a math eval)
-                    if probe.lower() in text and expected != "7777777":
-                        continue
+                    # Strict Reflection Check: If the probe ITSELF is in text, it might just be echoing.
+                    # UNLESS the expected value (e.g. 49) is NOT in the probe itself.
+                    # If probe is "{{7*7}}" and text contains "49", but NOT "{{7*7}}", then it's SSTI.
+                    if probe.lower() in text and expected not in ["7777777"]:
+                         # Check if the literal math expression is present
+                         if f"{a}*{b}" in text or f"{a} * {b}" in text:
+                             continue # Just echoing the math
                         
                     return {
                         "url": url,
@@ -204,7 +208,8 @@ class SSTIReaper:
                         "param": param,
                         "probe": probe,
                         "engine": engine,
-                        "snippet": resp.text[:400].strip()
+                        "snippet": resp.text[:400].strip(),
+                        "evidence_url": f"{url}?{param}={urllib.parse.quote(probe)}" if method == "GET" else url
                     }
         return None
 
@@ -301,7 +306,7 @@ class SSTIReaper:
 def run_ssti_scan(target: str):
     """CLI runner for direct execution."""
     # dummy map
-    engine = SSTIReaper(target=target)
+    engine = SSTIEngine(target=target)
     dummy_map = {
          "all_api_calls": [{"url": target + "?name=test", "method": "GET"}]
     }

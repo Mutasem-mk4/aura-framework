@@ -345,17 +345,28 @@ class DeepBlindSQLi:
         else:
             console.print(f"\n  ✅ No Blind SQLi vulnerabilities detected. Target appears clean.")
 
-def run_deep_sqli_scan(target: str):
+def run_sqli_scan(target: str, discovery_map_path: str = None):
     """CLI runner."""
     engine = DeepBlindSQLi(target=target)
-    dummy_map = {
-         "all_api_calls": [
-             {"url": target + "/products?id=1", "method": "GET"}
-         ]
-    }
-    return asyncio.run(engine.run(dummy_map))
+    
+    discovery_map = {}
+    if discovery_map_path and os.path.exists(discovery_map_path):
+        try:
+            with open(discovery_map_path, "r", encoding="utf-8") as f:
+                discovery_map = json.load(f)
+        except Exception as e:
+            console.print(f"[dim red]Error loading discovery map: {e}[/dim red]")
+
+    if not discovery_map:
+        # Give it a dummy map for standalone testing
+        discovery_map = {
+             "all_api_calls": [
+                 {"url": target + "/products?id=1", "method": "GET"}
+             ]
+        }
+    return asyncio.run(engine.run(discovery_map))
 
 if __name__ == "__main__":
     import sys
     url = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:5000"
-    run_deep_sqli_scan(url)
+    run_sqli_scan(url)

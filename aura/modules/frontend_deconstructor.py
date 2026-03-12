@@ -37,53 +37,68 @@ class FrontendDeconstructor:
         
         # v38.0: Recursive Discovery Initiation
         self.visited_scripts = set()
-        await self._recursive_js_hunt(self.target)
+        try:
+            await self._recursive_js_hunt(self.target)
+        except Exception as e:
+            console.print(f"[dim red][!] Recursive JS Hunt failed: {e}[/dim red]")
             
-        res = self.get_results()
-        for sec in res["secrets"]:
-            all_findings.append({
-                "type": f"Exposed Secret: {sec['type']}",
-                "severity": "HIGH",
-                "url": sec["origin"],
-                "content": f"Source Mining: Found {sec['type']} in reconstructed code.",
-                "evidence": sec
-            })
-            
-        for ep in res["endpoints"]:
-            all_findings.append({
-                "type": "Hidden API Endpoint",
-                "severity": "INFO", 
-                "url": self.target,
-                "content": f"Architectural Discovery: Extracted route `{ep}` from deconstructed source."
-            })
+        try:
+            res = self.get_results()
+            for sec in res["secrets"]:
+                all_findings.append({
+                    "type": f"Exposed Secret: {sec['type']}",
+                    "severity": "HIGH",
+                    "url": sec["origin"],
+                    "content": f"Source Mining: Found {sec['type']} in reconstructed code.",
+                    "evidence": sec.get("value", ""),
+                    "value": sec.get("value", ""),
+                    "confirmed": True
+                })
+
+            for ep in res["endpoints"]:
+                all_findings.append({
+                    "type": "Discovered Hidden Endpoint",
+                    "severity": "INFO",
+                    "url": self.target,
+                    "content": f"Source Mining: Discovered hidden API/Frontend endpoint: {ep}",
+                    "value": ep,
+                    "confirmed": True
+                })
+        except Exception as e:
+            console.print(f"[dim red][!] Error processing deconstructor results: {e}[/dim red]")
             
         return all_findings
 
-    async def deconstruct(self, js_url: str, content: str = ""):
-        """Attempts to find and parse .js.map for a given JS file."""
-        map_url = js_url + ".map"
-        try:
-            if not content:
+    async def deconstruct(self, js_url: str, content: str = None):
+        """v25.0: Fetches JS and looks for .map files."""
+        if not content:
+            try:
                 resp = await self.session.get(js_url)
                 if not resp or resp.status_code != 200: return
                 content = resp.text
+            except: return
 
-            # Check for sourcemap
-            try:
-                m_resp = await self.session.get(map_url)
-                if m_resp and m_resp.status_code == 200:
+        # Try to find sourceMappingURL
+        map_match = re.search(r'sourceMappingURL=([\w\./-]+\.map)', content)
+        try:
+            if map_match:
+                map_url = urljoin(js_url, map_match.group(1))
+                console.print(f"[dim cyan][✓] Sourcemap Found: {map_url}[/dim cyan]")
+                resp_map = await self.session.get(map_url)
+                if resp_map and resp_map.status_code == 200:
                     try:
-                        map_data = m_resp.json()
-                        console.print(f"[bold green][✓] Sourcemap Found: {m_resp.url}[/bold green]")
+                        import json
+                        map_data = json.loads(resp_map.text)
                         await self._parse_map(map_data, js_url)
-                    except Exception as e:
+                    except:
                         console.print(f"[dim red][!] Sourcemap parsing failed for {map_url}: Non-JSON or Corrupt. Falling back to raw mining...[/dim red]")
                         await self._mine_raw_js(content, js_url)
                 else:
                     await self._mine_raw_js(content, js_url)
-            except:
+            else:
                 await self._mine_raw_js(content, js_url)
-        except: pass
+        except:
+            await self._mine_raw_js(content, js_url)
 
     async def _recursive_js_hunt(self, url: str, depth: int = 0):
         """v38.0: Recursive JS bundle hunter."""

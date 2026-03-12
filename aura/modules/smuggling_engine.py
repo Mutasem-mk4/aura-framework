@@ -214,6 +214,7 @@ class SmugglingEngine:
                 "mitre": "T1190 – Exploit Public-Facing Application",
                 "content": evidence,
                 "url": target_url,
+                "evidence_url": target_url,
                 "confirmed": True,
                 "poc_evidence": evidence,
             })

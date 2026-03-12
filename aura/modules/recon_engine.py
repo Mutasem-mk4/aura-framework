@@ -351,10 +351,24 @@ class ReconEngine:
                 from aura.core.storage import AuraStorage
                 db = AuraStorage()
                 
-                with open(output_file, 'r', encoding='utf-8') as f:
-                    for line in f:
-                        try:
-                            finding = json.loads(line)
+                try:
+                    with open(output_file, 'r', encoding='utf-8') as f:
+                        content = f.read().strip()
+                        if not content:
+                            findings = []
+                        elif content.startswith("["):
+                            findings = json.loads(content)
+                        else:
+                            # Fallback to JSON lines
+                            findings = []
+                            for line in content.splitlines():
+                                if line.strip():
+                                    findings.append(json.loads(line))
+                        
+                        for finding in findings:
+                            if not isinstance(finding, dict):
+                                continue
+                                
                             severity = finding.get("info", {}).get("severity", "info").upper()
                             name = finding.get("info", {}).get("name", "Unknown Vuln")
                             url = finding.get("matched-at", self.target)
@@ -365,8 +379,8 @@ class ReconEngine:
                                 db.add_finding(self.target, details, f"Nuclei: {name}", severity)
                                 console.print(f"[bold red]► {severity}:[/bold red] [white]{name}[/white] at [yellow]{url}[/yellow]")
                                 findings_count += 1
-                        except json.JSONDecodeError:
-                            continue
+                except Exception as e:
+                    console.print(f"[red]❌ Error parsing Nuclei results: {e}[/red]")
                 
                 if findings_count == 0:
                     console.print("[dim green]✅ Nuclei Vanguard: No immediate low-hanging fruit found.[/dim green]")
