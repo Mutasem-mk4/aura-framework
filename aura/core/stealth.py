@@ -11,6 +11,29 @@ from typing import Dict, Optional, List
 from aura.core import state
 from aura.ui.zenith_ui import ZenithUI, console
 
+class MorphicHeaderEngine:
+    """v51.0 OMEGA: Generates evolving, high-entropy browser-like header sets."""
+    
+    @staticmethod
+    def generate(url: str = None) -> Dict[str, str]:
+        """Generates dynamic, authentic browser headers."""
+        engine = StealthEngine()
+        params = engine.get_stealth_params()
+        headers = params["headers"]
+        
+        # Add dynamic context
+        if url:
+            parsed = urlparse(url)
+            headers["Host"] = parsed.netloc
+            headers["Origin"] = f"{parsed.scheme}://{parsed.netloc}"
+            headers["Referer"] = f"{parsed.scheme}://{parsed.netloc}/"
+            
+        # Entropy injection: randomize order/minor variants
+        if random.random() > 0.5:
+            headers["Upgrade-Insecure-Requests"] = "1"
+        
+        return headers
+
 class SwarmManager:
     """v6.0: Manages a swarm of proxies and nodes with adaptive health tracking."""
     def __init__(self, proxies: List[str]):
@@ -118,6 +141,13 @@ class StealthEngine:
             "Generic": {"Transfer-Encoding": "chunked", "X-Real-IP": "127.0.0.1"}
         }
         return evasions.get(waf_type, evasions["Generic"])
+        
+    async def hunt_origin_ip(self, domain: str) -> list[str]:
+        """v33.1 Zenith: Attempts to discover the origin IP of a domain to bypass WAFs."""
+        console.print(f"[bold yellow][[STEALTH] ORIGIN-HUNT] Searching for origin IP of {domain}...[/bold yellow]")
+        # Placeholder for actual origin IP hunting logic (searching history, DNS records, etc.)
+        return []
+
 
     def get_morphic_delay(self) -> float:
         """v25.0 OMEGA+: Bio-Mimetic timing jitter to bypass Akamai Bot Manager."""

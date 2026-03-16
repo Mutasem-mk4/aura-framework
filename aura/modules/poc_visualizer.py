@@ -95,7 +95,7 @@ class PoCVisualizer:
         """
         Public method to generate proof. Wraps the capturing logic.
         """
-        if not poc_link or not poc_link.startswith("http"):
+        if not poc_link or not (poc_link.startswith("http") or poc_link.startswith("file://")):
             return None
             
         console.print(f"[bold magenta][*] Generating Visual Proof for {finding_type}...[/bold magenta]")

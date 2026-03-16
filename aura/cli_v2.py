@@ -69,6 +69,11 @@ Examples:
     parser.add_argument("target", nargs="?", help="Target domain (e.g. example.com)")
     parser.add_argument("--auto", action="store_true", help="[v2] 🚀 AUTOPILOT: run ALL engines (recon+auth+csrf+xss+hunt+api+sqli+report)")
     parser.add_argument("--skip", default="", metavar="PHASES", help="[v2] Skip specific autopilot phases by number (e.g. --skip 1,6)")
+    parser.add_argument("--profit", action="store_true", help="Calculate ROI for a target")
+    parser.add_argument("--earnings", action="store_true", help="Show cumulative projected earnings")
+    parser.add_argument("--setup", action="store_true", help="Initialize and check Zenith OS environment")
+    parser.add_argument("--status", action="store_true", help="Show Zenith system pulse and metrics")
+    parser.add_argument("--aggressive", action="store_true", help="Engage high-impact heavy weapons scanning")
     parser.add_argument("--nexus", action="store_true", help="Launch interactive Nexus War Room")
     parser.add_argument("--auto-submit", action="store_true", help="Enable autonomous bounty submission")
     parser.add_argument("--free-ai", action="store_true", help="Use local Ollama AI (zero cost)")
@@ -97,7 +102,7 @@ Examples:
     parser.add_argument("--web3", action="store_true", help="[v4] 🕸️ Web3 Engine: Audit Smart Contracts (Solidity/Rust) via AI and SAST tools")
     parser.add_argument("--ast", action="store_true", help="[v38] 🔬 Semantic AST Taint Analysis (Zero-FP JS auditing)")
     parser.add_argument("--logic-fuzz", action="store_true", help="[v38] 🧠 Stateful Logic Fuzzer (DAG-based API testing)")
-    parser.add_argument("--workflow", default=None, metavar="JSON_FILE", help="[v38] Load workflow from JSON file for the Logic Fuzzer")
+    parser.add_argument("--clinic", action="store_true", help="[v4] 🎓 CLINIC MODE: Educational tooltips for beginners")
     parser.add_argument("--swarm", action="store_true", help="[Phase 7] 🌩️ DISTRIBUTED SWARM: Dispatch tasks to RabbitMQ/Celery cluster")
 
     args = parser.parse_args()
@@ -105,7 +110,72 @@ Examples:
     from aura.ui.zenith_ui import ZenithUI
     ZenithUI.show_startup_banner()
 
-    from aura.core import state
+    if args.setup:
+        from rich.panel import Panel
+        from rich.table import Table
+        console.print(Panel("[bold cyan]Zenith OS: Global Environment Initialization[/bold cyan]"))
+        checks = [
+            ("Brain Engine (Gemini)", os.getenv("GEMINI_API_KEY")),
+            ("HackerOne API", os.getenv("H1_API_TOKEN")),
+            ("Intigriti API", os.getenv("INTIGRITI_API_TOKEN")),
+            ("Ollama (Local AI)", os.getenv("OLLAMA_HOST"))
+        ]
+        table = Table(title="Dependency Status")
+        table.add_column("Component", style="cyan")
+        table.add_column("Status", style="bold")
+        for name, key in checks:
+            status = "[green]ONLINE[/green]" if key else "[red]OFFLINE[/red]"
+            table.add_row(name, status)
+        console.print(table)
+        console.print("[yellow]Initial setup complete. Ready for the hunt.[/yellow]")
+        return
+
+    if args.status:
+        from aura.core.storage import AuraStorage
+        from rich.panel import Panel
+        storage = AuraStorage()
+        stats = storage.get_stats()
+        console.print(Panel(
+            f"Aura v33 Zenith [Pulse: STABLE]\n"
+            f"Findings Captured: {stats['findings']}\n"
+            f"Targets Mapped: {stats['targets']}\n"
+            f"Autopilot: {'ENABLED' if args.auto else 'DISABLED'}\n"
+            f"AI Validation: {'ACTIVE' if os.getenv('GEMINI_API_KEY') or os.getenv('OLLAMA_HOST') else 'OFFLINE'}",
+            title="Zenith System Status"
+        ))
+        return
+
+    if args.earnings:
+        from aura.core.storage import AuraStorage
+        from aura.core.profit_engine import profit_engine
+        storage = AuraStorage()
+        findings = storage.get_all_findings()
+        total_payout = 0
+        for f in findings:
+            payout_str = profit_engine.estimate_payout(f.get('finding_type', 'Vulnerability'), f.get('severity', 'MEDIUM'))
+            try:
+                # Basic extraction of the first number in the range, e.g., "$500 - $1000" -> 500
+                payout = int(payout_str.split('$')[1].split('-')[0].strip().replace(',', ''))
+                total_payout += payout
+            except: continue
+        console.print(f"[bold green]💰 Total Cumulative Projected Earnings: ${total_payout:,}[/bold green]")
+        return
+
+    if args.profit and args.target:
+        from aura.core.profit_engine import profit_engine
+        from aura.core.storage import AuraStorage
+        storage = AuraStorage()
+        findings = storage.get_findings_by_target(args.target)
+        if not findings:
+            console.print(f"[yellow]No findings for {args.target} found in local DB.[/yellow]")
+            return
+        total_roi = 0
+        for f in findings:
+            total_roi += profit_engine.calculate_roi(f.get('finding_type', 'Vulnerability'), f.get('severity', 'MEDIUM'))
+        avg_roi = total_roi / len(findings)
+        console.print(f"[bold cyan]💹 Target ROI Score for {args.target}: {avg_roi:.2f}[/bold cyan]")
+        return
+
     if args.free_ai:
         state.OPENROUTER_FREE_MODE = True
         console.print("[bold cyan][AI] Zero-Cost Ollama Engine engaged.[/bold cyan]")
@@ -113,6 +183,11 @@ Examples:
     if args.auto_submit:
         state.AUTO_SUBMIT = True
         console.print("[bold red][!] Autonomous Submission Protocol enabled.[/bold red]")
+
+    if args.clinic:
+        state.CLINIC_MODE = True
+        state.BEGINNER_MODE = True
+        console.print("[bold yellow][🎓] Educational Clinic Mode engaged.[/bold yellow]")
 
     if args.target and os.path.isfile(args.target):
         targets = []
@@ -151,8 +226,33 @@ Examples:
         console.print("[bold red][!] RE-ROUTING --auto TO ZENITH PROTOCOL...[/bold red]")
         asyncio.run(_run_mission(args.target, swarm=args.swarm))
     elif args.nexus:
+        import webbrowser
+        import subprocess
+        import time
         from aura.core.orchestrator import NeuralOrchestrator
         from aura.core.nexus import launch_nexus
+        
+        # 1. Start the API Server in the background
+        console.print("[bold green][🌐] Starting Nexus API Server...[/bold green]")
+        # Since this is running as a package, we find server.py relative to this file
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        api_path = os.path.join(current_dir, "api", "server.py")
+        
+        subprocess.Popen(
+            [sys.executable, api_path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+        )
+        
+        # 2. Wait a moment for the server to bind
+        time.sleep(2)
+        
+        # 3. Automatically open the browser
+        console.print("[bold cyan][🚀] Opening Nexus Dashboard at http://localhost:8000[/bold cyan]")
+        webbrowser.open("http://localhost:8000")
+        
+        # 4. Launch the interactive CLI War Room
         orchestrator = NeuralOrchestrator()
         launch_nexus(orchestrator)
     elif args.targets:
@@ -195,9 +295,9 @@ Examples:
         console.print(f"[bold bright_red]🔐 Auth Logic Scan: {args.target}[/bold bright_red]")
         run_auth_scan(args.target)
     elif args.sqli and args.target:
-        from aura.modules.sqli_engine import run_deep_sqli_scan
+        from aura.modules.sqli_engine import run_sqli_scan
         console.print(f"[bold yellow]🟠 SQLi Scan: {args.target}[/bold yellow]")
-        run_deep_sqli_scan(args.target)
+        run_sqli_scan(args.target, discovery_map_path=args.map)
     elif args.web and args.target:
         from aura.modules.web_engine import run_web_scan
         console.print(f"[bold bright_blue]🛡️  Web Security Scan: {args.target}[/bold bright_blue]")

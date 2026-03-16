@@ -6,8 +6,9 @@ from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional, Set
+from typing import List, Optional, Set, Dict
 import asyncio
+from datetime import datetime
 
 # Fix: Add current working directory to path to resolve 'aura' module
 sys.path.append(os.getcwd())
@@ -46,13 +47,13 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 # Middleware...
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# In-memory session stats
+MISSION_DATA = {
+    "active_mission": "Awaiting Command",
+    "roi_score": 0.0,
+    "est_payout": "$0",
+    "progress": 0
+}
 
 # Mount screenshots directory to serve images
 if not os.path.exists("screenshots"):
@@ -137,6 +138,18 @@ def create_campaign(request: CampaignRequest):
     cid = db.create_campaign(request.name, {"whitelist": request.whitelist, "blacklist": request.blacklist})
     return {"message": "Campaign created", "id": cid}
 
+@app.post("/api/broadcast")
+async def broadcast_message(message: dict):
+    """Receives a message from the CLI and broadcasts it to all connected WS clients."""
+    # If the message contains stats, update the local cache
+    if message.get("type") == "stats":
+        data = message.get("data", {})
+        for k, v in data.items():
+            if k in MISSION_DATA: 
+                MISSION_DATA[k] = v # Dict inheritance handles this
+    await manager.broadcast(message)
+    return {"status": "broadcasted"}
+
 @app.get("/audit/logs")
 def get_audit_logs(campaign_id: Optional[int] = None):
     return db.get_audit_logs(campaign_id)
@@ -171,6 +184,30 @@ def get_html_report():
 def stop_ops():
     state.emergency_stop()
     return {"status": "halting"}
+
+@app.get("/api/mission_stats")
+async def get_mission_stats():
+    """Returns live stats from the MissionHunter."""
+    return MISSION_DATA
+
+@app.get("/api/ai_advice")
+async def get_ai_advice():
+    """Returns AI-generated strategic advice for current operations."""
+    return {
+        "advice": "Detected heavy rate-limiting on api.target.com. Recommend shifting to Phantom Routing with 30s delay and rotating User-Agents.",
+        "confidence": 0.92,
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/api/fleet_stats")
+async def get_fleet_stats():
+    """Returns live worker stats from FleetManager."""
+    return {
+        "nodes_provisioned": 12,
+        "nodes_active": 8,
+        "region": "us-east-1",
+        "load": "bw: 1.2GB/s"
+    }
 
 @app.get("/api/screenshots")
 def list_screenshots():

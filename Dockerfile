@@ -1,31 +1,29 @@
+# Aura OMEGA - Containerized Sentient Brain
+# ----------------------------------------
+# This Dockerfile enables automated cloud deployment for the 
+# Aura engine, specifically targeting Google Cloud Run.
+
 FROM python:3.10-slim
 
-WORKDIR /app
-
-# Install system dependencies for Playwright and other tools
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg \
-    nmap \
+    curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install python packages
-COPY requirements.txt ./
+# Set working directory
+WORKDIR /app
+
+# Install Python requirements
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application
+# Copy the Aura engine
 COPY . .
 
-# Install the aura-framework
-RUN pip install --no-cache-dir -e .
+# Set environment variables for GCP
+ENV GOOGLE_CLOUD_PROJECT="aura-sentinel-4412"
+ENV PYTHONUNBUFFERED=1
 
-# Install Playwright browsers (chromium only to save space/time)
-RUN playwright install --with-deps chromium
-
-# Create a non-root user for executing the tool
-RUN useradd -m aurauser && chown -R aurauser /app
-USER aurauser
-
-# Default command (can be overridden)
-ENTRYPOINT ["aura"]
-CMD ["--help"]
+# Command to run the OMEGA Sentient Brain
+CMD ["python", "aura/core/vertex_brain.py"]

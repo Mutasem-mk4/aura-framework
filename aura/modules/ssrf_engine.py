@@ -63,6 +63,11 @@ LOCALHOST_BYPASS_PAYLOADS = [
     "http://2130706433/",       # Decimal encoded
     "http://127.0.0.1.nip.io/", # Magic DNS Rebinding
     "http://127.1/",            # Dropped octets
+    "http://0.0.0.0/",
+    "http://localhost:22",
+    "http://127.0.0.1:6379",    # Redis
+    "http://127.0.0.1:3306",    # MySQL
+    "http://127.0.0.1:8080",    # Admin
 ]
 
 INTERNAL_PORTS = {

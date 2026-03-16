@@ -17,7 +17,11 @@ class AuraStorage:
         
         if self.is_postgres:
             # Swarm Mode: Connect to centralized PostgreSQL DB
-            self.engine = create_engine(self.db_url, pool_size=20, max_overflow=0)
+            if self.db_url:
+                self.engine = create_engine(self.db_url, pool_size=20, max_overflow=0)
+            else:
+                # Should not happen if is_postgres is true, but for safety:
+                self.engine = create_engine("sqlite:///fallback.db") 
         else:
             # Standalone Mode: Fall back to local SQLite
             if db_path is None:
@@ -260,7 +264,8 @@ class AuraStorage:
                 return cursor.lastrowid
             else:
                 self._execute(cursor, "SELECT id FROM targets WHERE value = ?", (val,))
-                return cursor.fetchone()[0]
+                row = cursor.fetchone()
+                return row[0] if row else None
 
     def log_action(self, action: str, target: str, details: str = "", campaign_id: int = None):
         """Logs an operational action for audit compliance."""
@@ -279,7 +284,8 @@ class AuraStorage:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
                 self._execute(cursor, "SELECT COUNT(*) FROM findings")
-                findings_count = cursor.fetchone()[0]
+                row = cursor.fetchone()
+                findings_count = row[0] if row else 0
                 
                 # Postgres vs SQLite distinction for JSON matching
                 if self.is_postgres:
@@ -288,7 +294,8 @@ class AuraStorage:
                     targets_count = 0 
                 else:
                     self._execute(cursor, "SELECT COUNT(DISTINCT 1) FROM findings")
-                    targets_count = cursor.fetchone()[0]
+                    row = cursor.fetchone()
+                    targets_count = row[0] if row else 0
                 return {"findings": findings_count, "targets": targets_count}
         except:
             return {"findings": 0, "targets": 0}
@@ -339,7 +346,8 @@ class AuraStorage:
                 return cursor.lastrowid
             else:
                 self._execute(cursor, "SELECT id FROM campaigns WHERE name = ? ORDER BY id DESC LIMIT 1", (name,))
-                return cursor.fetchone()[0]
+                row = cursor.fetchone()
+                return row[0] if row else None
 
     def add_finding(self, target_value, content, finding_type="Vulnerability", campaign_id=None, proof=None, **kwargs):
         """
@@ -451,7 +459,7 @@ class AuraStorage:
             ''', (severity, target_value, content_str))
             conn.commit()
 
-    def get_audit_logs(self, campaign_id: int = None):
+    def get_audit_logs(self, campaign_id: int | None = None):
         """Retrieves audit logs, optionally filtered by campaign."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -500,6 +508,20 @@ class AuraStorage:
             if row and row[0] == 'COMPLETED':
                 return True
             return False
+
+    def is_duplicate_finding(self, target_value: str, finding_type: str, content: str) -> bool:
+        """v33 Zenith: Signature-based dupe detection to prevent multi-campaign double-counting."""
+        norm_val = self.normalize_target(target_value)
+        content_str = content if isinstance(content, str) else json.dumps(content)
+        
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            self._execute(cursor, '''
+                SELECT id FROM findings 
+                WHERE target_id = (SELECT id FROM targets WHERE value = ?) 
+                AND finding_type = ? AND content = ?
+            ''', (norm_val, finding_type, content_str))
+            return cursor.fetchone() is not None
 
     def get_all_findings(self):
         """Retrieves all findings for the Nexus overview."""
@@ -562,7 +584,7 @@ class AuraStorage:
                     urls_discovered = excluded.urls_discovered,
                     last_update = excluded.last_update,
                     state_json = excluded.state_json
-            ''', (norm_val, current_step, stats.get("findings", 0), stats.get("urls", 0), now, json.dumps(full_state)))
+            ''', (norm_val, current_step, stats.get("findings", 0) if stats else 0, stats.get("urls", 0) if stats else 0, now, json.dumps(full_state or {})))
             conn.commit()
 
     def get_mission_state(self, target_value: str) -> dict | None:

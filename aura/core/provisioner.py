@@ -2,9 +2,26 @@ import os
 import sys
 import shutil
 import subprocess
+
+# Fix Windows Unicode issues FIRST before any rich imports
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        pass
+
+os.environ['TERM'] = 'dumb'
+os.environ['NO_COLOR'] = '1'
+os.environ['RICH_DISABLE_JUPYTER'] = '1'
+
+# Patch Windows console before rich imports
+import rich._windows_renderer
+rich._windows_renderer.LegacyWindowsTerm = None
+
 from rich.console import Console
 
-console = Console()
+console = Console(file=sys.stdout, force_terminal=False)
 
 class AuraProvisioner:
     """v25.0 OMEGA: Autonomous Dependency Provisioner."""
@@ -18,7 +35,7 @@ class AuraProvisioner:
             return
         cls._has_run = True
         
-        console.print("[bold cyan][⚙️] OMEGA Provisioner: Verifying environment integrity...[/bold cyan]")
+        console.print("[bold cyan][GEAR] OMEGA Provisioner: Verifying environment integrity...[/bold cyan]")
         
         # Node.js Check
         if not shutil.which("node"):
@@ -31,7 +48,7 @@ class AuraProvisioner:
                 try:
                     subprocess.run(["go", "install", "-v", "github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest"], 
                                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    console.print("[bold green][✓] Nuclei installed successfully via Go.[/bold green]")
+                    console.print("[bold green][OK] Nuclei installed successfully via Go.[/bold green]")
                 except subprocess.CalledProcessError:
                     console.print("[dim red][!] Failed to install Nuclei automatically. Run: go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest[/dim red]")
             else:
@@ -45,6 +62,6 @@ class AuraProvisioner:
             try:
                 subprocess.run([sys.executable, "-m", "pip", "install", "esprima"], 
                                check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                console.print("[bold green][✓] Package 'esprima' installed successfully.[/bold green]")
+                console.print("[bold green][OK] Package 'esprima' installed successfully.[/bold green]")
             except subprocess.CalledProcessError:
                 console.print("[dim red][!] Failed to install 'esprima'. Please run: pip install esprima[/dim red]")

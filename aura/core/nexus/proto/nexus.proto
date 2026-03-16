@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package nexus;
+
+option go_package = "./proto";
+
+// Veritas Service: The high-performance bridge for Aura Nexus
+service Veritas {
+    // Passive Interception Control
+    rpc StartProxy(ProxyRequest) returns (ProxyResponse);
+    rpc StopProxy(Empty) returns (StatusResponse);
+    rpc GetTrafficLogs(LogRequest) returns (LogStream);
+
+    // Advanced Auditing & Probing
+    rpc PulseProbe(ProbeRequest) returns (ProbeResponse);
+    rpc RapidScan(ScanRequest) returns (ScanResponse);
+    
+    // Resource Monitoring
+    rpc GetSystemHealth(Empty) returns (HealthStatus);
+}
+
+message Empty {}
+
+message ProxyRequest {
+    int32 port = 1;
+    string log_file = 2;
+    bool mitm_enabled = 3;
+}
+
+message ProxyResponse {
+    bool success = 1;
+    string message = 2;
+    int32 pid = 3;
+}
+
+message StatusResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message LogRequest {
+    int32 last_n = 1;
+}
+
+message TrafficLog {
+    int64 timestamp = 1;
+    string method = 2;
+    string url = 3;
+    int32 status = 4;
+    string request_body = 5;
+    string response_body = 6;
+    map<string, string> headers = 7;
+}
+
+message LogStream {
+    repeated TrafficLog logs = 1;
+}
+
+message ProbeRequest {
+    string target = 1;
+    repeated string headers = 2;
+}
+
+message ProbeResponse {
+    int32 status = 1;
+    string body = 2;
+    float duration = 3;
+}
+
+message ScanRequest {
+    string target = 1;
+    string port_range = 2;
+}
+
+message ScanResponse {
+    repeated int32 open_ports = 1;
+    map<int32, string> banners = 2;
+}
+
+message HealthStatus {
+    float cpu_usage = 1;
+    float ram_usage_mb = 2;
+    int32 active_workers = 3;
+}

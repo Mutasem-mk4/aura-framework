@@ -7,12 +7,22 @@ maximum speed and accuracy. If not, Aura falls back to its internal DNS/HTTP/TCP
 This ensures the MISSING KEY problem is fully solved — no external API needed.
 """
 import asyncio
+import os
 import socket
 import subprocess
 import shutil
 import re
 import json
+from urllib.parse import urlparse
+from aura.core import state
 from rich.console import Console
+from aura.core.native_prober import NativeProber
+from aura.core.aura_subfinder import NativeSubfinder
+from aura.core.aura_port_scanner import NativePortScanner
+from aura.modules.cloud_recon import AuraCloudRecon
+from aura.modules.infra_reaper import InfraReaper
+from aura.modules.sentinel_ssrf import SentinelSSRF
+from aura.modules.desync_prober import DesyncProber
 
 console = Console()
 
@@ -51,150 +61,61 @@ class ReconPipeline:
         self.nmap_path = find_tool("nmap")
         self.katana_path = find_tool("katana")
         
-        self._has_subfinder = self.subfinder_path is not None
-        self._has_httpx = self.httpx_path is not None
-        self._has_nmap = self.nmap_path is not None
+        self.native_prober = NativeProber()
+        self.native_subfinder = NativeSubfinder()
+        self.native_port_scanner = NativePortScanner()
+        
+        self.cloud_recon = AuraCloudRecon(storage=None) # Storage to be passed per run
+        self.infra_reaper = InfraReaper()
+        self.sentinel_ssrf = SentinelSSRF()
+        self.desync_prober = DesyncProber(storage=None) # Storage to be passed per run
+        
+        self._has_subfinder = True # We now have native subfinder via NativeSubfinder
+        self._has_httpx = True # We now have native httpx via NativeProber
+        self._has_nmap = True # We now have native nmap via NativePortScanner
         self._has_katana = self.katana_path is not None
 
     # ─── Stage 1: Subdomain Discovery ────────────────────────────────────────
 
     async def stage1_subfinder(self, domain: str) -> list[str]:
-        """Discovers live subdomains using Native OSINT Engines (HackerTarget, OTX, crt.sh) + Resolving."""
-        console.print(f"[cyan][🌐 Recon] Stage 1 (Native OSINT): Gathering subdomains for {domain}...[/cyan]")
-        subdomains = set([domain])
-
-        # Always include the basic fallback list
-        for sub in self.SUBDOMAINS_WORDLIST:
-            subdomains.add(f"{sub}.{domain}")
-
-        async def fetch_otx(d):
-            try:
-                import aiohttp
-                async with aiohttp.ClientSession() as s:
-                    async with s.get(f"https://otx.alienvault.com/api/v1/indicators/domain/{d}/passive_dns", timeout=15) as r:
-                        if r.status == 200:
-                            data = await r.json()
-                            for active in data.get('passive_dns', []):
-                                sub = active.get('hostname', '')
-                                if sub.endswith(d): subdomains.add(sub.lower())
-            except: pass
-
-        async def fetch_hackertarget(d):
-            try:
-                import aiohttp
-                async with aiohttp.ClientSession() as s:
-                    async with s.get(f"https://api.hackertarget.com/hostsearch/?q={d}", timeout=15) as r:
-                        if r.status == 200:
-                            text = await r.text()
-                            for line in text.splitlines():
-                                sub = line.split(',')[0]
-                                if sub.endswith(d): subdomains.add(sub.lower())
-            except: pass
-
-        async def fetch_crtsh(d):
-            try:
-                import aiohttp
-                async with aiohttp.ClientSession() as s:
-                    async with s.get(f"https://crt.sh/?q=%25.{d}&output=json", timeout=20) as r:
-                        if r.status == 200:
-                            try:
-                                data = await r.json()
-                            except:
-                                text = await r.text()
-                                data = json.loads(text)
-                            for item in data:
-                                name = item.get('name_value', '')
-                                for sub in name.split('\\n'):
-                                    sub = sub.strip().lstrip('*.')
-                                    if sub.endswith(d): subdomains.add(sub.lower())
-            except: pass
-
-        # Run OSINT sources concurrently
-        await asyncio.gather(fetch_otx(domain), fetch_hackertarget(domain), fetch_crtsh(domain))
-
-        console.print(f"[yellow][↻] OSINT Aggregated: {len(subdomains)} unique potential subdomains. Resolving...[/yellow]")
-
-        found = []
-        loop = asyncio.get_event_loop()
-
-        # Batch resolve to filter out dead subdomains
-        async def resolve(sub):
-            try:
-                ip = await loop.run_in_executor(None, socket.gethostbyname, sub)
-                if ip:
-                    found.append(sub)
-            except: pass
-
-        # Limit concurrency for resolving to avoid overwhelming the DNS resolver
-        sem = asyncio.Semaphore(100)
-        async def sem_resolve(sub):
-            async with sem:
-                await resolve(sub)
-
-        await asyncio.gather(*[sem_resolve(sub) for sub in subdomains])
-
-        console.print(f"[bold green][+] Stage 1 Complete: {len(found)} LIVE subdomains discovered natively.[/bold green]")
-        return found
+        """v51.0: Discovers live subdomains using NATIVE Subfinder (OSINT + DNS Resolver)."""
+        try:
+            found = await self.native_subfinder.discover(domain)
+            console.print(f"[bold green][+] Stage 1 Complete: {len(found)} LIVE subdomains discovered natively.[/bold green]")
+            return found
+        except Exception as e:
+            console.print(f"[red][!] Native Subfinder failed: {e}. Falling back to basic list.[/red]")
+            return [domain]
 
     # ─── Stage 2: HTTP Probing ────────────────────────────────────────────────
 
     async def stage2_httpx(self, hosts: list[str], stealth_mode: bool = False) -> list[dict]:
-        """Probes hosts for live HTTP services using httpx CLI or aiohttp fallback."""
-        if self._has_httpx:
-            console.print(f"[cyan][🌐 Recon] Stage 2: HTTPX → probing {len(hosts)} hosts...[/cyan]")
-            try:
-                input_hosts = "\n".join(hosts)
-                
-                # Base httpx command
-                cmd_args = ["-silent", "-json", "-title", "-tech-detect", "-status-code", "-k"]
-                
-                if stealth_mode:
-                    console.print("[yellow][!] Stealth Mode: Adding randomized browsers headers and rate limiting to HTTPX.[/yellow]")
-                    import random
-                    user_agents = [
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15",
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0"
-                    ]
-                    # Add jitter, rate limits, and custom headers
-                    cmd_args.extend([
-                        "-H", f"User-Agent: {random.choice(user_agents)}",
-                        "-H", "Accept-Language: en-US,en;q=0.9",
-                        "-H", "Sec-Fetch-Dest: document",
-                        "-H", "Sec-Fetch-Mode: navigate",
-                        "-H", "Sec-Fetch-Site: none",
-                        "-rl", "5",        # 5 requests per second
-                        "-c", "2",         # Low concurrency
-                        "-delay", "2s"     # Delay between requests
-                    ])
-                
-                proc = await asyncio.create_subprocess_exec(
-                    self.httpx_path, *cmd_args,
-                    stdin=asyncio.subprocess.PIPE,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.DEVNULL
-                )
-                stdout, _ = await asyncio.wait_for(
-                    proc.communicate(input=input_hosts.encode()), timeout=120
-                )
-                results = []
-                for line in stdout.decode().splitlines():
-                    try:
-                        data = json.loads(line)
-                        results.append({
-                            "host": data.get("host", ""),
-                            "url": data.get("url", ""),
-                            "status": data.get("status-code", 0),
-                            "title": data.get("title", ""),
-                            "tech": data.get("tech", []),
-                        })
-                    except: pass
-                console.print(f"[green][+] HTTPX: {len(results)} live HTTP services.[/green]")
-                if not results:
-                    return await self.stage2_fallback(hosts)
-                return results
-            except Exception as e:
-                console.print(f"[yellow][!] HTTPX failed: {e}. Falling back to Python HTTP probe.[/yellow]")
+        """v51.0: Probes hosts using AURA NATIVE Prober (Morphic Headers + AI Feedback)."""
+        console.print(f"[cyan][🌐 Recon] Stage 2: Native Prober → analyzing {len(hosts)} hosts...[/cyan]")
+        
+        try:
+            results = await self.native_prober.batch_probe(hosts, stealth=stealth_mode)
+            
+            # Map native results to recon pipeline format
+            formatted_results = []
+            for r in results:
+                if r.get("error") or r.get("status_code") == 0:
+                    continue
+                formatted_results.append({
+                    "host": urlparse(r.get("url", "")).netloc if r.get("url") else "unknown",
+                    "url": r.get("url", ""),
+                    "status": r.get("status_code", 0),
+                    "title": r.get("title", ""),
+                    "tech": r.get("tech", []),
+                    "waf": r.get("waf"),
+                    "ai_advice": r.get("ai_advice")
+                })
+            
+            console.print(f"[green][+] Native Prober: {len(formatted_results)} live HTTP services discovered.[/green]")
+            return formatted_results
+        except Exception as e:
+            console.print(f"[yellow][!] Native Prober failed: {e}. Falling back to basic Python probe.[/yellow]")
+            return await self.stage2_fallback(hosts)
 
         return await self.stage2_fallback(hosts)
 
@@ -234,63 +155,40 @@ class ReconPipeline:
     # ─── Stage 3: Port Scanning & Banner Grabbing ─────────────────────────────
 
     async def stage3_nmap(self, ip: str, ports: list[int] = None, stealth_mode: bool = False, passive_ports: list[int] = None) -> list[dict]:
-        """Port scanning using nmap CLI or raw TCP scanner fallback. Utilizes passive ports if available."""
-        ports = ports or self.COMMON_PORTS
-
+        """v51.0 (PRO): Scans for open ports using AURA NATIVE Port Scanner."""
+        ports = ports or self.native_port_scanner.COMMON_PORTS
+        
         if passive_ports:
-            console.print(f"[cyan][🌐 Recon] Stage 3: Discovered {len(passive_ports)} passive ports via OSINT.[/cyan]")
+            # Use passive intel to focus the scan or skip if in deep stealth
             if stealth_mode:
-                console.print(f"[bold yellow][!] Stealth Mode Active: Skipping active Nmap scan. Relying ONLY on passive OSINT ports.[/bold yellow]")
-                return [{"port": p, "service": "unknown", "version": "passive-intel"} for p in passive_ports]
+                console.print(f"[bold yellow][!] Stealth Mode Active: Skipping active scan. Relying on passive OSINT ports.[/bold yellow]")
+                return [{"port": p, "state": "open", "service": "unknown", "banner": "passive-intel"} for p in passive_ports]
             else:
-                console.print(f"[green][+] Accelerating Nmap scan using precisely {len(passive_ports)} known OSINT ports.[/green]")
-                ports = passive_ports # Overwrite COMMON_PORTS to only scan known open ports
+                ports = list(set(ports) | set(passive_ports))
 
-        if self._has_nmap:
-            console.print(f"[cyan][🌐 Recon] Stage 3: Nmap → {ip}...[/cyan]")
-            try:
-                port_str = ",".join(str(p) for p in ports)
-                result = await asyncio.create_subprocess_exec(
-                    self.nmap_path, "-sV", "--open", "-p", port_str, ip,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.DEVNULL
-                )
-                stdout, _ = await asyncio.wait_for(result.communicate(), timeout=90)
-                raw = stdout.decode()
-                services = []
-                for line in raw.splitlines():
-                    m = re.match(r"(\d+)/tcp\s+open\s+(\S+)\s*(.*)", line)
-                    if m:
-                        port, svc, ver = m.groups()
-                        services.append({"port": int(port), "service": svc, "version": ver.strip()})
-                        console.print(f"[green]  [+] {ip}:{port} → {svc} {ver}[/green]")
-                return services
-            except Exception as e:
-                console.print(f"[yellow][!] Nmap failed: {e}. Falling back to TCP scanner.[/yellow]")
-
-        # Fallback: raw TCP banner grab
-        console.print(f"[cyan][🌐 Recon] Stage 3 (TCP Fallback): Scanning {ip}...[/cyan]")
-        services = []
-        loop = asyncio.get_event_loop()
-
-        def _grab(port):
-            try:
-                s = socket.socket()
-                s.settimeout(2)
-                s.connect((ip, port))
-                s.send(b"HEAD / HTTP/1.0\r\n\r\n" if port in [80, 8080, 443, 8443] else b"\r\n")
-                banner = s.recv(512).decode("utf-8", "ignore").strip()
-                s.close()
-                return {"port": port, "service": "unknown", "version": banner[:80]}
-            except: return None
-
-        tasks = [loop.run_in_executor(None, _grab, p) for p in ports]
-        results = await asyncio.gather(*tasks)
-        for r in results:
-            if r:
-                services.append(r)
-                console.print(f"[green]  [+] {ip}:{r['port']} open → {r['version'][:60]}[/green]")
-        return services
+        console.print(f"[cyan][🌐 Recon] Stage 3: Native Port Scanner → {ip}...[/cyan]")
+        try:
+            results = await self.native_port_scanner.scan(ip, ports)
+            
+            # Formatting results for the pipeline
+            services = []
+            for r in results:
+                services.append({
+                    "port": r.get("port", 0),
+                    "state": r.get("state", "unknown"),
+                    "service": r.get("service", "unknown"),
+                    "version": r.get("banner", "") # Mapping banner to 'version' for legacy compatibility
+                })
+                console.print(f"[green]  [+] {ip}:{r.get('port')} open → {r.get('service')} {r.get('banner', '')[:30]}[/green]")
+            
+            # Path 3 Integration: Trigger InfraReaper if infra ports found
+            open_ports = [r["port"] for r in results if r["state"] == "open"]
+            await self.infra_reaper.audit_host(ip, open_ports)
+            
+            return services
+        except Exception as e:
+            console.print(f"[red][!] Native Port Scanner failed for {ip}: {e}[/red]")
+            return []
 
     # ─── Stage 4: Katana Deep Crawling (v25.0 Go-Arsenal) ─────────────────────
 
@@ -339,9 +237,30 @@ class ReconPipeline:
             except: pass
         return list(discovered)
 
+    async def _run_beginner_recon(self, domain: str, results: dict):
+        """v51.0: Populates beginner-friendly data (Dorks, Tips, soft-target scanning)."""
+        console.print(f"[bold yellow][🎓 CLINIC] Beginner Recon engaged for {domain}...[/bold yellow]")
+        
+        # 1. Load templates
+        templates_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "recon_templates.json")
+        if os.path.exists(templates_path):
+            try:
+                with open(templates_path, "r") as f:
+                    templates = json.load(f)
+                    results["dorks"] = [d.replace("{{domain}}", domain) for d in templates.get("dorks", [])]
+                    console.print(f"  [+] Loaded {len(results['dorks'])} specialized Google Dorks.")
+            except: pass
+        
+        # 2. Add Educational Tips
+        results["beginner_tips"] = [
+            "Always check subdomains for 'dev' or 'staging' environments; they often have weaker auth.",
+            "Look for exposed .git or .env files in the root directory.",
+            "If you see a 403, try adding 'X-Forwarded-For: 127.0.0.1' to your headers."
+        ]
+
     # ─── Full Pipeline ────────────────────────────────────────────────────────
 
-    async def run(self, domain: str, target_ip: str = None, intel_data: dict = None, stealth_mode: bool = False) -> dict:
+    async def run(self, domain: str, target_ip: str = None, intel_data: dict = None, stealth_mode: bool = False, beginner_mode: bool = False) -> dict:
         """
         Runs the full Stage1→Stage2→Stage3 recon pipeline.
         Merges passive data (Shodan, VirusTotal, SecurityTrails) into active checks.
@@ -349,6 +268,23 @@ class ReconPipeline:
         """
         intel_data = intel_data or {}
         console.print(f"\n[bold cyan][🌐 RECON PIPELINE] Starting 3-stage pipeline for {domain}...[/bold cyan]")
+
+        # Initialize results dictionary for beginner mode and general use
+        results = {
+            "subdomains": [],
+            "http_services": [],
+            "open_ports": [],
+            "deep_links": [],
+            "tech_stack": [],
+            "tool_chain": "",
+            "dorks": [] # Added for beginner mode
+        }
+
+        if state.BEGINNER_MODE:
+            await self._run_beginner_recon(domain, results)
+            # In beginner mode, we might want to simplify or skip some active stages
+            # For now, we'll let the full pipeline run and just add dorks.
+            # Future: Add logic to conditionally run stages based on beginner_mode.
 
         # v22.1: Pre-flight DNS Check
         try:
@@ -359,6 +295,8 @@ class ReconPipeline:
 
         # Stage 1
         subdomains = await self.stage1_subfinder(domain)
+        if not subdomains: subdomains = []
+        if domain not in subdomains: subdomains.insert(0, domain)
         
         # Merge Passive Subdomains
         passive_subs = set()
@@ -397,10 +335,19 @@ class ReconPipeline:
         nmap_data = await self.stage3_nmap(ip, stealth_mode=stealth_mode, passive_ports=passive_ports)
 
         # Stage 4: Katana Deep Crawl
-        active_http_urls = [h.get("url") for h in http_data if h.get("url")]
-        deep_links = await self.stage4_katana(active_http_urls)
+        deep_links = [] # Placeholder for future Katana integration results
+        
+        # Path 3 Integration: Cloud Recon
+        from aura.core.storage import AuraStorage
+        self.cloud_recon.storage = AuraStorage() # Initialize storage for the result
+        await self.cloud_recon.hunt(domain)
 
-        result = {
+        # Path 2/3 Apex Integration: HTTP Request Smuggling Audit
+        self.desync_prober.storage = self.cloud_recon.storage
+        active_http_urls = [r["url"] for r in http_data if r.get("url")]
+        await self.desync_prober.audit_endpoints(active_http_urls)
+
+        results.update({
             "subdomains": subdomains,
             "http_services": http_data,
             "open_ports": nmap_data,
@@ -412,8 +359,8 @@ class ReconPipeline:
                 f"{'Nmap' if self._has_nmap else 'TCP-Scan'} → "
                 f"{'Katana' if self._has_katana else 'Spider-Skipped'}"
             )
-        }
+        })
 
         console.print(f"[bold green][✔ RECON PIPELINE] Complete: {len(subdomains)} subdomains, "
                       f"{len(http_data)} HTTP services, {len(nmap_data)} open ports, {len(deep_links)} deep links.[/bold green]")
-        return result
+        return results

@@ -1,0 +1,14 @@
+[*] ShadowProxy: Actively validating 3 endpoints...
+[[Traceback (most recent call last):
+  File "C:\Users\User\.gemini\antigravity\scratch\aura\verify_apex_v2.py", line 5, in <module>
+    from aura.core.orchestrator import NeuralOrchestrator
+  File "C:\Users\User\.gemini\antigravity\scratch\aura\aura\core\orchestrator.py", line 26, in <module>
+    from aura.modules.recon_pipeline import ReconPipeline
+  File "C:\Users\User\.gemini\antigravity\scratch\aura\aura\modules\recon_pipeline.py", line 20, in <module>
+    from aura.modules.cloud_recon import AuraCloudRecon
+  File "C:\Users\User\.gemini\antigravity\scratch\aura\aura\modules\cloud_recon.py", line 11, in <module>
+    class AuraCloudRecon:
+  File "C:\Users\User\.gemini\antigravity\scratch\aura\aura\modules\cloud_recon.py", line 116, in AuraCloudRecon
+    def _parse_s3_xml(self, xml_content: str) -> List[str]:
+                                                 ^^^^
+NameError: name 'List' is not defined. Did you mean: 'list'?

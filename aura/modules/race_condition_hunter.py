@@ -13,8 +13,10 @@ import asyncio
 import httpx
 import re
 import time
+from typing import List, Dict, Any, Optional, Tuple
 from rich.console import Console
 from aura.core import state
+from aura.core.nexus_bridge import NexusBridge
 
 console = Console()
 
@@ -33,13 +35,17 @@ RACE_CONCURRENCY = 25   # simultaneous requests in a single burst
 
 class RaceConditionHunter:
     """
-    v28.0: Race Condition Hunter.
-    Uses asyncio.gather to hammer single-use endpoints simultaneously.
+    v50.0 OMEGA: Race Condition Hunter.
+    Uses Nexus (Go) for microsecond-precise parallel bursting.
     """
 
     def __init__(self, session=None):
         self.session = session
         self._candidates = []
+        try:
+            self.nexus = NexusBridge()
+        except:
+            self.nexus = None
 
     # ── Candidate Detection ──────────────────────────────────────────────────
     def _is_candidate(self, url: str) -> bool:
@@ -54,9 +60,16 @@ class RaceConditionHunter:
     async def _race_burst(self, url: str, method: str = "GET",
                           data: dict = None, headers: dict = None) -> list:
         """
-        Fires RACE_CONCURRENCY requests simultaneously using a shared client.
-        Returns list of (status_code, response_time, response_body_snippet).
+        Fires RACE_CONCURRENCY requests simultaneously.
+        Uses Nexus (Go) for maximum precision, or httpx fallback.
         """
+        if self.nexus and method.upper() == "POST":
+            console.print("[yellow][⚡] Nexus Core Active: Initiating synchronized high-precision burst...[/yellow]")
+            # Go results are [Result{URL, StatusCode, Server}, ...]
+            go_results = self.nexus.race_burst(url, data or {}, RACE_CONCURRENCY)
+            return [(r["status"], 0, f"Nexus-Burst: {r['server']}") for r in go_results]
+
+        # FALLBACK: Native Python Async + HTTP/2
         shared_headers = {
             "User-Agent": "Mozilla/5.0 (compatible; AuraRaceEngine/28.0)",
             **(headers or {})
@@ -74,8 +87,6 @@ class RaceConditionHunter:
             except Exception as e:
                 return (0, time.monotonic() - t0, str(e)[:100])
 
-        # Use an HTTP/2 Connection Pool for TRUE multiplexed parallel bursting
-        # HTTP/2 sends all packets down a single TCP pipe, avoiding TLS handshake jitter
         limits = httpx.Limits(max_connections=RACE_CONCURRENCY, max_keepalive_connections=RACE_CONCURRENCY)
         async with httpx.AsyncClient(limits=limits, verify=False, follow_redirects=True, http2=True) as client:
             tasks = [_single_req(client) for _ in range(RACE_CONCURRENCY)]

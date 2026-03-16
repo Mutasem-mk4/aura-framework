@@ -1,0 +1,31 @@
+{
+  "soft_targets": [
+    {
+      "name": "Non-Profit VDP Search",
+      "dork": "site:org \"security.txt\" \"bounty\" -commercial",
+      "description": "Searching for non-profit organizations with vulnerability disclosure programs."
+    },
+    {
+      "name": "Local Government VDP Search",
+      "dork": "site:gov \"security.txt\" \"responsible disclosure\"",
+      "description": "Government domains often have lower security maturity and welcome reports."
+    },
+    {
+      "name": "Open Source Bug Bounties",
+      "dork": "site:github.com \"bug bounty\" \"security policy\"",
+      "description": "Open source projects are great for beginners to build a reputation."
+    }
+  ],
+  "common_misconfigs": [
+    {
+      "type": "CORS Misconfiguration",
+      "impact": "Data theft via cross-origin requests",
+      "dork": "inurl:api \"Access-Control-Allow-Origin: *\""
+    },
+    {
+      "type": "Exposed Git Directories",
+      "impact": "Full source code leak",
+      "dork": "inurl:/.git/config"
+    }
+  ]
+}

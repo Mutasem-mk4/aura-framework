@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aura - Sentient Offensive Engine</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #020408;
+            --panel: #0d1117;
+            --accent: #00f2ff;
+            --text: #e6edf3;
+            --dim: #8b949e;
+            --critical: #ff3e3e;
+            --terminal-bg: #010204;
+        }
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 20px;
+            height: 100vh;
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            grid-template-rows: 60px 1fr;
+            gap: 15px;
+            overflow: hidden;
+        }
+        header {
+            grid-column: 1 / span 2;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(0, 242, 255, 0.2);
+            padding: 0 10px;
+        }
+        .logo {
+            font-family: 'Fira Code', monospace;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--accent);
+            letter-spacing: 2px;
+        }
+        .mission-status {
+            font-size: 0.8rem;
+            color: #4ade80;
+            display: flex;
+            align-items: center;
+        }
+        .mission-status span {
+            margin-right: 15px;
+        }
+        .mission-status::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: #4ade80;
+            border-radius: 50%;
+            margin-right: 8px;
+            box-shadow: 0 0 10px #4ade80;
+        }
+
+        /* Terminal Style */
+        .terminal {
+            background: var(--terminal-bg);
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            font-family: 'Fira Code', monospace;
+            font-size: 13px;
+            padding: 15px;
+            overflow-y: auto;
+            color: #d1d1d1;
+            position: relative;
+        }
+        .terminal-header {
+            position: sticky;
+            top: -15px;
+            background: var(--terminal-bg);
+            padding: 5px 0;
+            border-bottom: 1px solid #333;
+            margin-bottom: 15px;
+            color: var(--accent);
+            font-size: 11px;
+            z-index: 10;
+        }
+        .line { margin-bottom: 4px; line-height: 1.4; }
+        .green { color: #4ade80; }
+        .cyan { color: var(--accent); }
+        .red { color: var(--critical); }
+        .yellow { color: #ebbc71; }
+        .dim { color: #6e7681; }
+
+        /* Dashboard Style */
+        .dashboard {
+            background: var(--panel);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 6px;
+        }
+        .vuln-item {
+            border-left: 3px solid var(--critical);
+            padding-left: 15px;
+            margin-bottom: 15px;
+        }
+        .vuln-item h4 { margin: 0 0 5px 0; color: var(--critical); font-size: 1rem; }
+        .vuln-item p { margin: 0; font-size: 0.85rem; color: var(--dim); }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .stat-box {
+            text-align: center;
+            padding: 10px;
+            background: rgba(0, 242, 255, 0.03);
+            border-radius: 4px;
+        }
+        .stat-box span { display: block; }
+        .stat-val { font-size: 1.2rem; font-weight: bold; color: var(--accent); }
+        .stat-lbl { font-size: 0.65rem; text-transform: uppercase; color: var(--dim); }
+
+        .code-block {
+            background: #000;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #d1d1d1;
+            border: 1px solid #333;
+            margin-top: 10px;
+        }
+
+        /* Cursor blinking */
+        .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 15px;
+            background: var(--accent);
+            animation: blink 1s infinite;
+        }
+        @keyframes blink { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+
+        /* Scanline effect over terminal */
+        .terminal::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">AURA OMEGA // SENTIENT ENGINE</div>
+        <div class="mission-status">
+            <span>TARGET: juice-shop.herokuapp.com</span>
+            <span>OSINT: 0.4s</span>
+            <span>MODEL: PATH-SEARCH-7B</span>
+        </div>
+    </header>
+
+    <div class="terminal" id="term">
+        <div class="terminal-header">AURA CORE // LIVE EXECUTION STREAM</div>
+        <div class="line dim">[07:12:44] [SYSTEM] Initializing Sentient OMEGA Protocol...</div>
+        <div class="line">[07:12:45] <span class="cyan">[RECON]</span> Discovering endpoints via Neural Spider...</div>
+        <div class="line">[07:12:47] <span class="cyan">[RECON]</span> Found 293 unique logical nodes.</div>
+        <div class="line">[07:12:48] <span class="yellow">[DAST]</span> Injecting morphic payloads into /rest/user/login...</div>
+        <div class="line">[07:12:50] <span class="red">[CRITICAL]</span> SSTI confirmed at endpoint 'login'. Expression ${7*7} evaluated to 49.</div>
+        <div class="line">[07:12:51] <span class="cyan">[RECON]</span> Mapping dependency DAG for stateful fuzzing...</div>
+        <div class="line">[07:12:53] <span class="yellow">[FUZZ]</span> Executing 1,420 mutations across session state.</div>
+        <div class="line">[07:12:55] <span class="red">[VULN]</span> HTTP Request Smuggling (CL.TE) detected at Edge node.</div>
+        <div class="line">[07:12:56] <span class="green">[APEX]</span> Starting Autonomous Weaponization...</div>
+        <div class="line">[07:12:58] <span class="green">[APEX]</span> Synthesizing PoC script for SSTI (Exploit-322)...</div>
+        <div class="line">[07:12:59] <span class="green">[APEX]</span> PoC synthesis complete. Validation passed.</div>
+        <div class="line cyan">[07:13:00] MISSION COMPLETE. 2 High impact findings identified.</div>
+        <div class="line">aura@sentinel:~$ <span class="cursor"></span></div>
+    </div>
+
+    <div class="dashboard">
+        <div class="card">
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <span class="stat-val">293</span>
+                    <span class="stat-lbl">Nodes</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-val">1.4k</span>
+                    <span class="stat-lbl">Mutations</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-val">2</span>
+                    <span class="stat-lbl">Exploits</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h4>SECURITY FINDINGS</h4>
+            <div class="vuln-item">
+                <h4>Server-Side Template Injection</h4>
+                <p>Severity: Critical | CVSS: 9.8</p>
+                <p>Location: /rest/user/login</p>
+            </div>
+            <div class="vuln-item" style="border-left-color: #ff9d00;">
+                <h4>HTTP Request Smuggling</h4>
+                <p>Severity: High | CVSS: 8.1</p>
+                <p>Location: Gateway / Frontend-Edge</p>
+            </div>
+        </div>
+
+        <div class="card" style="flex: 1;">
+            <h4>AUTONOMOUS WEAPONIZATION (POC)</h4>
+            <div class="code-block">
+import httpx
+
+# Exploit-322: SSTI via Ruby/ERB
+def exploit():
+    target = "https://juice-shop.herokuapp.com/rest/user/login"
+    payload = "<%= 11111 * 11111 %>" # Sentient Choice
+    headers = {"User-Agent": "Aura/v25.0-Sentient"}
+    
+    resp = httpx.get(target, params={"name": payload}, headers=headers)
+    if "123454321" in resp.text:
+        print("[!] SUCCESS: Target is vulnerable to SSTI.")
+
+if __name__ == "__main__":
+    exploit()
+            </div>
+        </div>
+    </div>
+</body>
+</html>

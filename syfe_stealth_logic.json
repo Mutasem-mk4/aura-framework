@@ -1,0 +1,21 @@
+[
+  {
+    "id": "locale_session_hk",
+    "method": "GET",
+    "path": "/en-hk/myAccount",
+    "description": "Baseline session establishment in HK locale."
+  },
+  {
+    "id": "nextjs_data_leak",
+    "method": "GET",
+    "path": "/_next/data/latest/en-hk/myAccount.json",
+    "expected_status": [200, 404],
+    "description": "Probing Next.js internal data endpoints for PII leaks."
+  },
+  {
+    "id": "cross_locale_idor",
+    "method": "GET",
+    "path": "/hk/myAccount/addresses",
+    "description": "Checking if locale-switching bypasses session scoping."
+  }
+]

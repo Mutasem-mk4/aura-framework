@@ -3,7 +3,7 @@ import asyncio
 import re
 from rich.console import Console
 from aura.core import state
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 console = Console()
 
@@ -75,10 +75,16 @@ class APIReaper:
         base_routes = self.endpoints[:10] 
         
         for ep in base_routes:
+            # Fix: Ensure ep is a dictionary and has a 'path' key
+            if not isinstance(ep, dict) or "path" not in ep:
+                continue
+                
             path = ep["path"]
             # Try to identify the 'api' part or the root
-            parsed = urlparse(path)
+            import urllib.parse
+            parsed = urllib.parse.urlparse(path)
             path_str = parsed.path
+            base_authority = f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme else self.target
             
             for pattern in mobile_patterns:
                 # 1. Prefix extrapolation: /api/v1/user -> /api/mobile/v1/user
@@ -87,17 +93,19 @@ class APIReaper:
                 else:
                     new_path = f"{pattern}{path_str}"
                 
-                new_url = urljoin(f"{parsed.scheme}://{parsed.netloc}", new_path)
+                # Ensure we don't have double slashes if pattern and path_str both have them
+                new_path = new_path.replace("//", "/")
+                new_url = urljoin(base_authority, new_path)
                 
                 # Verify if the extrapolated route exists
                 try:
-                    resp = await self.session.request("GET", new_url)
+                    resp = await self.session.request("GET", new_url, timeout=5)
                     if resp and resp.status_code in [200, 401, 403, 405]:
                         console.print(f"[bold green][✓] GHOST BACKEND DISCOVERED: {new_url} ({resp.status_code})[/bold green]")
                         extrapolated.append({
                             "path": new_url,
                             "method": "GET",
-                            "params": ep["params"],
+                            "params": ep.get("params", {}),
                             "tags": ["mobile_ghost_extrapolated"]
                         })
                 except: pass

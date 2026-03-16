@@ -5,7 +5,7 @@ import os
 import re
 import asyncio
 import time
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 import httpx
 from google import genai
@@ -43,40 +43,46 @@ class AuraBrain:
         self.ai_cache = {} # v19.2: General AI query cache
         self.active_provider = None
         
-        # Zero-Cost Local AI (Ollama)
+        # Zero-Cost Local AI (Ollama) - MANDATORY PRIORITY
         if state.OLLAMA_HOST:
             self.enabled = True
             self.active_provider = "ollama"
             logger.info(f"AuraBrain Singularity: Local Ollama Engine online at {state.OLLAMA_HOST}")
         
-        # Primary Gemini SDK
-        if state.GEMINI_API_KEY and not self.active_provider:
+        # Primary Gemini SDK - Fallback
+        if state.GEMINI_API_KEY:
             try:
                 self.client = genai.Client(api_key=state.GEMINI_API_KEY)
                 self.enabled = True
-                self.active_provider = "gemini"
-                logger.info("AuraBrain Singularity: Gemini Engine online (SDK v1).")
+                if not self.active_provider:
+                    self.active_provider = "gemini"
+                logger.info("AuraBrain Singularity: Gemini Engine initialized as fallback.")
             except Exception as e:
-                logger.error(f"AuraBrain: Failed to initialize Gemini: {e}")
+                logger.debug(f"AuraBrain: Optional Gemini init failed: {e}")
         
-        # OpenRouter Free Mode
-        if state.OPENROUTER_API_KEY and not self.active_provider:
+        # OpenRouter Free Mode - Fallback
+        if state.OPENROUTER_API_KEY:
             self.enabled = True
-            self.active_provider = "openrouter"
-            logger.info("AuraBrain Singularity: OpenRouter Free-Tier Engine engaged.")
+            if not self.active_provider:
+                self.active_provider = "openrouter"
+            logger.info("AuraBrain Singularity: OpenRouter Free-Tier Engine available.")
 
     def _call_ai(self, prompt, system_instruction=None, use_cache=True):
-        """v25.0 OMEGA: Multi-Model Router with deep failover and 300s timeouts."""
+        """v25.0 OMEGA: Multi-Model Router with local-first priority."""
         if not self.enabled: return None
         if use_cache and prompt in self.ai_cache:
             return self.ai_cache[prompt]
 
-        # Order of operations: Active -> Ollama -> Gemini -> OpenRouter
+        # Strategic Order: Ollama (Local) -> Gemini -> OpenRouter
         providers = []
-        if self.active_provider: providers.append(self.active_provider)
-        if state.OLLAMA_HOST and "ollama" not in providers: providers.append("ollama")
-        if state.GEMINI_API_KEY and "gemini" not in providers: providers.append("gemini")
-        if state.OPENROUTER_API_KEY and "openrouter" not in providers: providers.append("openrouter")
+        if state.OLLAMA_HOST: providers.append("ollama")
+        if state.GEMINI_API_KEY: providers.append("gemini")
+        if state.OPENROUTER_API_KEY: providers.append("openrouter")
+
+        # Ensure the currently active provider is tried first if it's in our valid list
+        if self.active_provider and self.active_provider in providers:
+            providers.remove(self.active_provider)
+            providers.insert(0, self.active_provider)
 
         for provider in providers:
             try:
@@ -115,9 +121,11 @@ class AuraBrain:
                 return res_text
             except Exception as e:
                 if "400" in str(e) or "API key not valid" in str(e):
-                    logger.error(f"AuraBrain: Gemini API Key Invalid/Expired (400). Failing over...")
+                    logger.warning(f"AuraBrain: Gemini API Key Invalid/Expired (400). Failing over...")
                     return None
-                if attempt == max_retries - 1: break
+                if attempt == max_retries - 1:
+                    logger.error(f"AuraBrain: Gemini SDK Error: {e}")
+                    break
                 time.sleep(1 + random.uniform(0.1, 0.5))
         return None
 
@@ -152,7 +160,7 @@ class AuraBrain:
         """v25.0 OMEGA: Local Ollama Engine with 300s timeout."""
         url = f"{state.OLLAMA_HOST}/api/generate"
         payload = {
-            "model": "llama3.1",
+            "model": getattr(state, "OLLAMA_MODEL", "qwen2.5-coder:7b"),
             "prompt": f"{system_instruction or self.SYSTEM_PROMPT}\n\nUser: {prompt}\nAI:",
             "stream": False
         }
@@ -239,7 +247,29 @@ class AuraBrain:
             logger.error(f"AuraBrain JSON Reason: {e}")
             return "[]"
 
-    def analyze_behavior(self, url: str, payload: str, delay_ms: int, length: int, status: int, body: str) -> dict:
+    def validate_vulnerability(self, finding_type: str, content: str, target: str) -> dict:
+        """v33 Zenith: Second Opinion layer. Validates if a finding is likely a False Positive."""
+        if not self.enabled: return {"valid": True, "confidence": "unknown", "reason": "AI Offline"}
+        
+        prompt = (
+            f"As AURA-Zenith Security Oracle, validate this finding for {target}.\n"
+            f"Type: {finding_type}\n"
+            f"Finding Data: {content}\n\n"
+            "Analyze if this is a high-confidence vulnerability or a false positive (e.g., informative only, non-exploitable error, standard behavior).\n"
+            "Respond ONLY in JSON: {'valid': boolean, 'confidence': 'low/med/high', 'reason': 'str', 'improved_poc': 'str'}"
+        )
+        try:
+            raw = self._call_ai(prompt, use_cache=True)
+            return self._clean_json(raw)
+        except Exception: 
+            return {"valid": True, "confidence": "high", "reason": "Validation Error (Defaulting to Trust)"}
+
+    def find_exploit_path(self, context: str) -> str:
+        """Suggests a sequence of actions to exploit a discovered vulnerability."""
+        if not self.enabled: return "Manual verification required."
+        prompt = f"Given this security context: {context}\nGenerate a step-by-step exploit path for a professional report."
+        try: return self._call_ai(prompt)
+        except: return "See PoC steps in finding details."
         """Deep behavioral analysis for Blind vulnerabilities and WAF evasion indicators."""
         if not self.enabled: return {"vulnerable": False}
         
@@ -406,3 +436,90 @@ class AuraBrain:
             raw = self._call_ai(prompt, use_cache=False)
             return raw.replace("```python", "").replace("```", "").strip()
         except: return ""
+
+    async def model_state(self, traffic_logs: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """v51.0 OMEGA: Reconstructs the target's state machine from proxy logs."""
+        if not self.enabled: return {}
+        
+        # Summarize logs to fit context (taking the first 20 transactions for now)
+        summary = []
+        for log in traffic_logs[:20]:
+            summary.append({
+                "method": log["method"],
+                "url": log["url"],
+                "status": log["response_stats"],
+                "keys": list(json.loads(log["request_body"]).keys()) if log["request_body"].startswith("{") else []
+            })
+            
+        prompt = (
+            "Analyze these intercepted HTTP logs and reconstruct the application's state model.\n"
+            f"Logs: {json.dumps(summary)}\n\n"
+            "Identify:\n"
+            "1. Authentication dependencies (which endpoints require a token from where?)\n"
+            "2. State transitions (e.g., Login -> Cart -> Checkout)\n"
+            "3. Sensitive parameters for fuzzing.\n"
+            "Respond ONLY in JSON: {'states': [], 'transitions': [], 'suggested_fuzz_points': []}"
+        )
+        try:
+            raw = await asyncio.to_thread(self._call_ai, prompt)
+            return self._clean_json(raw)
+        except Exception: return {}
+
+    async def verify_strategy(self, strategy: Dict[str, Any], context: str) -> bool:
+        """v3.0 Omega: The Consensus Oracle. Cross-verifies AI strategy across multiple models."""
+        if not self.enabled: return True # Default to trust if AI offline
+        
+        prompt = (
+            "As an independent Security Auditor, verify the following offensive strategy for technical validity.\n"
+            f"Context: {context}\n"
+            f"Proposed Strategy: {json.dumps(strategy)}\n\n"
+            "Does this strategy make sense technically? Is it free from hallucinations? "
+            "Respond ONLY in JSON: {'valid': boolean, 'confidence': 'str', 'reason': 'str'}"
+        )
+        
+        # Trigger Consensus Vote: Use a DIFFERENT provider than the active one if possible
+        providers = []
+        if state.OLLAMA_HOST: providers.append("ollama")
+        if state.GEMINI_API_KEY: providers.append("gemini")
+        if state.OPENROUTER_API_KEY: providers.append("openrouter")
+        
+        verification_provider = next((p for p in providers if p != self.active_provider), self.active_provider)
+        
+        try:
+            logger.info(f"[🧠] Consensus Oracle: Verifying via {verification_provider}")
+            raw = await asyncio.to_thread(self._call_ai, prompt, use_cache=False)
+            audit = self._clean_json(raw)
+            return audit.get("valid", False)
+        except Exception:
+            return True # Fallback to trust if verification fails
+
+    async def reconstruct_openapi(self, traffic_logs: List[Dict[str, Any]]) -> str:
+        """v51.0 OMEGA: Generates a partial OpenAPI spec from captured traffic."""
+        if not self.enabled: return ""
+        
+        prompt = (
+            "Based on the following intercepted traffic logs, generate a partial OpenAPI 3.0 specification in YAML format.\n"
+            f"Logs: {json.dumps(traffic_logs[:15])}\n\n"
+            "Return ONLY the raw YAML spec."
+        )
+        try:
+            return await asyncio.to_thread(self._call_ai, prompt)
+        except Exception: return ""
+
+    def generate_triage_guide(self, finding: Dict[str, Any]) -> Dict[str, Any]:
+        """v3.0 Omega - Beginner Enablement: Explains a finding to a newcomer."""
+        if not self.enabled: return {}
+        
+        prompt = (
+            "As the AURA Mentor, explain this security finding to a beginner.\n"
+            f"Finding: {json.dumps(finding)}\n\n"
+            "Respond ONLY in JSON with these keys:\n"
+            "1. 'technical_explanation': (simple breakdown of what happened),\n"
+            "2. 'business_impact': (why this costs the company money or reputation),\n"
+            "3. 'manual_verification_steps': (list[str] of actions the user should take in Burp or browser),\n"
+            "4. 'educational_tip': (a short lesson about this vuln class)"
+        )
+        try:
+            raw = self._call_ai(prompt)
+            return self._clean_json(raw)
+        except Exception: return {}

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aura Mission Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #05070a;
+            --panel: #0d1117;
+            --accent: #00f2ff;
+            --text: #e6edf3;
+            --dim: #8b949e;
+            --critical: #ff3e3e;
+        }
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 40px;
+            overflow: hidden;
+        }
+        .dashboard {
+            max-width: 1200px;
+            margin: 0 auto;
+            border: 1px solid rgba(0, 242, 255, 0.2);
+            background: var(--panel);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 0 50px rgba(0, 242, 255, 0.1);
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .logo {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 4px;
+        }
+        .status {
+            color: #4ade80;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+        }
+        .status::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: #4ade80;
+            border-radius: 50%;
+            margin-right: 10px;
+            box-shadow: 0 0 10px #4ade80;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+        .finding {
+            background: rgba(255, 255, 255, 0.03);
+            border-left: 4px solid var(--critical);
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .finding h3 {
+            margin: 0 0 10px 0;
+            color: var(--critical);
+        }
+        .finding p {
+            margin: 0;
+            font-size: 0.95rem;
+            color: var(--dim);
+        }
+        .code {
+            font-family: 'JetBrains Mono', monospace;
+            background: #000;
+            padding: 15px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: #d1d1d1;
+            border: 1px solid #333;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-val {
+            font-size: 1.5rem;
+            font-weight: bold;
+            display: block;
+            color: var(--accent);
+        }
+        .stat-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--dim);
+        }
+        @keyframes pulse {
+            0% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+        .scanning-line {
+            height: 2px;
+            background: var(--accent);
+            width: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            animation: scan 4s infinite linear;
+            box-shadow: 0 0 15px var(--accent);
+            opacity: 0.3;
+        }
+        @keyframes scan {
+            0% { top: 0%; }
+            100% { top: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="scanning-line"></div>
+    <div class="dashboard">
+        <header>
+            <div class="logo">Aura Sentinel</div>
+            <div class="status">Mission Success: juice-shop.herokuapp.com</div>
+        </header>
+
+        <div class="grid">
+            <div class="main-report">
+                <div class="finding">
+                    <h3>[CRITICAL] Server-Side Template Injection (SSTI)</h3>
+                    <p>Target: <code>/rest/user/login</code> | Payload: <code>${{7*7}}</code> confirmed 49.</p>
+                </div>
+                <div class="finding">
+                    <h3>[HIGH] HTTP Request Smuggling (TE.CL)</h3>
+                    <p>Frontend: Nginx | Backend: Node.js. Desync successful on CL.TE probe.</p>
+                </div>
+                <div class="code">
+# PoC Synthesis complete
+import requests
+payload = "<%= 24*14 %>"
+r = requests.get("https://target.com/?q="+payload)
+if "336" in r.text:
+    print("[✓] Vulnerability Confirmed")
+                </div>
+            </div>
+
+            <div class="side-panel">
+                <div class="stats">
+                    <div class="stat-card">
+                        <span class="stat-val">293</span>
+                        <span class="stat-label">Neural Nodes</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-val">0</span>
+                        <span class="stat-label">Crashes</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-val">100%</span>
+                        <span class="stat-label">Coverage</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-val">12</span>
+                        <span class="stat-label">Days Saved</span>
+                    </div>
+                </div>
+                <p style="font-size: 12px; color: var(--dim); margin-top: 20px; line-height: 1.6;">
+                    Aura v25.2 OMEGA Protocol engaged. Deep-multi-target scans completed with autonomous weaponization.
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

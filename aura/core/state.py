@@ -58,9 +58,11 @@ def clear_dns_failures():
 PROXY_FILE = None
 TOR_MODE = False
 TOR_PORT = 9050 # Dynamic: verified by stealth engine
+SMART_BYPASS = True
 CLOUD_SWARM_MODE = False
 FAST_MODE = False # v14.2: Optimized rapid-fire mode (skips deep audits)
 AUTO_SUBMIT = False # v19.5: Phase 32 Integrated Submission Gate
+APEX_MODE = False   # v40.0: AI-Driven Zero-False-Positive verification loop
 
 # Network Stability & Performance Scaling
 GLOBAL_CONCURRENCY_LIMIT = 3    # Reduced for Intigriti compliance (Max 5 req/sec)
@@ -78,6 +80,9 @@ CUSTOM_COOKIES = {}
 AUTH_TOKEN_ATTACKER = os.environ.get("AUTH_TOKEN_ATTACKER")
 AUTH_TOKEN_VICTIM = os.environ.get("AUTH_TOKEN_VICTIM")
 
+# Apex Protocol Phase 1: Ghost Mode (Global Stealth Engine)
+GHOST_MODE = False # Enabled via --ghost CLI flag
+
 # Professional Reporting Options
 CUSTOM_CONSULTANT = "Independent Security Researcher"
 CUSTOM_COMPANY = "Security Assessment Team"
@@ -87,7 +92,11 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_MODEL = "gemini-2.0-flash" 
 
 # Zero-Cost Local AI Configuration (Ollama)
-OLLAMA_HOST = os.environ.get("OLLAMA_HOST") 
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST")
+# v4.0 Beginner Enablement
+BEGINNER_MODE = True # Default to true for newcomers
+CLINIC_MODE = False
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5-coder:7b")
 
 # Zero-Cost AI (OpenRouter Free Tier)
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
@@ -111,6 +120,9 @@ BINARYEDGE_API_KEY = os.environ.get("BINARYEDGE_API_KEY")
 INTELX_API_KEY = os.environ.get("INTELX_API_KEY")
 HUNTERIO_API_KEY = os.environ.get("HUNTERIO_API_KEY")
 FULLHUNT_API_KEY = os.environ.get("FULLHUNT_API_KEY")
+
+# v40.0 OMEGA: Bounty Platform Target
+BOUNTY_PLATFORM = os.environ.get("BOUNTY_PLATFORM", "hackerone") # hackerone, intigriti, bugcrowd, generic
 
 # v21.0 Cloud Swarm Phase (DigitalOcean Orchestration)
 DIGITALOCEAN_TOKEN = os.environ.get("DIGITALOCEAN_TOKEN")

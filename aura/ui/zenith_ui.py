@@ -1,3 +1,23 @@
+import os
+import sys
+import io
+
+# Fix Windows Unicode issues FIRST before any rich imports
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        pass
+    
+os.environ['TERM'] = 'dumb'
+os.environ['NO_COLOR'] = '1'
+os.environ['RICH_DISABLE_JUPYTER'] = '1'
+
+# Patch Windows console before rich imports
+import rich._windows_renderer
+rich._windows_renderer.LegacyWindowsTerm = None
+
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
@@ -5,9 +25,9 @@ from rich.status import Status
 from rich.align import Align
 from rich.text import Text
 from rich import box
-import asyncio
 
-console = Console()
+# Use non-terminal console to avoid Windows encoding issues
+console = Console(file=sys.stdout, force_terminal=False)
 
 class ZenithUI:
     """The visual soul of Aura: Gemini-style high-fidelity UI components."""
@@ -87,6 +107,16 @@ class ZenithUI:
             f"[white]Target:[/white] [dim]{target}[/dim]",
             box=box.ROUNDED,
             border_style=color,
+            padding=(0, 2),
+            expand=False
+        ))
+    @staticmethod
+    def clinic_info(topic: str, content: str):
+        """v4.0 Clinic Mode: Displays educational tooltips for beginners."""
+        console.print(Panel(
+            f"[bold cyan]📚 Topic: {topic}[/bold cyan]\n[white]{content}[/white]",
+            title="[bold yellow]CLINIC TIP[/bold yellow]",
+            border_style="yellow",
             padding=(0, 2),
             expand=False
         ))

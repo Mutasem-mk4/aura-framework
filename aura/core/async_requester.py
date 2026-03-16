@@ -13,50 +13,73 @@ import logging
 from typing import List, Dict, Any, Optional
 
 from aura.core.phantom_router import PhantomRouter
+from aura.core.privacy import PrivacyFilter
+from aura.core.signers import SignerManager
 
 class AsyncRequester:
     def __init__(self, concurrency_limit: int = 50, timeout: int = 15, proxy_file: Optional[str] = None):
         """
         Initializes the async requester with a connection pool and rate limiter.
-        
-        Args:
-            concurrency_limit (int): Maximum number of concurrent requests.
-            timeout (int): Global timeout per request.
         """
         self.concurrency_limit = concurrency_limit
         self.timeout = timeout
         self.semaphore = asyncio.Semaphore(self.concurrency_limit)
         self.phantom = PhantomRouter(proxy_file)
         self.proxy_file = proxy_file
-        
-        # We reuse the same client across the session if no proxy rotation is needed
         self._client: Optional[httpx.AsyncClient] = None
 
     async def __aenter__(self):
-        # We start with a base client. If we use a single proxy list, we'll
-        # instantiate them dynamically if we hit a 403 or if proxy rotation is on.
-        self._client = self._create_client(self.phantom.get_proxy())
+        self._client = httpx.AsyncClient(timeout=self.timeout, verify=False)
         return self
-
-    def _create_client(self, proxy_str: Optional[str] = None) -> httpx.AsyncClient:
-        """Creates a new httpx client, optionally with a proxy."""
-        limits = httpx.Limits(max_connections=self.concurrency_limit, max_keepalive_connections=self.concurrency_limit)
-        if proxy_str:
-            return httpx.AsyncClient(verify=False, timeout=self.timeout, limits=limits, proxies={"all://": proxy_str})
-        return httpx.AsyncClient(verify=False, timeout=self.timeout, limits=limits)
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self._client:
             await self._client.aclose()
+            self._client = None
+
+    async def ghost_fetch(self, method: str, url: str, **kwargs) -> Optional[Any]:
+        """
+        Aura v25.0: The Ghost Protocol.
+        Uses curl_cffi to mimic a real Chrome browser TLS fingerprint.
+        Bypasses JA3/TLS-based Cloudflare blocks.
+        """
+        try:
+            from curl_cffi import requests as ghost_requests
+            
+            # Mask logging
+            masked_url = PrivacyFilter.redact(url)
+            logging.debug(f"[GHOST] Requesting {masked_url}")
+            
+            # Auto-sign if needed
+            signer = SignerManager.get_signer(url)
+            if signer:
+                kwargs["headers"] = signer.sign(method, url, kwargs.get("headers", {}), kwargs.get("json") or kwargs.get("data"))
+
+            response = ghost_requests.request(
+                method, 
+                url, 
+                impersonate="chrome110", 
+                timeout=self.timeout,
+                verify=False,
+                **kwargs
+            )
+            return response
+        except Exception as e:
+            logging.error(f"[GHOST] Error: {e}")
+            return None
 
     async def fetch(self, method: str, url: str, **kwargs) -> Optional[httpx.Response]:
         """
-        Core fetching method with Semaphore concurrency, custom evasion headers,
-        and Auto-WAF Bypass on 403/429.
+        Core fetching method with Semaphore concurrency and Auto-Signer integration.
         """
         if not self._client:
             raise RuntimeError("AsyncRequester must be used as an async context manager.")
             
+        # Apply target-specific signing if registered
+        signer = SignerManager.get_signer(url)
+        if signer:
+            kwargs["headers"] = signer.sign(method, url, kwargs.get("headers", {}), kwargs.get("json") or kwargs.get("data"))
+
         retries = kwargs.pop("retries", 3)
         client_to_use = self._client
         

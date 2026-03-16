@@ -28,6 +28,8 @@ from pathlib import Path
 from typing import Optional
 
 import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from rich.console import Console
 
 console = Console()

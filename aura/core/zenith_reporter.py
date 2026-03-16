@@ -68,8 +68,14 @@ class ZenithReporter:
             # v20.0: We use the brain to generate the submission content
             report_body = await asyncio.to_thread(self.brain._call_ai, prompt)
             
+            if report_body is None:
+                report_body = f"## Automated Summary\n\nAI report generation failed. Raw finding data: {v_content}"
+
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"Zenith_Report_{target.replace('.', '_')}_{v_type.replace(' ', '_')}_{timestamp}.md"
+            # v25.0: Sanitize filename for Windows compatibility
+            v_safe = v_type.replace(" ", "_").replace("/", "-").replace("\\", "-").replace(":", "-").replace(".", "-")
+            t_safe = target.replace(".", "_").replace("/", "-").replace(":", "-")
+            filename = f"Zenith_Report_{t_safe}_{v_safe}_{timestamp}.md"
             filepath = os.path.join(self.report_dir, filename)
             
             with open(filepath, "w", encoding="utf-8") as f:

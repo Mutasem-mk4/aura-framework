@@ -1,0 +1,32 @@
+[
+  {
+    "id": "config_leak_probe",
+    "method": "GET",
+    "path": "/config.js",
+    "description": "Probing for leaked frontend environment variables (API keys, internal URLs)."
+  },
+  {
+    "id": "well_known_jwks",
+    "method": "GET",
+    "path": "/.well-known/jwks.json",
+    "description": "Checking for exposed JWT signing keys."
+  },
+  {
+    "id": "registration_domain_fuzz",
+    "method": "POST",
+    "path": "/api/v1/auth/signup",
+    "json": {
+      "email": "researcher@syfe.com",
+      "password": "Password123!",
+      "referral_code": "ADMIN_OVERRIDE"
+    },
+    "expected_status": [200, 201, 400, 403],
+    "description": "Testing if internal email domains or referral overrides are accepted."
+  },
+  {
+    "id": "path_traversal_api",
+    "method": "GET",
+    "path": "/api/v1/../../etc/passwd",
+    "description": "Classic traversal to check for improper normalization in the Gateway layer."
+  }
+]

@@ -13,6 +13,8 @@ from aura.modules.dast import AuraDAST
 from aura.modules.dast_v2 import AuraSingularity
 from aura.modules.vision import VisualEye
 from aura.core.vuln_intel import CVEProvider
+from aura.core.nexus_bridge import NexusBridge
+from aura.core.omega_crawler import OMEGACrawler
 from aura.modules.safety import ScopeManager
 from aura.core.exploit_chain import ChainOfThoughtExploiter
 from aura.core.memory import DeepMemoryFuzzer
@@ -59,6 +61,12 @@ from aura.modules.dorks_intel import DorksIntel
 from aura.modules.subdomain_takeover import SubdomainTakeoverHunter
 from aura.modules.nuclei_engine import NucleiEngine
 from aura.core.weaponization_engine import WeaponizationEngine
+from aura.core.apex_sentinel import ApexSentinel
+from aura.core.shadow_state import ShadowStateModeler
+from aura.core.bounty_reporter import BountyReporter
+from aura.core.fleet_manager import FleetManager
+from aura.core.mission_hunter import MissionHunter
+from aura.core.sentinel_watch import SentinelWatch
 from aura.core import state
 from aura.core.storage import AuraStorage
 from aura.core.oast_server import OASTManager
@@ -69,7 +77,7 @@ from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 from rich.panel import Panel
 from rich.console import Console
 from rich.table import Table
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 from aura.core.metrics import METRICS
 
 # v38.0: Semantic Analysis Engines
@@ -81,8 +89,9 @@ logger = logging.getLogger("aura.orchestrator")
 
 class AsyncDBProxy:
     """v36.0: Asynchronous Database Queue Proxy to eliminate SQLite WAL write-locks."""
-    def __init__(self, real_db):
+    def __init__(self, real_db, broadcast_callback=None):
         self.real_db = real_db
+        self.broadcast_callback = broadcast_callback
         self._queue = None
 
     def _get_queue(self):
@@ -98,6 +107,25 @@ class AsyncDBProxy:
         }
         try:
             self._get_queue().put_nowait(data)
+            if self.broadcast_callback:
+                import asyncio
+                from aura.core.profit_engine import profit_engine
+                roi = profit_engine.calculate_roi(finding_type, severity)
+                payout = profit_engine.estimate_payout(finding_type, severity)
+                
+                asyncio.create_task(self.broadcast_callback({
+                    "type": "finding",
+                    "level": "critical" if severity == "CRITICAL" else "success",
+                    "content": f"New Finding: {finding_type} on {target} | ROI: {roi} | Est: {payout}",
+                    "icon": "bug",
+                    "data": {"roi": roi, "payout": payout}
+                }))
+                
+                # Update Mission HUD Stats
+                asyncio.create_task(self.broadcast_callback({
+                    "type": "stats",
+                    "data": {"roi_score": roi, "est_payout": payout}
+                }))
         except Exception:
             self.real_db.add_finding(target, content_obj, finding_type, severity, campaign_id)
 
@@ -155,7 +183,7 @@ class MirrorSimulator:
         self.alert_threshold = 0.7
 
     async def predict_exposure(self, activity_log: list) -> dict:
-        console.print("[bold blue][🪞 MIRROR] Simulating Defensive Response Analysis...[/bold blue]")
+        console.print("[bold blue][[MIRROR] MIRROR] Simulating Defensive Response Analysis...[/bold blue]")
         risk_score = random.random()
         return {
             "alert_triggered": risk_score > self.alert_threshold,
@@ -168,7 +196,7 @@ class DeceptionOrchestrator:
         self.swarm = swarm
 
     async def deploy_distraction(self, target: str):
-        console.print(f"[bold yellow][🎭 DECEPTION] Deploying Noise Workers to distract security for {target}...[/bold yellow]")
+        console.print(f"[bold yellow][[MASQUERADE] DECEPTION] Deploying Noise Workers to distract security for {target}...[/bold yellow]")
         await asyncio.sleep(0.5)
         console.print("[dim yellow][+] Noise Swarm active: Engaging WAF with generic 'noisy' signatures.[/dim yellow]")
 
@@ -178,12 +206,12 @@ class SovereignDecisionEngine:
         self.db = db
 
     async def autonomous_mission_planning(self, domain: str = None) -> list:
-        console.print("[bold purple][🧠 SOVEREIGN] Analyzing Global Battlefield for Autonomous Target Selection...[/bold purple]")
+        console.print("[bold purple][[BRAIN] SOVEREIGN] Analyzing Global Battlefield for Autonomous Target Selection...[/bold purple]")
         if domain:
             selected = [domain]
         else:
             selected = [domain or "unknown"]
-        console.print(f"[bold purple][👑] Decision: Primary Objective set to: {selected[0]}[/bold purple]")
+        console.print(f"[bold purple][[CROWN]] Decision: Primary Objective set to: {selected[0]}[/bold purple]")
         return selected
 
 from aura.modules.api_reaper import APIReaper
@@ -194,9 +222,15 @@ from aura.core.zenith_reporter import ZenithReporter
 
 class NeuralOrchestrator:
     def __init__(self, whitelist: list = None, blacklist: list = None, broadcast_callback=None):
+        from aura.core.provisioner import AuraProvisioner
+        from aura.core.brain import AuraBrain
+        from aura.core.storage import AuraStorage
+        from aura.core.profit_engine import profit_engine
         AuraProvisioner.check_and_provision()
         self.brain = AuraBrain()
-        self.db = AsyncDBProxy(AuraStorage())
+        self.broadcast_callback = broadcast_callback or self._default_remote_broadcast
+        self.db = AsyncDBProxy(AuraStorage(), broadcast_callback=self.broadcast_callback)
+        self.profit_engine = profit_engine
         self.api_reaper = APIReaper(None) # Session will be assigned later
         self.frontend_miner = FrontendDeconstructor(None)
         self.gql_reaper = GraphQLReaper(None)
@@ -246,8 +280,9 @@ class NeuralOrchestrator:
         self.ssti_engine     = SSTIEngine(target="") # Target will be set or passed during run
         self.smuggling_engine = SmugglingEngine(self.session)
         self.ws_oauth_engine = WSAndOAuthEngine(self.session)
-        from aura.modules.cloud_swarm import CloudSwarm
-        self.cloud_swarm = CloudSwarm()
+        self.fleet_manager = FleetManager()
+        self.mission_hunter = MissionHunter()
+        self.sentinel_watch = SentinelWatch(self.db)
         self.plugins = []
         self._load_plugins()
         self.current_campaign = None
@@ -257,7 +292,50 @@ class NeuralOrchestrator:
         self.mirror = MirrorSimulator(self.brain)
         self.deception = DeceptionOrchestrator(self.stealth.swarm)
         self.sovereign = SovereignDecisionEngine(self.brain, self.db)
+        self.nexus_bridge = NexusBridge()
+        self.omega_crawler = OMEGACrawler(proxy_url="http://127.0.0.1:8081")
+        self.apex = ApexSentinel(self.brain)
+        self.shadow_state = ShadowStateModeler(self.brain)
+        self.bounty_reporter = BountyReporter(self.brain, platform=getattr(state, "BOUNTY_PLATFORM", "generic"))
         self.knowledge_base = {"redirects": [], "sinks": [], "leaks": [], "idor_vectors": []}
+        self._guard_active = False
+        
+        # v45.0: Integrated Broadcast Bridge (CLI -> Background Nexus)
+        if self.broadcast_callback is None:
+            self.broadcast_callback = self._default_remote_broadcast
+        
+        # v25.0: Register custom API signers from environment
+        from aura.core.signers import SignerManager, CoinhakoSigner
+        coinhako_key = os.getenv("COINHAKO_API_KEY")
+        coinhako_secret = os.getenv("COINHAKO_API_SECRET")
+        if coinhako_key and coinhako_secret:
+            SignerManager.register("coinhako.com", CoinhakoSigner(coinhako_key, coinhako_secret))
+            console.print("[bold green][[OK]] Coinhako API Signer active.[/bold green]")
+
+    async def _broadcast(self, content, type="status", level="info", icon="info", data=None):
+        """Unified broadcast interface with remote bridge support."""
+        message = {
+            "type": type,
+            "level": level,
+            "content": content,
+            "icon": icon,
+            "data": data,
+            "timestamp": time.time()
+        }
+        if self.broadcast_callback:
+            if asyncio.iscoroutinefunction(self.broadcast_callback):
+                await self.broadcast_callback(message)
+            else:
+                self.broadcast_callback(message)
+
+    async def _default_remote_broadcast(self, message):
+        """Bridge CLI events to the background Nexus API server."""
+        import httpx
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.post("http://127.0.0.1:8000/api/broadcast", json=message, timeout=1.0)
+        except Exception:
+            pass
 
     async def _process_exploit_chain(self, domain, finding_type, content_obj):
         campaign_id = getattr(self, 'current_campaign', None)
@@ -276,7 +354,7 @@ class NeuralOrchestrator:
             redirect_url = self.knowledge_base["redirects"][0]
             sink_url = self.knowledge_base["sinks"][0]
             chained_payload = f"{sink_url}?url={redirect_url}"
-            console.print(f"[bold red][⚓] EXPLOIT CHAIN DETECTED: Combining SSRF sink with Open Redirect for Network Bypass![/bold red]")
+            console.print(f"[bold red][[ANCHOR]] EXPLOIT CHAIN DETECTED: Combining SSRF sink with Open Redirect for Network Bypass![/bold red]")
             chain_finding = {
                 "type": "Critical Chain: SSRF via Open Redirect Bypass",
                 "content": f"Aura synthesized a exploit chain: SSRF via Open Redirect.",
@@ -289,17 +367,38 @@ class NeuralOrchestrator:
         if any(k in str(finding_type).lower() for k in ["ssrf", "rce", "lfi"]):
             await self.lateral.pivot_from_finding(content_obj)
         
-        # v38.0 OMEGA: Sentient Oracle Synthesis for Chaining
+        # v3.5 OMEGA: Sentient Oracle Synthesis for Chaining
         await self._perform_oracle_chaining_synthesis(domain)
         
+        # v4.0 Beginner Enablement: Mentor Engine
+        if state.BEGINNER_MODE:
+            await self._display_mentor_guide(content_obj)
+        
         return None
+
+    async def _display_mentor_guide(self, finding: dict):
+        """v4.0: Calls the brain to explain a finding to the user."""
+        try:
+            guide = await asyncio.to_thread(self.brain.generate_triage_guide, finding)
+            if guide:
+                console.print(Panel(
+                    f"[bold cyan]Technical Explanation:[/bold cyan] {guide.get('technical_explanation')}\n\n"
+                    f"[bold red]Business Impact:[/bold red] {guide.get('business_impact')}\n\n"
+                    f"[bold yellow]Manual Verification:[/bold yellow]\n" + 
+                    "\n".join([f"  - {step}" for step in guide.get('manual_verification_steps', [])]) + "\n\n"
+                    f"[bold green]Mentor Tip:[/bold green] {guide.get('educational_tip')}",
+                    title="🎓 AURA MENTOR",
+                    border_style="cyan"
+                ))
+        except Exception as e:
+            logger.debug(f"Mentor guide generation failed: {e}")
 
     async def _cloud_metadata_escalation(self, domain: str, finding: dict):
         """
         [CLOUD PREDATOR] v38.0: Autonomous IAM Credential Extraction.
         Pivots from SSRF to full metadata harvest (AWS/GCP/Azure).
         """
-        console.print(f"[bold red][🛰️ CLOUD PREDATOR] SSRF Detected on Cloud Infrastructure. Pivoting to IAM Escalation...[/bold red]")
+        console.print(f"[bold red][[SATELLITE] CLOUD PREDATOR] SSRF Detected on Cloud Infrastructure. Pivoting to IAM Escalation...[/bold red]")
         
         target_url = finding.get("url")
         param = finding.get("param")
@@ -338,7 +437,7 @@ class NeuralOrchestrator:
                         resp = await self.session.get(new_url, headers=headers)
                     
                     if resp and "AccessKeyId" in resp.text or "access_token" in resp.text:
-                        console.print(f"[bold red][🔥 CLOUD TAKEOVER] SUCCESS: Extracted {name} Credentials![/bold red]")
+                        console.print(f"[bold red][[FIRE] CLOUD TAKEOVER] SUCCESS: Extracted {name} Credentials![/bold red]")
                         takeover_finding = {
                             "type": f"Cloud Infrastructure Takeover: {name} Leak",
                             "severity": "CRITICAL",
@@ -375,7 +474,7 @@ class NeuralOrchestrator:
             chain = json.loads(raw) if isinstance(raw, str) else raw
             
             if chain and chain.get("chained_payload"):
-                console.print(f"[bold red][🔮 ORACLE] Sentient Discovery: {chain.get('chain_name')}![/bold red]")
+                console.print(f"[bold red][[ORACLE] ORACLE] Sentient Discovery: {chain.get('chain_name')}![/bold red]")
                 console.print(f"[dim red]Logic: {chain.get('logic')}[/dim red]")
                 
                 chain_finding = {
@@ -388,7 +487,7 @@ class NeuralOrchestrator:
                 self.db.add_finding(domain, chain_finding, chain_finding["type"], chain_finding["severity"], campaign_id)
                 
                 # Autonomously pivot to the new mission
-                console.print(f"[bold purple][🚀] Autonomous Pivot: Launching targeted mission for {chain.get('chained_payload')}...[/bold purple]")
+                console.print(f"[bold purple][[ROCKET]] Autonomous Pivot: Launching targeted mission for {chain.get('chained_payload')}...[/bold purple]")
                 await self.lateral.pivot_from_finding(chain_finding)
                 
         except Exception as e:
@@ -418,13 +517,30 @@ class NeuralOrchestrator:
         except asyncio.CancelledError:
             pass
 
+    async def _resource_guard_monitor(self):
+        """v3.0 Omega: Background watchdog to prevent resource exhaustion."""
+        self._guard_active = True
+        console.print("[bold green][[SHIELD]] OMEGA Guard: Resource Watchdog active via Veritas.[/bold green]")
+        while self._guard_active:
+            try:
+                health = self.nexus_bridge.get_health()
+                if health.get("result"):
+                    ram_mb = health["result"].get("ram_usage_mb", 0)
+                    if ram_mb > 2500: # 2.5GB RAM Threshold for emergency kill
+                        console.print(f"[bold red][[WARNING]] AURA GUARD: High RAM usage ({ram_mb}MB). Executing emergency cleanup...[/bold red]")
+                        self.nexus_bridge.veritas.call("guard_kill_chromes")
+                await asyncio.sleep(60)
+            except Exception as e:
+                logger.debug(f"Resource Guard poll error: {e}")
+                await asyncio.sleep(60)
+
     async def activate_sentient_mode(self, domain: str):
-        console.print(f"[bold red][🌌 OMEGA] Activating Sentient Singularity Mode for {domain}...[/bold red]")
+        console.print(f"[bold red][[OMEGA] OMEGA] Activating Sentient Singularity Mode for {domain}...[/bold red]")
         exposure = await self.mirror.predict_exposure(self.session.latency_log)
         if exposure["alert_triggered"]:
             await self.deception.deploy_distraction(domain)
         objectives = await self.sovereign.autonomous_mission_planning(domain)
-        console.print("[bold green][🧬] Genetic Payload Mutator active.[/bold green]")
+        console.print("[bold green][[DNA]] Genetic Payload Mutator active.[/bold green]")
 
     async def broadcast(self, content, type="status", level="info", icon="info-circle", **kwargs):
         if self.broadcast_callback:
@@ -468,11 +584,13 @@ class NeuralOrchestrator:
                 self.oast_task.cancel()
                 try: await self.oast_task
                 except asyncio.CancelledError: pass
-            console.print("[bold green][✓] Framework shutdown complete.[/bold green]")
+            console.print("[bold green][OK] Framework shutdown complete.[/bold green]")
         except Exception as e:
             console.print(f"[dim red][!] Shutdown warning: {e}[/dim red]")
 
     async def _phase_preflight(self, domain, status):
+        if state.CLINIC_MODE:
+            ZenithUI.clinic_info("Phase 0: Pre-Flight", "This phase checks if the target is alive and determines its IP. If a firewall is detected, Aura attempts to find the 'Origin IP' to bypass it.")
         ZenithUI.phase_banner("Phase 0: Stealth Pre-Flight Recon", domain, icon="⚡")
         status.update(f"[bold cyan]Initializing pre-flight telemetry for {domain}...")
         target_url = f"https://{domain}"
@@ -481,7 +599,7 @@ class NeuralOrchestrator:
             resp = await self.session.get(target_url, timeout=30)
             is_live = True
             recon_domain = domain
-            if state.SMART_BYPASS and resp.status_code in [403, 401]:
+            if getattr(state, "SMART_BYPASS", False) and resp and resp.status_code in [403, 401]:
                 origin_ips = await self.stealth.hunt_origin_ip(domain)
                 if origin_ips:
                     best_ip = origin_ips[0]
@@ -499,31 +617,117 @@ class NeuralOrchestrator:
             except Exception: return None, None, None, False
         return domain, target_url, original_domain, is_live
 
-    async def _phase_intel(self, recon_domain, target_ip, status, campaign_id):
-        ZenithUI.phase_banner("Phase 1: Gathering OSINT", recon_domain, icon="📡")
+    async def _phase_intel(self, recon_domain: str | None, target_ip: str | None, status, campaign_id):
+        ZenithUI.phase_banner("Phase 1: Gathering OSINT", recon_domain, icon="[RADAR]")
+        await self._broadcast(recon_domain, type="stats", data={"active_mission": f"Recon: {recon_domain}", "progress": 15})
+        await self._broadcast(f"Gathering OSINT intelligence for {recon_domain}...", type="intel", icon="satellite-dish")
         status.update(f"[bold magenta]Querying threat intelligence databases...")
         intel_data = {}
+        
         async def _shodan():
             try: return "shodan", await self.intel.query_shodan(target_ip) if target_ip else None
             except: return "shodan", None
-        results = await asyncio.gather(_shodan(), return_exceptions=True)
+            
+        async def _censys():
+            try: return "censys", await self.intel.query_censys(target_ip) if target_ip else None
+            except: return "censys", None
+
+        async def _virustotal():
+            try: return "virustotal", await self.intel.query_virustotal(recon_domain)
+            except: return "virustotal", None
+
+        async def _leaks():
+            try: return "leaks", self.leaks.probe_domain(recon_domain)
+            except: return "leaks", None
+
+        async def _dorks():
+            try: return "dorks", await self.dorks_intel.run_dorks(recon_domain)
+            except: return "dorks", None
+
+        async def _security_trails():
+            try: return "securitytrails", await self.intel.query_securitytrails(recon_domain)
+            except: return "securitytrails", None
+
+        results = await asyncio.gather(_shodan(), _censys(), _virustotal(), _leaks(), _dorks(), _security_trails(), return_exceptions=True)
         for r in results:
-            if isinstance(r, tuple) and r[1]: intel_data[r[0]] = r[1]
+            if isinstance(r, tuple) and r[1]: 
+                intel_data[r[0]] = r[1]
+                # Log findings to DB if they are lists of dicts (like dorks/leaks)
+                if r[0] in ["dorks", "leaks"] and isinstance(r[1], list):
+                    for finding in r[1]:
+                        self.db.add_finding(recon_domain, finding, finding.get("type", "OSINT Leak"), finding.get("severity", "MEDIUM"), campaign_id)
+
         return intel_data
 
-    async def _phase_recon(self, recon_domain, target_ip, intel_data, status, campaign_id, swarm_mode):
-        ZenithUI.phase_banner("Phase 2: Active Reconnaissance", recon_domain, icon="🛰️")
+    async def _phase_recon(self, recon_domain: str | None, target_ip: str | None, intel_data, status, campaign_id, swarm_mode):
+        if state.CLINIC_MODE:
+            ZenithUI.clinic_info("Phase 2: Active Recon", "Here we map the infrastructure. We look for hidden subdomains and services that might be vulnerable or forgotten by the owner.")
+        ZenithUI.phase_banner("Phase 2: Active Reconnaissance", recon_domain, icon="[SATELLITE]")
+        await self._broadcast(recon_domain, type="stats", data={"progress": 30})
+        await self._broadcast(f"Mapping infrastructure & subdomains for {recon_domain}...", type="recon", icon="map-location-dot")
         status.update(f"[bold blue]Mapping infrastructure and subdomains...")
-        recon_data = await self.recon_pipeline.run(recon_domain, target_ip, intel_data=intel_data, stealth_mode=self.effective_fast_mode)
+        recon_data = await self.recon_pipeline.run(
+            recon_domain, 
+            target_ip, 
+            intel_data=intel_data, 
+            stealth_mode=getattr(self, "effective_fast_mode", False),
+            beginner_mode=state.BEGINNER_MODE
+        )
         all_subs = recon_data.get("subdomains", [])
         if all_subs: await self.takeover_hunter.run(all_subs)
+        
+        # v38.0: Active Secret Hunting on discovered URLs
+        found_urls = [r["url"] for r in recon_data.get("urls", []) if "url" in r]
+        if found_urls:
+            status.update(f"[bold yellow]SecretHunter: Scanning JS/Config files in {len(found_urls)} URLs...")
+            secrets = await self.secret_hunter.hunt_js_files(found_urls)
+            if secrets:
+                for s in secrets:
+                    self.db.add_finding(recon_domain, s, s["type"], s["severity"], campaign_id)
+                    
         return recon_data
 
     async def _phase_discovery(self, target_url, recon_domain, recon_data, status, campaign_id):
-        ZenithUI.phase_banner("Phase 3: Deep Discovery", target_url, icon="🔍")
+        ZenithUI.phase_banner("Phase 3: Deep Discovery", target_url, icon="[SEARCH]")
+        await self._broadcast(target_url, type="stats", data={"progress": 50})
+        await self._broadcast(f"Starting Deep Discovery on {target_url}...", type="discovery", icon="magnifying-glass-nodes")
         status.update(f"[bold yellow]Crawling and discovering endpoints...")
+        
+        # v38.0: Dual Crawler Strategy (AuraScanner + OMEGACrawler)
         spidered_urls, discovered_forms = await self.scanner.recursive_spider(target_url, max_depth=1)
+        
+        try:
+            status.update(f"[bold cyan]OMEGACrawler: Deconstructing SPA/Lazy-loaded routes...")
+            omega_results = await self.omega_crawler.crawl(target_url)
+            if omega_results:
+                omega_urls = [r.get("url") for r in omega_results if r.get("url")]
+                spidered_urls.extend(omega_urls)
+                console.print(f"[bold green][[OK]] OMEGACrawler discovered {len(omega_urls)} additional routes.[/bold green]")
+        except Exception as e:
+            console.print(f"[dim red][!] OMEGACrawler skipped: {e}[/dim red]")
+            
         return list(set([target_url] + spidered_urls)), discovered_forms
+
+    async def _phase_0day_radar(self, recon_domain, tech_stack, campaign_id):
+        """v40.0 OMEGA: Global Threat Feed 0-Day PoC check."""
+        if not tech_stack or state.FAST_MODE: return []
+        
+        ZenithUI.phase_banner("Phase 3.9: 0-Day Radar Scanning", recon_domain, icon="[RADAR]")
+        try:
+            exploits = await self.intel.query_github_0days(tech_stack)
+            for exp in exploits:
+                finding = {
+                    "type": f"0-Day Radar Hit: {exp['tech']} Exploit",
+                    "severity": "CRITICAL",
+                    "content": f"A potential 0-day PoC for {exp['tech']} was found on GitHub: {exp['repo']}\n{exp['description']}",
+                    "evidence_url": exp["repo"],
+                    "confirmed": False
+                }
+                self.db.add_finding(recon_domain, finding, finding["type"], "CRITICAL", campaign_id)
+            return exploits
+        except Exception as e:
+            logger.debug(f"0-Day Radar failed: {e}")
+            return []
 
     async def _phase_deconstruction(self, target_url, recon_domain, recon_data, status, campaign_id):
         ZenithUI.phase_banner("Phase 3.5: Deconstruction Doctrine", target_url, icon="🏗️")
@@ -557,8 +761,15 @@ class NeuralOrchestrator:
             api_findings = await api_engine.run()
             all_findings.extend(api_findings)
             for ep in getattr(api_engine, 'endpoints', []):
-                params_dict = {p["name"]: 1 for p in ep.get("params", []) if p["in"] == "query"}
-                fuzz_param_names = list(params_dict.keys())
+                # Fix: In api_reaper.py, ep['params'] is a dictionary {name: val}, not a list of dicts.
+                params = ep.get("params", {})
+                params_dict = {}
+                fuzz_param_names = []
+                
+                if isinstance(params, dict):
+                    params_dict = {k: v for k, v in params.items()}
+                    fuzz_param_names = list(params.keys())
+                
                 if fuzz_param_names or ep.get("body_schema"):
                     endpoints_to_fuzz.append({
                         "method": ep["method"],
@@ -612,23 +823,189 @@ class NeuralOrchestrator:
             await fuzzer.execute_workflow(workflow, mutate_only=True)
             
             for finding in fuzzer.findings:
-                # Add to findings array
-                f_dict = {"type": finding.vuln_type, "severity": finding.severity, "content": finding.description, "evidence": finding.evidence}
+                # v38.0: Logic findings are dicts, not objects
+                f_type = finding.get("type", "Logic Flaw")
+                f_sev = finding.get("severity", "HIGH")
+                f_desc = finding.get("description", "Unknown logic vulnerability")
+                f_ev = finding.get("evidence", "")
+                
+                f_dict = {"type": f_type, "severity": f_sev, "content": f_desc, "evidence": f_ev}
                 all_findings.append(f_dict)
-                self.db.add_finding(recon_domain, f_dict, finding.vuln_type, finding.severity, campaign_id)
+                self.db.add_finding(recon_domain, f_dict, f_type, f_sev, campaign_id)
                 # Note: Autonomous PoC Generation is already handled by API Reaper and GraphQL reaper natively,
                 # and in phase_exploit for general findings.
                 
         return all_findings
 
+    async def _phase_sentient_interception(self, target_url: str, status):
+        ZenithUI.phase_banner("Phase 3.8: Sentient Interception", target_url, icon="🌀")
+        status.update(f"[bold cyan]Launching Nexus Proxy & OMEGA Crawler for state mapping...")
+        
+        log_file = "nexus_traffic.json"
+        if os.path.exists(log_file): os.remove(log_file)
+        
+        # 1. Start Veritas Backbone (If not running)
+        self.nexus_bridge.start_veritas(port=50051)
+        asyncio.create_task(self._resource_guard_monitor())
+        
+        # 2. Trigger Proxy Worker via Veritas (Omega RPC)
+        self.nexus_bridge.start_proxy(port=8081, log_file=log_file)
+        await asyncio.sleep(2) # Wait for proxy to bind
+        
+        # 3. Run OMEGA Crawler
+        try:
+            await self.omega_crawler.start()
+            await self.omega_crawler.crawl(target_url)
+            await self.omega_crawler.stop()
+        except Exception as e:
+            console.print(f"[bold red][!] OMEGA Crawler failed: {e}[/bold red]")
+        
+        # 3. Read Logs & Model State
+        traffic_logs = []
+        if os.path.exists(log_file):
+            with open(log_file, "r") as f:
+                for line in f:
+                    try: traffic_logs.append(json.loads(line))
+                    except: pass
+        
+        if not traffic_logs:
+            console.print("[yellow][!] No traffic intercepted. Neural modeling skipped.[/yellow]")
+            return {}
+
+        status.update(f"[bold magenta]Shadow State Modeler: Reconstructing {len(traffic_logs)} transactions...")
+        state_model = await self.shadow_state.model_sequence(traffic_logs)
+        
+        # 4. Integrate with StatefulLogicFuzzer
+        if state_model.get("states"):
+            console.print(f"[bold green][[BRAIN]] Neural Model synthesized: {len(state_model['states'])} states found.[/bold green]")
+            fuzzer = StatefulLogicFuzzer(base_url=target_url)
+            # v2.0: Feed the neural model directly to the fuzzer
+            # This is a hypothetical extension to the fuzzer we will implement next
+            if hasattr(fuzzer, "ingest_model"):
+                await fuzzer.ingest_model(state_model)
+                await fuzzer.execute_advanced_strategy()
+                
+        return state_model
+
     async def _phase_audit(self, target_url, recon_domain, discovered_urls, status, campaign_id, swarm_mode):
         ZenithUI.phase_banner("Phase 4: Deep Security Audit", target_url, icon="💥")
-        status.update(f"[bold red]Firing Nuclei and intelligent payloads...")
-        vulns = await self.nuclei_engine.scan(target_url)
-        return vulns
+        await self._broadcast(recon_domain, type="stats", data={"progress": 75})
+        await self._broadcast(f"Initiating Deep Security Audit on {recon_domain}...", type="audit", level="warning", icon="bomb")
+        
+        # Zenith v33: Engaging Heavy Weapons Suite
+        from aura.modules.scanners.smuggling_engine import SmugglingEngine
+        from aura.modules.scanners.race_engine import RaceEngine
+        smuggler = SmugglingEngine()
+        racer = RaceEngine()
+        
+        all_vulns = []
+        
+        # 1. PowerStack / Nuclei (Broad Scanning)
+        status.update("[bold yellow]Running PowerStack & Nuclei broad vulnerability discovery...")
+        
+        # v33: Run Heavy Weapons concurrently
+        status.update("[bold red]Engaging Smuggling & Race Engines (Zenith Suite)...")
+        heavy_results = await asyncio.gather(
+            smuggler.run(target_url),
+            racer.run(target_url, discovered_urls)
+        )
+        for sub_finding_list in heavy_results:
+            all_vulns.extend(sub_finding_list)
+            for v in sub_finding_list:
+                self.db.add_finding(recon_domain, v, v['type'], v['severity'], campaign_id)
+        try:
+            power_findings = await self.power_stack.nuclei_scan(target_url)
+            all_vulns.extend(power_findings)
+        except Exception as e:
+            console.print(f"[dim red][!] PowerStack/Nuclei encountered an error: {e}[/dim red]")
+            # Fallback to internal nuclei_engine if power_stack fails
+            vulns = await self.nuclei_engine.scan(target_url)
+            all_vulns.extend(vulns)
+
+        # 2. AuraSingularity (Main Target CoT Attack)
+        status.update(f"[bold red]AuraSingularity: Unleashing Autonomous CoT Logic Attack...")
+        try:
+            async with self.sing_semaphore:
+                sing_findings = await self.singularity.execute_singularity(target_url)
+                all_vulns.extend(sing_findings)
+        except Exception as e:
+            console.print(f"[dim red][!] AuraSingularity skipped: {e}[/dim red]")
+
+        # 3. AuraDAST (Multi-target Browser-based Fuzzing)
+        unique_urls = list(set([target_url] + discovered_urls))
+        audit_limit = 15 # Velocity v38.5: Increased depth
+        targets_to_audit = unique_urls[:audit_limit]
+        
+        status.update(f"[bold red]AuraDAST: Auditing {len(targets_to_audit)} unique endpoints with Nexus Deep...")
+        
+        async def _run_dast(url):
+            async with self.dast_semaphore:
+                try:
+                    return await self.dast.scan_target(url)
+                except Exception as e:
+                    console.print(f"[dim red][!] AuraDAST Error on {url}: {e}[/dim red]")
+                    return []
+
+        if swarm_mode and self.fleet_manager._enabled:
+            status.update(f"[bold magenta]FleetManager: Distributing audit across {len(targets_to_audit)} targets...[/bold magenta]")
+            nodes = await self.fleet_manager.provision_nodes(count=3)
+            await self.fleet_manager.distribute_workflow("deep-audit", targets_to_audit, nodes)
+            swarm_results = await self.fleet_manager.collect_results()
+            for res in swarm_results:
+                all_vulns.extend(res.get("findings", []))
+            await self.fleet_manager.decommission_fleet()
+        else:
+            dast_results = await asyncio.gather(*[_run_dast(u) for u in targets_to_audit])
+            for cluster in dast_results:
+                all_vulns.extend(cluster)
+
+        # 4. Apex Sentinel (Autonomous Verification Loop)
+        status.update(f"[bold red]ApexSentinel: Verifying {len(all_vulns)} potential vulnerabilities with zero-day logic...")
+        verified_vulns = []
+        for v in all_vulns:
+            # We skip verification for informational findings if needed, but for BB we verify HIGH/CRITICAL
+            if v.get("severity") in ["CRITICAL", "HIGH", "MEDIUM"]:
+                is_real = await self.apex.verify_finding(v, recon_domain)
+                if is_real:
+                    v["confirmed"] = True
+                    v["verified_by"] = "ApexSentinel"
+                    verified_vulns.append(v)
+                    
+                    # Phase 4.3: Automated Bounty Reporting
+                    if v.get("severity") in ["HIGH", "CRITICAL"]:
+                        console.print(f"[bold green]| [📝] ApexSentinel verified. Generating professional bounty report...[/bold green]")
+                        await self.bounty_reporter.generate_report(v)
+                else:
+                    logger.info(f"[!] ApexSentinel discarded unverified finding: {v.get('type')}")
+            else:
+                # Keep low/info findings for context
+                verified_vulns.append(v)
+
+        # 5. Save and Deduplicate
+        final_vulns = []
+        seen_findings = set()
+        for v in verified_vulns:
+            # v38.0: Findings can be dicts or strings (Nuclei findings are dicts)
+            if isinstance(v, dict):
+                sig = f"{v.get('type')}_{v.get('content')[:100]}"
+                if sig not in seen_findings:
+                    seen_findings.add(sig)
+                    final_vulns.append(v)
+                    self.db.add_finding(recon_domain, v, v.get("type"), v.get("severity", "HIGH"), campaign_id)
+            elif isinstance(v, str):
+                if v not in seen_findings:
+                    seen_findings.add(v)
+                    f_dict = {"type": "Manual Finding", "content": v, "severity": "MEDIUM"}
+                    final_vulns.append(f_dict)
+                    self.db.add_finding(recon_domain, f_dict, "Manual Finding", "MEDIUM", campaign_id)
+
+        console.print(f"[bold green][OK] Deep Security Audit complete: {len(final_vulns)} high-signal vulnerabilities identified.[/bold green]")
+        return final_vulns
 
     async def _phase_exploit(self, recon_domain, vulns, status, campaign_id):
-        ZenithUI.phase_banner("Phase 5: Autonomous Exploitation", recon_domain, icon="🔮")
+        if state.CLINIC_MODE:
+            ZenithUI.clinic_info("Phase 5: Exploitation", "This is where we confirm the vulnerabilities. Aura creates safe 'Proof of Concepts' to prove the flaw exists without damaging the server.")
+        ZenithUI.phase_banner("Phase 5: Autonomous Exploitation", recon_domain, icon="exploit")
         status.update(f"[bold purple]Synthesizing custom exploit chains...")
         await self.execute_exploit_chaining(recon_domain, vulns)
         # Elite Logic: Autonomous PoC Generation for CRITICAL/HIGH Findings
@@ -647,13 +1024,14 @@ class NeuralOrchestrator:
         return vulns
 
     async def _phase_finalize(self, recon_domain, vulns, tech_stack, status, campaign_id):
-        ZenithUI.phase_banner("Phase 6: Mission Finalization", recon_domain, icon="🏁")
+        ZenithUI.phase_banner("Phase 6: Mission Finalization", recon_domain, icon="finish")
+        await self._broadcast(recon_domain, type="stats", data={"progress": 100})
         status.update(f"[bold green]Generating strategic reports and submitting bugs...")
         stack_name = tech_stack[0].split("/")[0] if (isinstance(tech_stack, list) and tech_stack) else "Generic"
         report_paths = await self.reporter.finalize_mission(recon_domain, vulns, tech_stack=stack_name)
         
         if report_paths:
-            console.print(f"\n[bold green][✓] Reports generated successfully:[/bold green]")
+            console.print(f"\n[bold green][OK] Reports generated successfully:[/bold green]")
             for path in report_paths:
                 console.print(f"  [cyan]↳ {path}[/cyan]")
         else:
@@ -663,6 +1041,7 @@ class NeuralOrchestrator:
         return report_paths
 
     async def execute_advanced_chain(self, domain, campaign_id=None, swarm_mode=False):
+        await self._broadcast(f"Mission Initiated: Target {domain}", type="system", level="success", icon="start")
         self.effective_fast_mode = state.FAST_MODE
         self.current_campaign = campaign_id
         domain = self.db.normalize_target(domain)
@@ -683,15 +1062,29 @@ class NeuralOrchestrator:
                 intel_data = await self._phase_intel(recon_domain, target_ip, status, campaign_id)
                 METRICS.phase_duration.labels(phase_name="intel").observe(time.time() - _t1)
                 _t2 = time.time()
-                recon_data = await self._phase_recon(recon_domain, target_ip, intel_data, status, campaign_id, swarm_mode)
+                recon_data = await self.recon_pipeline.run(
+                    recon_domain, 
+                    target_ip, 
+                    intel_data=intel_data, 
+                    stealth_mode=self.effective_fast_mode,
+                    beginner_mode=state.BEGINNER_MODE
+                )
                 METRICS.phase_duration.labels(phase_name="recon").observe(time.time() - _t2)
                 _t3 = time.time()
                 discovered_urls, discovered_forms = await self._phase_discovery(target_url, recon_domain, recon_data, status, campaign_id)
                 METRICS.phase_duration.labels(phase_name="discovery").observe(time.time() - _t3)
                 
+                # v40.0: 0-Day Radar
+                await self._broadcast(f"Scanning for 0-Day exploits in {recon_domain}...", type="intel", icon="radar")
+                await self._phase_0day_radar(recon_domain, recon_data.get("tech_stack", []), campaign_id)
+                
                 _t3_5 = time.time()
                 deconstruction_findings = await self._phase_deconstruction(target_url, recon_domain, recon_data, status, campaign_id)
                 METRICS.phase_duration.labels(phase_name="deconstruction").observe(time.time() - _t3_5)
+                
+                _t3_8 = time.time()
+                await self._phase_sentient_interception(target_url, status)
+                METRICS.phase_duration.labels(phase_name="sentient_interception").observe(time.time() - _t3_8)
                 
                 _t4 = time.time()
                 vulns = await self._phase_audit(target_url, recon_domain, discovered_urls, status, campaign_id, swarm_mode)
@@ -704,22 +1097,52 @@ class NeuralOrchestrator:
                 METRICS.phase_duration.labels(phase_name="finalize").observe(time.time() - _t6)
                 return {"status": "COMPLETE", "findings": len(vulns)}
         except Exception as e:
-            console.print(f"[bold red][💥] FATAL MISSION ERROR: {e}[/bold red]")
+            console.print(f"[bold red][ERR] FATAL MISSION ERROR: {e}[/bold red]")
             return {"status": "ERROR"}
         finally:
+            self._guard_active = False
             watchdog_task.cancel()
             if db_worker_task: db_worker_task.cancel()
+            self.nexus_bridge.stop_veritas()
             await self.close()
 
     async def execute_exploit_chaining(self, domain: str, findings: list):
         if not findings or len(findings) < 2: return
-        prompt = f"Analyze exploit chains for {domain}: {json.dumps(findings[:15])}"
+        
+        console.print(f"[bold yellow][ORACLE] Analyzing high-impact exploit chains for {domain}...[/bold yellow]")
+        
+        prompt = f"""
+        Analyze these findings for {domain} and determine if they can be chained for a CRITICAL bug bounty impact.
+        Findings: {json.dumps(findings[:20])}
+        
+        Focus on:
+        - Information Disclosure -> Account Takeover
+        - SSRF -> Internal Service Exploitation
+        - IDOR -> PII Leakage / Data Destruction
+        - CRSF -> Sensitive Action Execution
+        
+        Return a JSON list of objects: {{"chain_name": "...", "logic": "...", "severity": "CRITICAL", "payout_estimate": "$$$$"}}
+        Return an empty list if no critical chain is possible.
+        """
         try:
-            raw = self.brain.reason_json(prompt)
-            chains = json.loads(raw)
+            # We use the brain to reason about the 'Business Logic' of the chain
+            raw = await asyncio.to_thread(self.brain.reason_json, prompt)
+            chains = json.loads(raw) if isinstance(raw, list) else json.loads(raw).get("chains", [])
             for chain in chains:
-                findings.append({"type": f"Exploit Chain: {chain.get('chain_name')}", "severity": "CRITICAL"})
-        except Exception: pass
+                console.print(f"[bold red][CHAIN] Detected: {chain.get('chain_name')} (Est. Payout: {chain.get('payout_estimate')})[/bold red]")
+                findings.append({
+                    "type": f"Exploit Chain: {chain.get('chain_name')}", 
+                    "severity": "CRITICAL",
+                    "content": chain.get("logic"),
+                    "points": 100
+                })
+        except Exception as e:
+            logger.debug(f"ROI Chaining failed: {e}")
+
+    async def execute_hunt(self):
+        """v40.0 OMEGA: Entry point for the Eternal Hunt."""
+        console.print("[bold red][HUNT] ENTERING ETERNAL HUNT MODE: Payout Optimization Tier 1 [/bold red]")
+        await self.mission_hunter.run_eternal_hunt(self)
 
     async def _oast_polling_loop(self, recon_domain: str):
         while True:

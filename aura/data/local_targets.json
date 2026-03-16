@@ -1,0 +1,13 @@
+[
+    {
+        "name": "The Browser Company (bcny)",
+        "program_url": "https://hackerone.com/bcny",
+        "URL": "https://arc.net",
+        "count": 0,
+        "change": 0,
+        "is_new": true,
+        "platform": "hackerone",
+        "bounty": true,
+        "last_updated": "2026-03-16T00:00:00.000000Z"
+    }
+]

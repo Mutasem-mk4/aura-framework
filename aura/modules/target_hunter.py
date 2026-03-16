@@ -27,26 +27,39 @@ class TargetHunter:
         self.index_path = self.data_dir / "chaos_index.json"
 
     def fetch_index(self):
-        """Downloads the latest Chaos index JSON."""
+        """Downloads the latest Chaos index JSON and merges local targets."""
+        all_data = []
+        
+        # 1. Fetch live data
         with ZenithUI.create_progress() as progress:
             progress.add_task("[cyan]📡 Downloading live Chaos Bug Bounty Index...", total=None)
             try:
-                # Using standard sync httpx since this is a quick single download run from CLI directly
                 resp = httpx.get(CHAOS_INDEX_URL, timeout=15)
                 resp.raise_for_status()
-                data = resp.json()
+                all_data = resp.json()
                 
                 with open(self.index_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f)
-                return data
+                    json.dump(all_data, f)
             except Exception as e:
                 console.print(f"[red]❌ Failed to fetch index: {e}[/red]")
-                # Fallback to local cache if exists
                 if self.index_path.exists():
                     console.print("[yellow]⚠️  Using locally cached index...[/yellow]")
                     with open(self.index_path, "r", encoding="utf-8") as f:
-                        return json.load(f)
-                return []
+                        all_data = json.load(f)
+
+        # 2. Merge local overrides/targets
+        local_path = self.data_dir / "local_targets.json"
+        if local_path.exists():
+            try:
+                with open(local_path, "r", encoding="utf-8") as f:
+                    local_data = json.load(f)
+                    # Merge local data at the beginning so they show up first or are prioritized
+                    all_data = local_data + all_data
+            except Exception as e:
+                console.print(f"[red]❌ Failed to read local_targets.json: {e}[/red]")
+        
+        return all_data
+
 
     def filter_and_display(self, data: list):
         """Filters the data and displays a beautiful table of targets."""

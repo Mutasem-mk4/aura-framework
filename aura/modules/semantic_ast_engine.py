@@ -139,7 +139,8 @@ class SemanticASTAnalyzer:
             self._walk_ast(ast, self._semantic_visitor)
             return self.findings
         except Exception as e:
-            console.print(f"[bold red]> Analysis Error: {str(e)}[/bold red]")
+            if "Unexpected token" not in str(e):
+                console.print(f"[dim red]> Analysis Error: {str(e)}[/bold red]")
             return self._fallback_regex_analysis(js_code, source)
 
     def _semantic_visitor(self, node: Dict) -> None:
@@ -237,7 +238,15 @@ class SemanticASTAnalyzer:
 
     def _parse_javascript(self, js_code: str) -> Dict:
         import esprima
-        return esprima.toDict(esprima.parseScript(js_code, loc=True, range=True))
+        try:
+            # v51.0: Force tolerant parsing and loc tracking
+            return esprima.toDict(esprima.parseModule(js_code, loc=True, range=True, tolerant=True))
+        except:
+            try:
+                return esprima.toDict(esprima.parseScript(js_code, loc=True, range=True, tolerant=True))
+            except Exception as e:
+                # Silently fail if it's completely unparseable (JSX, etc.)
+                raise ValueError(f"AST Parsing failed: {e}")
 
     def _walk_ast(self, node: Any, visitor: callable) -> None:
         if not isinstance(node, dict): return
@@ -271,3 +280,32 @@ class ASTVisualizer:
         for f in findings:
             table.add_row("HIGH", f.vuln_type.value, f"inline:{f.line}")
         return table
+
+async def run_ast_audit(target: str, js_code: str = None):
+    """Wrapper for CLI/Orchestrator to run AST analysis."""
+    from rich.console import Console
+    console = Console()
+    analyzer = SemanticASTAnalyzer(strict_mode=True)
+    
+    if not js_code:
+        import httpx
+        from bs4 import BeautifulSoup
+        target_url = target if target.startswith("http") else f"https://{target}"
+        console.print(f"[bold cyan]🔬 Fetching and Auditing JS: {target_url}[/bold cyan]")
+        async with httpx.AsyncClient(verify=False) as client:
+            try:
+                resp = await client.get(target_url, timeout=15)
+                if "javascript" in resp.headers.get("content-type", "").lower():
+                    js_code = resp.text
+                else:
+                    soup = BeautifulSoup(resp.text, 'html.parser')
+                    js_code = "\n".join([s.string for s in soup.find_all("script") if s.string])
+            except Exception as e:
+                console.print(f"[red]❌ Failed to fetch JS: {e}[/red]")
+                return []
+
+    if js_code:
+        findings = await analyzer.analyze(js_code, source=target)
+        console.print(ASTVisualizer.create_finding_table(findings))
+        return findings
+    return []
