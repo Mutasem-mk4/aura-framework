@@ -11,12 +11,7 @@ import httpx
 from datetime import datetime, timezone
 from pathlib import Path
 
-from rich.console import Console
-from rich.table import Table
-from rich import box
-from aura.ui.zenith_ui import ZenithUI
-
-console = Console()
+from aura.ui.formatter import ZenithUI, console, ui, Table, Panel, box
 
 CHAOS_INDEX_URL = "https://chaos-data.projectdiscovery.io/index.json"
 
@@ -104,7 +99,7 @@ class TargetHunter:
             ), reverse=True)
             sort_title = "Fresh Changes & New"
 
-        table = Table(
+        table = ui.Table(
             title=f"🔥 Top {sort_title} Bounty Programs {'(Platform: ' + platform_filter_input.capitalize() + ')' if platform_filter_input else ''}",
             box=box.ROUNDED,
             show_header=True,
@@ -155,7 +150,7 @@ class TargetHunter:
 
         console.print(table)
         
-        console.print(Panel(
+        ui.console.print(ui.Panel(
             "[bold green]💡 Pro Tip:[/bold green] Copy a recommended command and let Aura Auto-Pilot destroy the target!\n"
             "[dim]Note: Always verify the exact scope on the platform before hacking.[/dim]",
             style="green",

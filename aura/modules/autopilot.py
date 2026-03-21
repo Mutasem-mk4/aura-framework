@@ -35,7 +35,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeEl
 from rich.rule import Rule
 from rich import box
 
-console = Console()
+from aura.ui.formatter import console
 
 # ─── Phase Registry ──────────────────────────────────────────────────────────
 

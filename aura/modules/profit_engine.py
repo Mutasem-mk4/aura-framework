@@ -16,10 +16,11 @@ import sqlite3
 import json
 import os
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple, Union
 from rich.console import Console
 from rich.table import Table
 
-console = Console()
+from aura.ui.formatter import console
 
 # Expected bounty ranges by severity (USD)
 BOUNTY_RANGES = {
@@ -64,7 +65,7 @@ def _get_multiplier(finding_type: str) -> float:
     return 1.0
 
 
-def _score_finding(finding: dict) -> dict:
+def _score_finding(finding: Dict[str, Any]) -> Dict[str, Any]:
     """Calculates ROI score and expected bounty for a finding."""
     severity = finding.get("severity", "INFO").upper()
     ftype = finding.get("finding_type") or finding.get("type", "")
@@ -80,7 +81,7 @@ def _score_finding(finding: dict) -> dict:
     return finding
 
 
-def _format_hackerone(finding: dict, index: int) -> str:
+def _format_hackerone(finding: Dict[str, Any], index: int) -> str:
     """Generates a HackerOne-formatted report section."""
     title = finding.get("type", "Security Vulnerability")
     severity = finding.get("severity", "MEDIUM").lower()
@@ -121,12 +122,12 @@ Apply standard security controls relevant to {title}.
 class ProfitEngine:
     """v31.0: Bug Bounty Profit Intelligence Engine."""
 
-    def __init__(self, db_path: str = None):
+    def __init__(self, db_path: Optional[str] = None):
         if db_path is None:
             db_path = os.path.join(os.path.dirname(__file__), "..", "..", "aura_intel.db")
         self.db_path = os.path.abspath(db_path)
 
-    def _load_findings(self, target_filter: str = None) -> list:
+    def _load_findings(self, target_filter: Optional[str] = None) -> List[Dict[str, Any]]:
         """Loads findings from the database."""
         try:
             conn = sqlite3.connect(self.db_path)
@@ -152,7 +153,7 @@ class ProfitEngine:
 
             conn.close()
 
-            findings = []
+            findings: List[Dict[str, Any]] = []
             for row in rows:
                 content = row["content"] or ""
                 try:
@@ -169,15 +170,11 @@ class ProfitEngine:
                         "owasp": row["owasp"] or "",
                         "mitre": row["mitre"] or "",
                         "url": "",
-                        "confirmed": row["status"] == "CONFIRMED",
+                        "confirmed": bool(row["status"] == "CONFIRMED"),
                     }
                 # Ensure required keys exist
                 if "severity" not in data:
                     data["severity"] = row["severity"] or "INFO"
-                if "type" not in data:
-                    data["type"] = row["finding_type"] or "Unknown"
-                if "finding_type" not in data:
-                    data["finding_type"] = row["finding_type"] or "Unknown"
                 findings.append(data)
             return findings
         except Exception as e:
@@ -185,7 +182,7 @@ class ProfitEngine:
             return []
 
 
-    def generate_priority_report(self, target_filter: str = None) -> str:
+    def generate_priority_report(self, target_filter: Optional[str] = None) -> str:
         """Generates a priority-ranked report with bounty estimates."""
         findings = self._load_findings(target_filter)
         if not findings:
@@ -199,14 +196,14 @@ class ProfitEngine:
 
         # Deduplicate by type
         seen_types = set()
-        unique_findings = []
+        unique_findings: List[Dict[str, Any]] = []
         for f in scored:
             key = (f.get("type", ""), f.get("severity", ""))
             if key not in seen_types:
                 seen_types.add(key)
                 unique_findings.append(f)
 
-        top = unique_findings[:30]
+        top = list(unique_findings)[:30]
 
         # Console table
         table = Table(title=f"[bold]Profit Intelligence Report — Top {len(top)} Findings[/bold]",
@@ -243,7 +240,7 @@ class ProfitEngine:
 
         # Generate Markdown report
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        target_slug = (target_filter or "all").replace(".", "_")
+        target_slug = str(target_filter or "all").replace(".", "_")
         os.makedirs("reports", exist_ok=True)
         report_path = f"reports/profit_report_{target_slug}_{ts}.md"
 
@@ -257,16 +254,16 @@ class ProfitEngine:
             f.write("## Priority Queue (Highest ROI First)\n\n")
             f.write("| # | Finding | Severity | Bounty Range | ROI Score |\n")
             f.write("|---|---------|----------|-------------|----------|\n")
-            for i, finding in enumerate(top, 1):
-                sev = finding.get("severity", "INFO")
-                low = finding.get("_expected_bounty_low", 0)
-                high = finding.get("_expected_bounty_high", 0)
-                roi = finding.get("_roi_score", 0)
-                f.write(f"| {i} | {finding.get('type', 'Unknown')[:40]} | {sev} | ${low:,}–${high:,} | {roi:,.0f} |\n")
+            for i, fn in enumerate(top, 1):
+                sev = fn.get("severity", "INFO")
+                low = fn.get("_expected_bounty_low", 0)
+                high = fn.get("_expected_bounty_high", 0)
+                roi = fn.get("_roi_score", 0)
+                f.write(f"| {i} | {fn.get('type', 'Unknown')[:40]} | {sev} | ${low:,}–${high:,} | {roi:,.0f} |\n")
 
             f.write("\n---\n\n## Detailed Reports (HackerOne Format)\n\n")
-            for i, finding in enumerate(top, 1):
-                f.write(_format_hackerone(finding, i))
+            for i, fn in enumerate(top, 1):
+                f.write(_format_hackerone(fn, i))
 
         console.print(f"\n[bold green][Profit] Report saved: {report_path}[/bold green]")
         return report_path

@@ -18,7 +18,7 @@ from rich.console import Console
 from aura.core import state
 from aura.core.nexus_bridge import NexusBridge
 
-console = Console()
+from aura.ui.formatter import console
 
 # Endpoints likely to have single-use state
 RACE_CANDIDATE_PATTERNS = [

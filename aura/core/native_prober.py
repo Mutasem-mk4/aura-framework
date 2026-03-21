@@ -11,7 +11,7 @@ from aura.core.brain import AuraBrain
 from aura.core.stealth import MorphicHeaderEngine
 from aura.core.nexus_bridge import NexusBridge
 
-console = Console()
+from aura.ui.formatter import console
 logger = logging.getLogger("aura")
 
 class NativeProber:
@@ -53,7 +53,7 @@ class NativeProber:
         
         if self.brain and self.brain.enabled:
             ai_advice = await asyncio.to_thread(self.brain.suggest_waf_evasion, "Generic/Pre-flight")
-            if "header" in ai_advice.lower():
+            if ai_advice and "header" in ai_advice.lower():
                 headers["X-Aura-Strategy"] = "AI-Heuristic"
 
         start_time = time.monotonic()

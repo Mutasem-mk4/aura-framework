@@ -1,0 +1,64 @@
+{
+    "https://gitlab.com/assets/webpack/commons-pages.groups.show-pages.projects.blob.show-pages.projects.show-pages.projects.tree.show.3c4762f9.chunk.js": {
+        "GraphQL Fragments & Queries": [
+            "getRef",
+            "getProjectPath",
+            "getCommits"
+        ]
+    },
+    "https://gitlab.com/assets/webpack/commons-pages.groups-pages.groups.achievements-pages.groups.activity-pages.groups.analytics.ci_cd_an-b4692605.173f44b8.chunk.js": {
+        "GraphQL Fragments & Queries": [
+            "getUserGroupCallouts"
+        ],
+        "Sensitive Keywords": [
+            "credits_cta_active_trial"
+        ]
+    },
+    "https://gitlab.com/assets/webpack/commons-pages.projects.blame.show-pages.projects.blob.show-pages.projects.show-pages.projects.tree.show.5a4d1c95.chunk.js": {
+        "Sensitive Keywords": [
+            "keyboard_shortcut_to_activate_command_palette"
+        ]
+    },
+    "https://gitlab.com/assets/webpack/commons-pages.projects.blob.show-pages.projects.show-pages.projects.tree.show.4bb81373.chunk.js": {
+        "GraphQL Fragments & Queries": [
+            "getUserGitpodInfo",
+            "getApplicationInfo",
+            "getProjectShortPath"
+        ]
+    },
+    "https://gitlab.com/assets/webpack/super_sidebar.1aaba67b.chunk.js": {
+        "Sensitive Keywords": [
+            "keyboard_shortcuts_help"
+        ]
+    },
+    "https://gitlab.com/assets/webpack/main.bc0c9c49.chunk.js": {
+        "GraphQL Fragments & Queries": [
+            "getAiConversationThreads",
+            "getActiveTab",
+            "CurrentUserFrecentProjectsWithDashboards",
+            "activeDesignDiscussion",
+            "boardsAppError",
+            "CurrentUserFrecentGroupsWithDashboards",
+            "isShowingLabels",
+            "issueState"
+        ],
+        "Internal API & Routes": [
+            "/api/v4/ai/duo_workflows/workflows/",
+            "/api/v4/ai/duo_workflows/ws"
+        ],
+        "Sensitive Keywords": [
+            "tokenHasBeenGeneratedOrResetDescription",
+            "token-operator-description",
+            "tokenHasNotBeenGeneratedMessage",
+            "tokenFormInputGroupProps",
+            "tokenNeedsToBeResetDescription",
+            "credits_purchase_credits",
+            "credits_upgrade_premium",
+            "keyboard-shortcuts-customizations",
+            "token-segment-input-disabled",
+            "tokenHasNotBeenGenerated",
+            "tokenEndpointUrlFormInputGroupProps",
+            "keyboard_shortcuts_enabled"
+        ]
+    }
+}

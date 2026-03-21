@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from aura.core.nexus_bridge import NexusBridge
 
-console = Console()
+from aura.ui.formatter import console
 logger = logging.getLogger("aura")
 
 class NativePortScanner:

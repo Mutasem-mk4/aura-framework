@@ -1,149 +1,155 @@
+"""
+aura.modules.logic_engine
+
+The Mission Strategist (Aura v2.0)
+Transforms the AILogicEngine into the 'Brain' of the Event-Driven Ecosystem.
+It monitors the EventBus, analyzes findings contextually, reprioritizes 
+engines dynamically, and performs self-correction on engine failures.
+"""
+
 import asyncio
-import re
-import urllib.parse
+import json
+from typing import List, Dict, Any, Optional
 from rich.console import Console
 
-console = Console()
+from aura.core.engine_base import AbstractEngine
+from aura.core.events import bus, EventType, AuraEvent
+from aura.core.registry import get_registry
 
-class AILogicEngine:
+from aura.ui.formatter import console
+
+class AILogicEngine(AbstractEngine):
     """
-    Aura v15: Autonomous Business Logic & IDOR Hunter.
-    Analyzes parameters and injects logical anomalies (negative values, arrays, ID increments).
+    The Mission Strategist: Monitors events, reprioritizes engines, 
+    and coordinates the ecosystem like a Grandmaster playing chess.
     """
-    def __init__(self, session):
-        self.session = session
-        self.sessions = [session] # v21.0: Store multiple sessions for Pincer attacks
-        self.vulnerabilities = []
+    ENGINE_ID = "ai_logic_engine"
+
+    def __init__(self, persistence=None, telemetry=None, brain=None, **kwargs):
+        super().__init__()
+        self.persistence = persistence
+        self.telemetry = telemetry
+        self.brain = brain
+        # Dynamic Priority Queue for Strategic Moves
+        self.decision_queue = asyncio.PriorityQueue()
+
+    async def setup(self, context):
+        await super().setup(context)
+        # Contextual Analysis: Monitor the EventBus in real-time
+        bus.subscribe(EventType.VULNERABILITY_FOUND, self._on_finding)
+        bus.subscribe(EventType.ERROR_OCCURRED, self._on_error)
+        console.print("[bold magenta][🧠 Strategist] Neural Link established. Monitoring EventBus...[/bold magenta]")
+
+    def _on_finding(self, event: AuraEvent):
+        """Callback for real-time finding analysis."""
+        finding_data = event.data
+        finding_type = finding_data.get("type", "").lower()
+        severity = finding_data.get("severity", "LOW").upper()
         
-        # Heuristics for parameters that are likely to be vulnerable to IDOR or Logic flaws
-        self.idor_params = ["id", "user_id", "account_id", "doc_id", "profile_id", "uuid", "order_id"]
-        self.logic_params = ["amount", "price", "qty", "quantity", "discount", "fee", "balance", "total"]
+        # Calculate Dynamic Priority (lower number = higher priority)
+        priority = 10
+        if severity == "CRITICAL": priority = 1
+        elif severity == "HIGH": priority = 3
+        elif severity == "MEDIUM": priority = 5
+        
+        # Smart Decision Tree: Determine the next strategic move
+        strategic_move = self._decision_matrix(finding_type)
+        if strategic_move:
+            console.print(f"[bold magenta][🧠 Strategist] High-value finding '{finding_type}'. Queuing move: {strategic_move} (Priority: {priority})[/bold magenta]")
+            self.decision_queue.put_nowait((priority, strategic_move, finding_data))
 
-    def _parse_url_params(self, url: str) -> dict:
-        """Extracts parameters from a URL."""
-        parsed = urllib.parse.urlparse(url)
-        return urllib.parse.parse_qs(parsed.query)
+    def _on_error(self, event: AuraEvent):
+        """Self-Correction: Decides how to handle engine failures."""
+        source_engine = event.source
+        error_msg = event.message.lower()
+        
+        console.print(f"[bold yellow][🧠 Strategist] Engine {source_engine} faltered. Analyzing failure...[/bold yellow]")
+        
+        if "timeout" in error_msg or "waf" in error_msg or "blocked" in error_msg:
+            # Self-Correction: Retry with different parameters (Stealth Mode)
+            console.print(f"[bold yellow][🧠 Strategist] Signature blocked. Queuing stealth retry for {source_engine}.[/bold yellow]")
+            self.decision_queue.put_nowait((2, "retry_stealth", {"engine": source_engine}))
+        elif "connection" in error_msg or "offline" in error_msg:
+            # Self-Correction: Skip and move to next
+            console.print(f"[dim yellow][🧠 Strategist] Target appears offline. Skipping {source_engine} execution.[/dim yellow]")
+        else:
+            console.print(f"[dim yellow][🧠 Strategist] Unhandled error in {source_engine}. Logging telemetry.[/dim yellow]")
 
-    def _build_url(self, base_url: str, params: dict) -> str:
-        """Reconstructs a URL with modified parameters."""
-        parsed = urllib.parse.urlparse(base_url)
-        # Flatten parse_qs output back to a normal query string
-        flat_params = []
-        for k, v in params.items():
-            if isinstance(v, list):
-                for item in v:
-                    flat_params.append(f"{k}={item}")
-            else:
-                flat_params.append(f"{k}={v}")
+    def _decision_matrix(self, finding_type: str) -> List[str]:
+        """
+        Smart Decision Tree: Maps finding_type to specific 'Strategic Moves'.
+        Returns a list of engine IDs to trigger.
+        """
+        if "subdomain" in finding_type:
+            # High-value asset found -> Deep scan before PoC
+            return ["banner_grabber", "aura_port_scanner", "threat_intel"]
+        
+        if "exposed_panel" in finding_type or "admin" in finding_type:
+            # Admin panel found -> Fuzz logic and synthesize protocol attacks
+            return ["protocol_synthesizer", "logic_fuzzer"]
+        
+        if "sql" in finding_type or "injection" in finding_type or "xss" in finding_type:
+            # Potential injection -> Trigger deterministic verification
+            return ["poc_engine", "exploit_chain"]
+            
+        if "secret" in finding_type or "leak" in finding_type or "token" in finding_type:
+            # Hardcoded secret -> Go straight for the bounty report
+            return ["bounty_hunter", "bounty_reporter"]
+            
+        return []
+
+    async def run(self) -> List[Dict[str, Any]]:
+        """
+        Asynchronous Execution Flow:
+        Processes the Dynamic Priority Queue and runs engines in parallel.
+        """
+        console.print("[bold magenta][🧠 Strategist] Executing Dynamic Priority Queue...[/bold magenta]")
+        findings = []
+        registry = get_registry()
+        tasks = []
+        
+        # Drain the queue and execute strategies
+        while not self.decision_queue.empty():
+            priority, move, data = await self.decision_queue.get()
+            
+            kwargs = {
+                "persistence": self.persistence, 
+                "telemetry": self.telemetry, 
+                "brain": self.brain
+            }
+            
+            if move == "retry_stealth":
+                engine_id = data.get("engine")
+                console.print(f"[bold magenta][🧠 Strategist] Applying Self-Correction: Retrying {engine_id} with Jitter/Stealth...[/bold magenta]")
                 
-        new_query = "&".join(flat_params)
-        return urllib.parse.urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, new_query, parsed.fragment))
-
-    async def hunt_idor(self, base_url: str, params: dict, original_response_len: int):
-        """Attempts to increment/decrement numeric IDs to access unauthorized data."""
-        for param, values in params.items():
-            if any(key in param.lower() for key in self.idor_params):
-                for val in values:
-                    if val.isdigit():
-                        original_id = int(val)
-                        # Test ID + 1 and ID - 1
-                        for test_id in [original_id + 1, original_id - 1]:
-                            if test_id <= 0: continue
-                            
-                            test_params = params.copy()
-                            test_params[param] = [str(test_id)]
-                            target_url = self._build_url(base_url, test_params)
-                            
-                            console.print(f"[cyan][🧠 Logic] Testing IDOR on {param}: {original_id} -> {test_id}[/cyan]")
-                            try:
-                                resp = await self.session.request("GET", target_url, timeout=10)
-                                if resp and resp.status_code in [200, 201]:
-                                    # v21.0 Pincer Move: Verify against a DIFFERENT session
-                                    if len(self.sessions) > 1:
-                                        pincer_session = self.sessions[1]
-                                        pincer_resp = await pincer_session.request("GET", target_url, timeout=10)
-                                        # If both sessions can access the same ID, it's a confirmed BOLA/IDOR
-                                        if pincer_resp and pincer_resp.status_code == 200:
-                                            console.print(f"[bold red][🔥 PINCER HIT] Confirmed Cross-Session IDOR at {target_url}[/bold red]")
-                                            self.vulnerabilities.append({
-                                                "type": "Confirmed BOLA (Broken Object Level Authorization)",
-                                                "url": target_url,
-                                                "severity": "CRITICAL",
-                                                "method": f"Pincer Cross-Session Validation: {param}={test_id}"
-                                            })
-                                            continue
-
-                                    # Baseline length-based detection (Fallback)
-                                    if abs(len(resp.text) - original_response_len) > 50:
-                                         console.print(f"[bold red][VULNERABILITY] Potential IDOR detected at {target_url}[/bold red]")
-                                         self.vulnerabilities.append({
-                                             "type": "Broken Access Control (IDOR)",
-                                             "url": target_url,
-                                             "severity": "High",
-                                             "method": "Auto-Incremented ID"
-                                         })
-                            except: pass
-
-    async def hunt_business_logic(self, base_url: str, params: dict):
-        """Injects negative values, zeros, and massive numbers into financial parameters."""
-        for param, values in params.items():
-            if any(key in param.lower() for key in self.logic_params):
-                logic_payloads = ["-1", "-100", "0", "0.00", "999999999", "NaN", "[]"]
+                # Mutate Context to force stealth
+                self.context.flags.fast_mode = False 
+                self.context.flags.ghost_mode = True
                 
-                for payload in logic_payloads:
-                    test_params = params.copy()
+                # Re-run the specific engine
+                tasks.append(registry.instantiate_and_run(engine_id, self.context, **kwargs))
+                
+            elif isinstance(move, list): 
+                # Parallel execution of multiple engines
+                console.print(f"[bold magenta][🧠 Strategist] Grandmaster Move: Parallel execution of {move}[/bold magenta]")
+                tasks.append(registry.run_parallel(move, self.context, **kwargs))
+                
+            self.decision_queue.task_done()
+            
+        # Await all strategic moves simultaneously without blocking
+        if tasks:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for res in results:
+                if isinstance(res, list):
+                    findings.extend(res)
+                elif isinstance(res, dict):
+                    findings.append(res)
+                elif isinstance(res, Exception):
+                    console.print(f"[bold red][🧠 Strategist] Strategy Execution Failed: {res}[/bold red]")
                     
-                    if payload == "[]":
-                        # Parameter Pollution / Array Injection: amount[]=1
-                        test_params[f"{param}[]"] = values
-                        del test_params[param]
-                        target_url = self._build_url(base_url, test_params)
-                    else:
-                        test_params[param] = [payload]
-                        target_url = self._build_url(base_url, test_params)
-                        
-                    console.print(f"[cyan][🧠 Logic] Testing Business Logic on {param} with payload: {payload}[/cyan]")
-                    try:
-                         resp = await self.session.request("GET", target_url, timeout=10)
-                         # If the server accepts a negative price or array without a 400/500 error, it's highly suspicious
-                         if resp and resp.status_code == 200:
-                             console.print(f"[bold red][VULNERABILITY] Potential Business Logic Flaw at {target_url}[/bold red]")
-                             self.vulnerabilities.append({
-                                 "type": "Business Logic Error / Parameter Pollution",
-                                 "url": target_url,
-                                 "severity": "High",
-                                 "method": f"Injected '{payload}' into '{param}'"
-                             })
-                    except: pass
+        console.print(f"[bold green][🧠 Strategist] Strategic turn complete. Yielded {len(findings)} derived findings.[/bold green]")
+        return findings
 
-    async def analyze(self, urls: list[str]):
-        """Main entry point for the Logic Engine."""
-        console.print("\n[bold magenta][🧠 AI LOGIC] Activating Autonomous Business Logic & IDOR Hunter...[/bold magenta]")
-        
-        # Filter URLs that actually have parameters
-        parameterized_urls = [url for url in urls if "?" in url]
-        
-        if not parameterized_urls:
-            console.print("[yellow][🧠 Logic] No parameterized URLs found to analyze.[/yellow]")
-            return self.vulnerabilities
-            
-        for url in parameterized_urls:
-            params = self._parse_url_params(url)
-            if not params: continue
-            
-            # Get baseline response
-            try:
-                resp = await self.session.request("GET", url, timeout=10)
-                if not resp or resp.status_code >= 400: continue
-                baseline_len = len(resp.text)
-            except: continue
-            
-            # Run heuristic hunts concurrently for speed
-            await asyncio.gather(
-                self.hunt_idor(url, params, baseline_len),
-                self.hunt_business_logic(url, params)
-            )
-            
-        console.print(f"[bold green][✔ LOGIC] Analysis complete. Found {len(self.vulnerabilities)} logical vulnerabilities.[/bold green]")
-        return self.vulnerabilities
-
+    async def teardown(self):
+        """Cleanup subscriptions if needed."""
+        pass

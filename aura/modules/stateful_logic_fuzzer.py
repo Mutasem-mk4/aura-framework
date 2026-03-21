@@ -50,7 +50,7 @@ from aura.modules.sentinel_ssrf import SentinelSSRF
 from aura.core.polymorphic_engine import PolymorphicEngine
 from aura.core import state
 
-console = Console(force_terminal=True)
+from aura.ui.formatter import console
 
 
 class WorkflowStepStatus(Enum):
@@ -159,6 +159,11 @@ class SessionState:
     
     def set_cookie(self, key: str, value: str):
         self.cookies[key] = value
+        # Ensure Cookie header string is built dynamically if needed, or rely on httpx cookiejar
+        current_cookie_str = self.headers.get("Cookie", "")
+        new_cookie = f"{key}={value}"
+        if new_cookie not in current_cookie_str:
+            self.headers["Cookie"] = f"{current_cookie_str}; {new_cookie}".strip("; ")
     
     def set_json(self, key: str, value: Any):
         self.json_data[key] = value
@@ -224,7 +229,10 @@ class StrategicMind:
             """
             try:
                 decision_raw = await asyncio.to_thread(self.brain.reason_json, prompt)
-                return json.loads(decision_raw)
+                decision = json.loads(decision_raw)
+                if isinstance(decision, list) and len(decision) > 0:
+                    return decision[0]
+                return decision if isinstance(decision, dict) else {"move": "PERSIST"}
             except:
                 return {"move": "PERSIST"}
         return {"move": "PERSIST"}
@@ -869,7 +877,7 @@ class StatefulLogicFuzzer:
                 result.extracted_data["json"]
             )
         
-        return result
+        return session
     
     def _is_vulnerable_status(self, step: WorkflowStep, status_code: int) -> bool:
         return status_code in [200, 201, 204] and status_code not in step.expected_status
@@ -928,7 +936,7 @@ class StatefulLogicFuzzer:
                 "cwe_id": "CWE-834"
             })
         
-        return findings[0] if findings else None
+        return findings
     
     def _analyze_result(
         self,
@@ -1158,89 +1166,48 @@ async def quick_workflow_test(base_url: str, workflow: List[Dict]) -> WorkflowRe
     return result
 
 
-async def run_logic_fuzz(target: str, workflow_path: str = None):
-    """Entry point for CLI."""
-    if not workflow_path:
-        console.print("[bold red]❌ Error: --workflow <file.json> is required for logic fuzzing.[/bold red]")
-        return
-
-    if not os.path.exists(workflow_path):
-        console.print(f"[bold red]❌ Error: Workflow file not found at {workflow_path}[/bold red]")
-        return
-
-    try:
-        with open(workflow_path, 'r') as f:
-            workflow_data = json.load(f)
-    except Exception as e:
-        console.print(f"[bold red]❌ Error parsing workflow JSON: {e}[/bold red]")
-        return
-
-    base_url = target
-    if not base_url.startswith("http"):
-        base_url = "https://" + base_url
-
+async def run_logic_fuzz(target: str, workflow_path: str = None, workflow_json: List[Dict] = None):
+    """Entry point for CLI/Orchestrator to run stateful logic fuzzing."""
+    base_url = target if target.startswith("http") else f"https://{target}"
     fuzzer = StatefulLogicFuzzer(base_url=base_url)
     
-    # Handle both list-of-steps and full workflow-object formats
-    if isinstance(workflow_data, list):
-        steps_list = workflow_data
-        wf_name = "cli_logic_test"
+    steps_list = []
+    wf_name = "dynamic_audit"
+
+    if workflow_path:
+        if not os.path.exists(workflow_path):
+            console.print(f"[bold red]❌ Error: Workflow file not found at {workflow_path}[/bold red]")
+            return []
+        try:
+            with open(workflow_path, 'r') as f:
+                workflow_data = json.load(f)
+                if isinstance(workflow_data, list):
+                    steps_list = workflow_data
+                    wf_name = "cli_logic_test"
+                else:
+                    steps_list = workflow_data.get("steps", [])
+                    wf_name = workflow_data.get("name", "cli_logic_test")
+        except Exception as e:
+            console.print(f"[bold red]❌ Error parsing workflow JSON: {e}[/bold red]")
+            return []
+    elif workflow_json:
+        steps_list = workflow_json
     else:
-        steps_list = workflow_data.get("steps", [])
-        wf_name = workflow_data.get("name", "cli_logic_test")
-
-    steps = fuzzer.define_workflow(wf_name, steps_list)
-    console.print(f"[bold cyan]🧠 Starting Stateful Logic Fuzzer on: {base_url}[/bold cyan]")
-    console.print(f"[dim]Loaded workflow: {wf_name} ({len(steps)} steps)[/dim]")
-    
-    result = await fuzzer.execute_workflow(steps)
-    
-    # Print results summary
-    console.print("\n" + fuzzer.generate_report())
-    
-    await fuzzer.close()
-
-
-if __name__ == "__main__":
-    import sys
-    
-    async def main():
-        if len(sys.argv) < 3:
-            console.print("[bold red]Usage: python -m aura.modules.stateful_logic_fuzzer <base_url> <workflow_json>[/bold red]")
-            sys.exit(1)
-        
-        base_url = sys.argv[1]
-        
-        with open(sys.argv[2], 'r') as f:
-            workflow_def = json.load(f)
-        
-        fuzzer = StatefulLogicFuzzer(base_url=base_url)
-        steps = fuzzer.define_workflow(workflow_def.get("name", "test"), workflow_def.get("steps", []))
-        result = await fuzzer.execute_workflow(steps)
-        
-        console.print(f"\n[bold cyan]Report:[/bold cyan]\n{fuzzer.generate_report()}")
-        
-        await fuzzer.close()
-    
-        await fuzzer.close()
-    
-    asyncio.run(main())
-
-async def run_logic_fuzz(target: str, workflow_json: List[Dict] = None):
-    """Wrapper for CLI/Orchestrator to run stateful logic fuzzing."""
-    from rich.console import Console
-    console = Console()
-    target_base = target if target.startswith("http") else f"https://{target}"
-    fuzzer = StatefulLogicFuzzer(base_url=target_base)
-    
-    if not workflow_json:
         # Default probe workflow
-        workflow_json = [
+        steps_list = [
             {"id": "root", "name": "Base Probe", "method": "GET", "path": "/"}
         ]
-        
-    console.print(f"[bold cyan][LOGIC] Initiating Stateful Logic Fuzzing: {target_base}[/bold cyan]")
-    steps = fuzzer.define_workflow("dynamic_audit", workflow_json)
+
+    console.print(f"[bold cyan][LOGIC] Initiating Stateful Logic Fuzzing: {base_url}[/bold cyan]")
+    console.print(f"[dim]Loaded workflow: {wf_name} ({len(steps_list)} steps)[/dim]")
+    
+    steps = fuzzer.define_workflow(wf_name, steps_list)
     result = await fuzzer.execute_workflow(steps)
+    
+    # Print results summary if it was likely a CLI run (has workflow_path)
+    if workflow_path:
+        console.print("\n" + fuzzer.generate_report())
+    
+    await fuzzer.close()
     return result.findings
 

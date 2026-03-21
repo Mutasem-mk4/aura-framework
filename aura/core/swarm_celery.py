@@ -6,7 +6,7 @@ from rich.console import Console
 from urllib.parse import urlparse
 from aura.core.metrics import METRICS
 
-console = Console()
+from aura.ui.formatter import console
 
 # Detect environment
 broker_url = os.getenv("CELERY_BROKER_URL", "amqp://guest:guest@localhost:5672//")

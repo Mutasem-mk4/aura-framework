@@ -19,7 +19,7 @@ CVSS 3.1 Base Metrics:
 """
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 # CVSS v3.1 Base Score lookup table (simplified but accurate)
 CVSS_BASE_SCORES = {

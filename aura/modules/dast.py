@@ -1,7 +1,9 @@
 import asyncio
 import os
 import random
+import uuid
 import urllib.parse
+from urllib.parse import urljoin
 from playwright.async_api import async_playwright
 from rich.console import Console
 from aura.core.stealth import StealthEngine, AuraSession
@@ -13,12 +15,16 @@ from aura.core.brain import AuraBrain
 from aura.modules.logic_analyzer import LogicAnalyzer
 from aura.modules.business_logic import BusinessLogicAuditor
 from aura.modules.oast import OastCatcher
-from aura.core.storage import AuraStorage
+from typing import List, Dict, Any, Optional
+from aura.core.engine_interface import IEngine
+from aura.core.models import Finding, Severity
 
-console = Console()
+from aura.ui.formatter import console
 
-class AuraDAST:
+class AuraDAST(IEngine):
     """The Ghost v5 DAST engine — Aura v2.0 Offensive Mastery. Proves exploitation, not just detection."""
+    
+    ENGINE_ID = "aura_dast"
     
     # v11.0 Hard Reset: 50+ Aggressive Deterministic Payloads for Injection Overdrive
     PAYLOADS = {
@@ -86,14 +92,15 @@ class AuraDAST:
         "IDOR":                    {"score": 8.1, "vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N"},
         "Default":                 {"score": 5.0, "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:N"},
     }
+    
+    ENGINE_ID = "aura_dast"
 
-    def __init__(self, brain=None, stealth=None, workflow=None, ghost_ops=None):
+    def __init__(self, brain=None, stealth=None, persistence=None, ghost_ops=None, telemetry=None, **kwargs):
         self.brain = brain or AuraBrain()
-        self.storage = AuraStorage() # Added storage to fix AttributeError
-        self.oast = OastCatcher()
-        self.stealth = stealth or StealthEngine() # Phase 28/29
+        self.stealth = stealth or StealthEngine()
+        self.persistence = persistence # Injected PersistenceHub
+        self.telemetry = telemetry
         self.session = AuraSession(self.stealth)
-        self.workflow = workflow or state.WorkflowTracker() # Phase 29
         self.patterns = AuraPatternEngine(self.brain)
         self.guardian = AuraAuditGuardian(self.brain)
         self.vision = VisualEye()
@@ -101,6 +108,47 @@ class AuraDAST:
         self.browser_semaphore = asyncio.Semaphore(10) # Velocity v19.5: Increased parallel pages
         self.biz_logic = BusinessLogicAuditor(self.brain, self.session) # Ghost v5: IDOR/Auth
         self.ghost_ops = ghost_ops
+        self.workflow = state.WorkflowTracker() # Restored for internal use
+        self._status = "initialized"
+
+    async def run(self, target: str, **kwargs) -> List[Finding]:
+        """Unified DAST entry point for Phase 3."""
+        self._status = "running"
+        findings = []
+        
+        # v11.0: Launch full-spectrum audit
+        console.print(f"[bold red][☠️] AuraDAST: Initiating Full-Spectrum Offensive Audit on {target}[/bold red]")
+        
+        # 2. URL Parameter Fuzzing
+        for f in await self.fuzz_url_params(target):
+            findings.append(Finding(
+                id=str(uuid.uuid4()),
+                engine_id=self.ENGINE_ID,
+                target=target,
+                type=f.get("type", "Vulnerability"),
+                severity=Severity[f.get("severity", "MEDIUM")],
+                description=f.get("content", ""),
+                remediation=f.get("remediation_fix", ""),
+                raw_data=f
+            ))
+
+        # 1. Form Fuzzing
+        for f in await self.fuzz_forms(target):
+            findings.append(Finding(
+                id=str(uuid.uuid4()),
+                engine_id=self.ENGINE_ID,
+                target=target,
+                type=f.get("type", "API Vulnerability"),
+                severity=Severity[f.get("severity", "HIGH")],
+                description=f.get("details", ""),
+                raw_data=f
+            ))
+
+        self._status = "completed"
+        return findings
+
+    def get_status(self) -> Dict[str, Any]:
+        return {"id": self.ENGINE_ID, "status": self._status}
 
     def _get_polymorphic_payload(self, vuln_type):
         """v15 Neural Forge: Mutates standard payloads to bypass WAFs."""
@@ -191,11 +239,9 @@ class AuraDAST:
                 # but we will just pass this info so orchestrator or storage logs it.
                 # Since we don't easily have db here, we'll import it just for logging
                 try:
-                    from aura.core.storage import AuraStorage
-                    temp_db = AuraStorage()
-                    # We will implement this method next
-                    if hasattr(temp_db, "log_operation"):
-                        temp_db.log_operation(url, payload, status_code)
+                    # v4.0: Log operation manually to persistence bridge
+                    if self.persistence:
+                        self.persistence.log_audit(url, f"SQLi PoC Attempt: {payload}")
                 except Exception as e:
                     pass
 
@@ -307,9 +353,8 @@ class AuraDAST:
         params = {k: v[0] for k, v in parse_qs(parsed.query).items()}
         
         # v7.1: Log attack attempt for proof
-        # Note: vuln_type and payload are not directly available here as in _fuzz_url_parameters.
-        # Adapting to log the specific boolean SQLi attempt.
-        self.storage.log_action("INJECTION_ATTEMPT", url, f"Type: Boolean SQLi | Param: {param_name} | Base Value: {param_value}")
+        if self.persistence:
+            self.persistence.log_audit(url, f"Boolean SQLi Attempt | Param: {param_name}")
         
         try:
             # TRUE condition (should return normal page)
@@ -531,7 +576,8 @@ class AuraDAST:
                                 cvss = self.CVSS_SCORES.get(vuln_type, self.CVSS_SCORES["Default"])
                                 
                                 # Log attempt to Audit Logs
-                                self.storage.log_action("INJECTION_OVERDRIVE", test_url, f"Payload: {vuln_type} ({payload}) - Status: {res.status_code}")
+                                if self.persistence:
+                                    self.persistence.log_audit(test_url, f"INJECTION_OVERDRIVE: {vuln_type} ({payload}) - Status: {res.status_code}")
                                 
                                 if vuln_type == "SQLi" and any(err in content for err in ["sql syntax", "mysql_fetch", "sqlite3", "ora-", "postgres"]):
                                     single_param_findings.append({
@@ -558,7 +604,8 @@ class AuraDAST:
                                         "impact_desc": "Session hijacking."
                                     })
                             except Exception as e:
-                                self.storage.log_action("INJECTION_OVERDRIVE_FAILED", test_url, f"Payload: {vuln_type} ({payload}) - Error: {str(e)}")
+                                if self.persistence:
+                                    self.persistence.log_audit(test_url, f"INJECTION_OVERDRIVE_FAILED: {str(e)}")
                     
                     # Original generic logic for other types
                     else:
@@ -1247,7 +1294,8 @@ class AuraDAST:
                                 if not any(x in full_url.lower() for x in ["search", "parking", "partner", "track", "click", "adserv"]):
                                     if full_url not in visited and full_url not in discovered_urls:
                                         # v7.1: Proof of Work Logging
-                                        self.storage.log_action("PATH_DISCOVERED", full_url, f"Aggressive Crawl Level {depth}")
+                                        if self.persistence:
+                                            self.persistence.log_audit(full_url, "PATH_DISCOVERED")
                                         discovered_urls.append(full_url)
                 except Exception as e:
                     console.print(f"[dim red][!] Link Extraction Error: {e}[/dim red]")

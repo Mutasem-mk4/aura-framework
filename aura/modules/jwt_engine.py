@@ -24,7 +24,7 @@ import httpx
 import jwt
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 # Standard JWT format: header.payload.signature
 JWT_REGEX = re.compile(r"^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]*$")

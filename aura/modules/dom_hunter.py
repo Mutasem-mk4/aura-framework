@@ -21,7 +21,7 @@ import random
 import string
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 XSS_SINKS = [
     "document.write",

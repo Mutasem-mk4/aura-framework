@@ -4,16 +4,53 @@ When external API keys (Shodan, VirusTotal) are missing, Aura fills the intellig
 by performing active Banner Grabbing and Service Fingerprinting.
 """
 import asyncio
+import uuid
 import socket
+from typing import List, Dict, Any, Optional
 from rich.console import Console
+from aura.core.engine_interface import IEngine
+from aura.core.models import Finding, Severity
 
-console = Console()
+from aura.ui.formatter import console
 
-class BannerGrabber:
+class BannerGrabber(IEngine):
     """
-    v3.0 OSINT Resiliency: Grabs service banners via raw TCP connections.
-    Used when Shodan/Censys API keys are missing to fill intelligence gaps.
+    v11.5 Active Fingerprinting Engine.
+    Used when OSINT/Shodan is blind/missing API keys.
     """
+    ENGINE_ID = "banner_grabber"
+
+    def __init__(self, persistence=None, telemetry=None, brain=None, **kwargs):
+        self.persistence = persistence
+        self.telemetry = telemetry
+        self.brain = brain
+        self._status = "initialized"
+
+    async def run(self, target: str, **kwargs) -> List[Finding]:
+        """Unified entry point for IEngine (Phase 3 Integration)."""
+        self._status = "running"
+        findings = []
+        
+        # Determine ports to scan
+        ports = kwargs.get("ports") or self.COMMON_PORTS
+        
+        # Use existing fingerprinting logic
+        intelligence = await self.run_fingerprinting(target, ports)
+        
+        for intel in intelligence:
+            findings.append(Finding(
+                content=intel.get("content", "Service Fingerprint discovery."),
+                finding_type=intel.get("type", "Service Discovery"),
+                severity=Severity[intel.get("severity", "INFO")],
+                target_value=f"{target}:{intel.get('port', '')}",
+                meta={"engine": self.ENGINE_ID, "remediation": intel.get("remediation_fix"), "raw": intel}
+            ))
+            
+        self._status = "completed"
+        return findings
+
+    def get_status(self) -> Dict[str, Any]:
+        return {"id": self.ENGINE_ID, "status": self._status}
     
     COMMON_PORTS = [21, 22, 23, 25, 80, 443, 110, 143, 3306, 5432, 6379, 8080, 8443, 27017]
     TIMEOUT = 3

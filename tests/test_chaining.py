@@ -5,7 +5,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 from aura.core.orchestrator import NeuralOrchestrator
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 async def test_chaining():
     console.print("[+] Initializing Neural Orchestrator for Chaining Test...")

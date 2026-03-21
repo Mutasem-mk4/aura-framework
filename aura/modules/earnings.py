@@ -18,7 +18,7 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
 
-console = Console()
+from aura.ui.formatter import console
 
 EARNINGS_DB = os.path.join(os.path.expanduser("~"), ".aura", "earnings.db")
 os.makedirs(os.path.dirname(EARNINGS_DB), exist_ok=True)

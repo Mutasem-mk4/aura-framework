@@ -5,7 +5,7 @@ from rich.console import Console
 from typing import List, Dict
 
 logger = logging.getLogger("aura")
-console = Console()
+from aura.ui.formatter import console
 
 class SubdomainTakeoverHunter:
     """

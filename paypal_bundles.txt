@@ -1,0 +1,8 @@
+https://www.paypalobjects.com/auth/createchallenge/66db34ba24351548/recaptchav3.js
+https://www.paypalobjects.com/globalnav/js/main-DLmvdIfW.js
+https://www.paypalobjects.com/ppcmsnodeweb/pp-com-components/datadog-629d9f48.js
+https://www.paypalobjects.com/globalnav/js/main-BhkxJxL0.js
+https://www.paypalobjects.com/ncs/ncs.js
+https://www.paypalobjects.com/ppcmsnodeweb/pp-com-components/pp-com-components-ca1ac81e.js
+https://www.paypalobjects.com/pa/js/min/pa.js
+https://www.paypalobjects.com/webcaptcha/ngrlCaptcha.min.js

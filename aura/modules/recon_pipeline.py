@@ -16,6 +16,8 @@ import json
 from urllib.parse import urlparse
 from aura.core import state
 from rich.console import Console
+from aura.core.engine_interface import IEngine
+from aura.core.models import Finding
 from aura.core.native_prober import NativeProber
 from aura.core.aura_subfinder import NativeSubfinder
 from aura.core.aura_port_scanner import NativePortScanner
@@ -24,16 +26,18 @@ from aura.modules.infra_reaper import InfraReaper
 from aura.modules.sentinel_ssrf import SentinelSSRF
 from aura.modules.desync_prober import DesyncProber
 
-console = Console()
+from aura.ui.formatter import console
 
 
-class ReconPipeline:
+class ReconPipeline(IEngine):
     """
     v5.0 Multi-layered Recon Pipeline:
       Stage 1: Subfinder (or DNS brute-force fallback) → alive subdomains
       Stage 2: HTTPX (or aiohttp fallback) → HTTP probe, title, status, tech
       Stage 3: Nmap (or TCP scanner fallback) → open ports, service banners
     """
+    
+    ENGINE_ID = "recon_pipeline"
 
     SUBDOMAINS_WORDLIST = [
         "www", "api", "dev", "staging", "admin", "mail", "blog", "app",
@@ -45,8 +49,11 @@ class ReconPipeline:
     COMMON_PORTS = [21, 22, 23, 25, 53, 80, 110, 143, 443, 445,
                     3306, 5432, 6379, 8080, 8443, 8888, 27017]
 
-    def __init__(self, session=None):
+    def __init__(self, session=None, persistence=None, telemetry=None, brain=None, **kwargs):
         self.session = session
+        self.persistence = persistence
+        self.telemetry = telemetry
+        self.brain = brain
         import os
         
         def find_tool(name):
@@ -65,10 +72,11 @@ class ReconPipeline:
         self.native_subfinder = NativeSubfinder()
         self.native_port_scanner = NativePortScanner()
         
-        self.cloud_recon = AuraCloudRecon(storage=None) # Storage to be passed per run
+        self.cloud_recon = AuraCloudRecon(storage=self.persistence)
         self.infra_reaper = InfraReaper()
         self.sentinel_ssrf = SentinelSSRF()
-        self.desync_prober = DesyncProber(storage=None) # Storage to be passed per run
+        self.desync_prober = DesyncProber(storage=self.persistence)
+        self._status = "initialized"
         
         self._has_subfinder = True # We now have native subfinder via NativeSubfinder
         self._has_httpx = True # We now have native httpx via NativeProber
@@ -363,4 +371,8 @@ class ReconPipeline:
 
         console.print(f"[bold green][✔ RECON PIPELINE] Complete: {len(subdomains)} subdomains, "
                       f"{len(http_data)} HTTP services, {len(nmap_data)} open ports, {len(deep_links)} deep links.[/bold green]")
+        self._status = "completed"
         return results
+
+    def get_status(self) -> dict:
+        return {"id": self.ENGINE_ID, "status": self._status}

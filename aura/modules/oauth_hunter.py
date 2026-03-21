@@ -15,7 +15,7 @@ import urllib.parse
 from rich.console import Console
 from aura.core import state
 
-console = Console()
+from aura.ui.formatter import console
 
 
 class OAuthHunter:

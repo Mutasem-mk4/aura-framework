@@ -18,7 +18,7 @@ import re
 import httpx
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 WS_PATHS = ["/ws", "/websocket", "/socket", "/api/ws", "/chat", "/live", "/stream"]
 OAUTH_PATHS = [

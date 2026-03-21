@@ -1,15 +1,15 @@
+import re
+import asyncio
+import uuid
+from typing import List, Dict, Any, Optional
 from aura.core.stealth import StealthEngine, AuraSession
 from aura.core import state
 from aura.core.notifier import CommLink
-from aura.core import state
+from aura.core.engine_interface import IEngine
+from aura.core.models import Finding, Severity
 from rich.console import Console
-import re
-import asyncio
 
-console = Console()
-stealth = StealthEngine()
-session = AuraSession(stealth)
-comm_link = CommLink()
+from aura.ui.formatter import console
 
 class BrokenLinkHijacker:
     """Phase 8: Scans for abandoned/broken social media links that can be hijacked."""
@@ -43,11 +43,41 @@ class BrokenLinkHijacker:
                 })
         return hijack_found
 
-class BountyHunter:
+class BountyHunter(IEngine):
     """High-impact vulnerability scanner focused on monetization."""
     
-    def __init__(self):
+    ENGINE_ID = "bounty_hunter"
+
+    def __init__(self, persistence=None, telemetry=None, brain=None, stealth=None, **kwargs):
+        self.persistence = persistence
+        self.telemetry = telemetry
+        self.brain = brain
+        self.stealth = stealth or StealthEngine()
+        self.session = AuraSession(self.stealth)
         self.hijacker = BrokenLinkHijacker()
+        self._status = "initialized"
+
+    async def run(self, target: str, **kwargs) -> List[Finding]:
+        """Unified entry point for IEngine."""
+        self._status = "running"
+        findings = []
+        
+        secrets = await self.scan_for_secrets(target)
+        
+        for s in secrets:
+            findings.append(Finding(
+                content=s.get("content") or f"Discovered leaked secret/hijackable link at {s.get('location')}",
+                finding_type=s.get("type", "Bounty Finding"),
+                severity=Severity[s.get("severity", "HIGH")],
+                target_value=target,
+                meta={"engine": self.ENGINE_ID, "remediation": s.get("remediation", "Revoke exposed secret and rotate credentials."), "raw": s}
+            ))
+            
+        self._status = "completed"
+        return findings
+
+    def get_status(self) -> Dict[str, Any]:
+        return {"id": self.ENGINE_ID, "status": self._status}
 
     # Expanded RE_PATTERNS - 25+ secret types with CVSS scores and bounty estimates
     RE_PATTERNS = {

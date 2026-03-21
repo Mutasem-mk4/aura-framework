@@ -32,7 +32,7 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 # ── Payload Lexicon ──────────────────────────────────────────────────────────
 

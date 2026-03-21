@@ -17,7 +17,7 @@ import httpx
 import re
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 UPLOAD_PATHS = [
     "/upload", "/api/upload", "/file/upload", "/files/upload",

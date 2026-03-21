@@ -13,31 +13,68 @@ import shutil
 import json
 import re
 import aiohttp
+import os
+import uuid
+from typing import List, Dict, Any, Optional
+from aura.core import state
+from aura.core.engine_interface import IEngine
+from aura.core.models import Finding, Severity
 from rich.console import Console
 from aura.core.stealth import AuraSession, StealthEngine
 
-console = Console()
+from aura.ui.formatter import console
 
 
-class PowerStack:
-    """v6.0: Orchestrates Nuclei, TruffleHog, HTTPX & Nmap as a unified offensive stack."""
+class PowerStack(IEngine):
+    """Orchestrator for external high-power tools (Nuclei, TruffleHog, etc) with Python fallbacks."""
+    
+    ENGINE_ID = "power_stack"
 
-    def __init__(self, stealth: StealthEngine = None):
-        import os
+    def __init__(self, stealth: StealthEngine = None, persistence=None, telemetry=None, brain=None, **kwargs):
+        self.persistence = persistence
+        self.telemetry = telemetry
+        self.brain = brain or kwargs.get("brain")
         self.stealth = stealth or StealthEngine()
         self.session  = AuraSession(self.stealth)
+        self.tools = ["nuclei", "trufflehog", "httpx", "nmap"]
+        self._status = "initialized"
         
+        # Tool path discovery
         def find_tool(name):
             path = shutil.which(name)
             if path: return path
             go_path = os.path.expanduser(f"~/go/bin/{name}.exe")
             if os.path.exists(go_path): return go_path
-            return None
+            return name  # Return name, assume it's in PATH
             
         self.nuclei_path = find_tool("nuclei")
         self.httpx_path = find_tool("httpx")
         self.trufflehog_path = find_tool("trufflehog")
         self.nmap_path = find_tool("nmap")
+
+    async def run(self, target: str, **kwargs) -> List[Finding]:
+        """Unified entry point for IEngine (Phase 3 Integration)."""
+        self._status = "running"
+        findings = []
+        
+        # Orchestrate tool runs
+        stack_results = await self.run_stack(target)
+        
+        for tool, res_list in stack_results.items():
+            for res in res_list:
+                findings.append(Finding(
+                    content=res.get("info", f"Discovery from {tool}"),
+                    finding_type=f"PowerStack: {tool.capitalize()} Finding",
+                    severity=Severity[res.get("severity", "MEDIUM").upper()],
+                    target_value=target,
+                    meta={"engine": self.ENGINE_ID, "remediation": res.get("remediation"), "raw": res}
+                ))
+                
+        self._status = "completed"
+        return findings
+
+    def get_status(self) -> Dict[str, Any]:
+        return {"id": self.ENGINE_ID, "status": self._status}
 
     # ── 1. NUCLEI ─────────────────────────────────────────────────────────
     async def nuclei_scan(self, target_url: str) -> list:

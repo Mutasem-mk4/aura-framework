@@ -7,7 +7,7 @@ from rich.console import Console
 import httpx
 import re
 
-console = Console()
+from aura.ui.formatter import console
 
 class OMEGACrawler:
     """v51.0: Stateful Headless Browser Cluster for SPA Deep Mapping."""

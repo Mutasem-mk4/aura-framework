@@ -1,0 +1,22 @@
+{
+    "Internal API Paths": [
+        "/v2/get-data-layer-variables",
+        "/api/queries/CouponPromotionQuery",
+        "/api/v2/get_travel_guides_by_user",
+        "/api/v3",
+        "/api/DatavortexCollectionsFlow",
+        "/api/queries/PaymentMethodsBootstrapData",
+        "/api/GuestBuildingRules",
+        "/v2/get-data-layer-variables/",
+        "/api/NotificationPreferencesPage",
+        "/api/v2/experiences_users/",
+        "/v2/get-data-layer-variables/xxxx",
+        "/api/v2",
+        "/api/EmailUnsubscribePage",
+        "/api/v2/client_configs",
+        "/api/v2/marketing_event_tracking"
+    ],
+    "Hardcoded Secrets": [
+        "d306zoyjsyarp7ifhu67rjxn52tv0t20"
+    ]
+}

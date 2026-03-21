@@ -11,7 +11,7 @@ from aura.modules.api_reaper import APIReaper
 from aura.modules.frontend_deconstructor import FrontendDeconstructor
 from aura.modules.graphql_reaper import GraphQLReaper
 
-console = Console()
+from aura.ui.formatter import console
 
 async def test_api_reaper():
     """Verify API Reaper's spec ingestion and parameter mapping."""

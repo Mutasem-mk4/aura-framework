@@ -11,7 +11,7 @@ from rich.panel import Panel
 from aura.core.nexus_bridge import NexusBridge
 from aura.core.storage import AuraStorage
 
-console = Console()
+from aura.ui.formatter import console
 
 class DesyncProber:
     """

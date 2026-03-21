@@ -5,7 +5,7 @@ from rich.console import Console
 from aura.core.brain import AuraBrain
 import asyncio
 
-console = Console()
+from aura.ui.formatter import console
 
 class BountyBroker:
     """

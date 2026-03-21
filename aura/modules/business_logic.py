@@ -10,7 +10,7 @@ from aura.core.brain import AuraBrain
 from aura.core import state
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 class BusinessLogicAuditor:
     """

@@ -2,7 +2,7 @@ import asyncio
 from rich.console import Console
 from aura.core.orchestrator import NeuralOrchestrator
 
-console = Console()
+from aura.ui.formatter import console
 
 async def grand_siege_demo():
     console.print("[bold red]🔥 INITIALIZING GRAND SIEGE: AURA OMNI-SOVEREIGN v16.1 FINAL VERIFICATION 🔥[/bold red]")

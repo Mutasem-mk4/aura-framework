@@ -2,7 +2,7 @@ import logging
 from aura.core.oast_server import OASTManager
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 logger = logging.getLogger("aura")
 
 class OastCatcher:

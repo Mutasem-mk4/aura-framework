@@ -3,12 +3,15 @@ import threading
 import select
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 class AuraLink:
     """The 'Pivoting' engine for internal network dominance."""
     
-    def __init__(self, bind_host="127.0.0.1", bind_port=9050):
+    def __init__(self, bind_host="127.0.0.1", bind_port=9050, persistence=None, telemetry=None, brain=None, **kwargs):
+        self.persistence = persistence
+        self.telemetry = telemetry
+        self.brain = brain
         self.bind_host = bind_host
         self.bind_port = bind_port
         self.running = False

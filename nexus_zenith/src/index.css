@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+@theme {
+  --color-aura-deep: #0D0D1F;
+  --color-omega-neon: #BF00FF;
+  --color-sentient-cyan: #00FFFF;
+  --color-glass-border: rgba(255, 255, 255, 0.1);
+  --color-glass-bg: rgba(13, 13, 31, 0.7);
+}
+
+@layer base {
+  body {
+    @apply bg-aura-deep text-white overflow-hidden;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-glass-bg backdrop-blur-xl border border-glass-border rounded-xl shadow-2xl;
+  }
+  
+  .neon-glow {
+    box-shadow: 0 0 15px theme('colors.omega-neon');
+  }
+}
+
+.sentient-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .5; }
+}

@@ -4,7 +4,7 @@ import random
 from bs4 import BeautifulSoup
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 class DorksIntel:
     """

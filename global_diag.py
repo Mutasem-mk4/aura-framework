@@ -14,7 +14,7 @@ from aura.core.brain import AuraBrain
 from aura.ui.zenith_ui import ZenithUI
 from aura.core import state
 
-console = Console()
+from aura.ui.formatter import console
 logging.basicConfig(level=logging.ERROR)
 
 async def test_veritas_bridge():

@@ -21,7 +21,7 @@ import time
 import httpx
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 # Unkeyed headers to test with a canary value
 UNKEYED_HEADERS = [

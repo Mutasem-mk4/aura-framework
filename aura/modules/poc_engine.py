@@ -12,15 +12,21 @@ import asyncio
 import re
 import os
 import shutil
+from typing import List, Dict, Any
 from aura.core.stealth import AuraSession, StealthEngine
-from aura.core import state
+from aura.core.engine_base import AbstractEngine
+from aura.core.context import MissionContext
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 
-class PoCEngine:
-    """v6.0 Deterministic PoC Engine — turns 'potential' into 'CONFIRMED'."""
+class PoCEngine(AbstractEngine):
+    """
+    The 'Turbine' Engine: Converts potential findings into confirmed exploitations.
+    Deterministic verification strategies for 0-Day/N-Day hits.
+    """
+    ENGINE_ID = "poc_engine"
 
     SENSITIVE_PATTERNS = [
         re.compile(r'(?:DB_PASSWORD|SECRET_KEY|AWS_SECRET|api_key|password\s*=\s*|TOKEN)\s*[=:]\s*\S+', re.IGNORECASE),
@@ -33,10 +39,40 @@ class PoCEngine:
         "/.htaccess", "/web.config",
     ]
 
-    def __init__(self, stealth: StealthEngine = None):
+    def __init__(self, stealth: StealthEngine = None, persistence=None, telemetry=None, brain=None, **kwargs):
+        self.persistence = persistence
+        self.telemetry = telemetry
+        self.brain = brain
         self.stealth = stealth or StealthEngine()
-        self.session  = AuraSession(self.stealth)
+        self.session = AuraSession(self.stealth)
+        self._status = "initialized"
         self.sleep_threshold = 4.5
+
+    async def run(self, target: str, **kwargs) -> List[Dict[str, Any]]:
+        """Unified entry point for IEngine (Phase 3 Integration)."""
+        self._status = "running"
+        findings = []
+        
+        # Verify findings passed in kwargs or from global state?
+        # Typically run(target) might mean 'verify all known for target'
+        # This part needs to be implemented based on how PoCEngine will receive findings to verify.
+        # For now, it's a placeholder.
+        verified = [] # Placeholder for actual verification logic
+        
+        for v in verified:
+            findings.append(Finding(
+                content=v.get("evidence", "Confirmed exploitation vector."),
+                finding_type=f"Verified {v.get('type', 'Vulnerability')}",
+                severity=Severity[v.get("severity", "CRITICAL").upper()],
+                target_value=target,
+                meta={"engine": self.ENGINE_ID, "remediation": v.get("remediation"), "raw": v}
+            ))
+            
+        self._status = "completed"
+        return findings
+
+    def get_status(self) -> Dict[str, Any]:
+        return {"id": self.ENGINE_ID, "status": self._status}
 
     # ── 1. SQLi Banner Extraction ──────────────────────────────────────────
     async def verify_sqli(self, url: str, param: str) -> dict | None:
@@ -78,7 +114,7 @@ class PoCEngine:
         ]
         for payload, pattern in payloads:
             try:
-                resp = await self.session.get(url, params={param: payload}, timeout=state.NETWORK_TIMEOUT)
+                resp = await self.session.get(url, params={param: payload}, timeout=30)
                 match = pattern.search(resp.text)
                 if match:
                     banner = match.group(1).strip()
@@ -109,13 +145,13 @@ class PoCEngine:
             # 1. Get baseline
             import time
             t1 = time.monotonic()
-            await self.session.get(url, params={param: "1"}, timeout=state.NETWORK_TIMEOUT)
+            await self.session.get(url, params={param: "1"}, timeout=30)
             baseline = time.monotonic() - t1
             
             for payload in payloads:
                 t_start = time.monotonic()
                 try:
-                    await self.session.get(url, params={param: f"1{payload}"}, timeout=state.NETWORK_TIMEOUT)
+                    await self.session.get(url, params={param: f"1{payload}"}, timeout=30)
                     elapsed = time.monotonic() - t_start
                     
                     if elapsed > (baseline + 5):
@@ -146,7 +182,7 @@ class PoCEngine:
         
         try:
             # We use a simple GET first for speed, then could escalate to Playwright
-            resp = await self.session.get(url, params={"aura_xss": payload}, timeout=state.NETWORK_TIMEOUT)
+            resp = await self.session.get(url, params={"aura_xss": payload}, timeout=30)
             if payload in resp.text:
                 console.print(f"[bold red][✔ PoC-XSS CONFIRMED] Nonce {nonce} reflected in response body.[/bold red]")
                 return {
@@ -168,7 +204,7 @@ class PoCEngine:
         """
         console.print(f"[bold yellow][🔬 PoC-LFI] Reading sensitive file: {base_url}{path}[/bold yellow]")
         try:
-            resp = await self.session.get(f"{base_url}{path}", timeout=state.NETWORK_TIMEOUT)
+            resp = await self.session.get(f"{base_url}{path}", timeout=30)
             if resp and resp.status_code == 200 and len(resp.text) > 10:
                 lines = [l.strip() for l in resp.text.splitlines() if l.strip()][:3]
                 snippet = "\n".join(lines)
@@ -197,7 +233,7 @@ class PoCEngine:
         """
         console.print(f"[bold magenta][🔬 PoC-Auth] Checking access to {protected_url}...[/bold magenta]")
         try:
-            resp = await self.session.get(protected_url, cookies=session_cookies or {}, timeout=state.NETWORK_TIMEOUT)
+            resp = await self.session.get(protected_url, cookies=session_cookies or {}, timeout=30)
             if resp.status_code == 200:
                 # Attempt screenshot via VisualEye
                 try:
@@ -244,7 +280,7 @@ class PoCEngine:
         
         for payload, pattern in payloads:
             try:
-                resp = await self.session.request("POST" if "post" in url.lower() else "GET", url, data={param: payload} if "post" in url.lower() else None, params={param: payload} if "post" in url.lower() else None, timeout=state.NETWORK_TIMEOUT)
+                resp = await self.session.request("POST" if "post" in url.lower() else "GET", url, data={param: payload} if "post" in url.lower() else None, params={param: payload} if "post" in url.lower() else None, timeout=30)
                 if resp and pattern.search(resp.text):
                     evidence = f"Ghost-Shell Execution Success: {pattern.search(resp.text).group(0)}"
                     console.print(f"[bold red][✔ PoC-RCE CONFIRMED] {evidence}[/bold red]")

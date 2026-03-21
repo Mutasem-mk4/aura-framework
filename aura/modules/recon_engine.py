@@ -29,7 +29,7 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich import box
 
-console = Console()
+from aura.ui.formatter import console
 
 # ─── JS Secret Regex Patterns ───────────────────────────────────────────────
 SECRET_PATTERNS = {
@@ -111,11 +111,13 @@ class ReconEngine:
         self.proxy_file = proxy_file
         
         self.subdomains: Set[str] = {self.target_domain}
+        self.horizontal_domains: Set[str] = set() # For acquired/secondary brands
         self.js_files: Set[str] = set()
         self.secrets: list[dict] = []
         self.open_ports: list[int] = []
         self.cloud_buckets: Set[str] = set()
         self.takeover_findings: list[dict] = []
+        self.asn_ranges: list[str] = []
 
     async def _fetch_crt_sh(self, requester: AsyncRequester):
         console.print(f"  [cyan]🔍 Fetching crt.sh logs for {self.base_domain}...[/cyan]")
@@ -133,6 +135,121 @@ class ReconEngine:
                                 self.subdomains.add(sub)
         except Exception as e:
             console.print(f"  [dim]crt.sh lookup failed: {e}[/dim]")
+            
+        # Fallback 1: AlienVault OTX
+        console.print(f"  [cyan]🔍 Fetching AlienVault OTX for {self.base_domain}...[/cyan]")
+        try:
+            url = f"https://otx.alienvault.com/api/v1/indicators/domain/{self.base_domain}/passive_dns"
+            resp = await requester.fetch("GET", url, timeout=15)
+            if resp and resp.status_code == 200:
+                data = resp.json()
+                for item in data.get("passive_dns", []):
+                    sub = item.get("hostname", "").lower()
+                    if sub and self.base_domain in sub:
+                        self.subdomains.add(sub)
+        except Exception as e:
+            console.print(f"  [dim]AlienVault lookup failed: {e}[/dim]")
+            
+        # Fallback 2: HackerTarget
+        console.print(f"  [cyan]🔍 Fetching HackerTarget for {self.base_domain}...[/cyan]")
+        try:
+            url = f"https://api.hackertarget.com/hostsearch/?q={self.base_domain}"
+            resp = await requester.fetch("GET", url, timeout=15)
+            if resp and resp.status_code == 200:
+                for line in resp.text.splitlines():
+                    sub = line.split(",")[0].lower()
+                    if sub:
+                        self.subdomains.add(sub)
+        except Exception as e:
+            console.print(f"  [dim]HackerTarget lookup failed: {e}[/dim]")
+
+    async def _fetch_asn_subnets(self, requester: AsyncRequester):
+        """v58.0: Nuclear ASN Expansion. Finds IP ranges owned by the target."""
+        console.print(f"  [cyan]🌐 Mapping Autonomous System Numbers (ASN) for {self.base_domain}...[/cyan]")
+        search_terms = [self.base_domain.split('.')[0], self.base_domain]
+        for term in search_terms:
+            try:
+                resp = await requester.fetch("GET", f"https://api.bgpview.io/search?query_term={term}")
+                if resp and hasattr(resp, 'text') and resp.status_code == 200:
+                    data = json.loads(resp.text)
+                    if 'data' in data and 'ipv4_prefixes' in data['data']:
+                        found_any = False
+                        for prefix in data['data']['ipv4_prefixes']:
+                            if prefix['prefix'] not in self.asn_ranges:
+                                self.asn_ranges.append(prefix['prefix'])
+                                found_any = True
+                        if found_any:
+                            break # Found prefixes for this term, move on
+            except Exception as e:
+                console.print(f"  [dim]ASN lookup failed for {term}: {e}[/dim]")
+        
+        if self.asn_ranges:
+             console.print(f"  [bold green]✓ Found {len(self.asn_ranges)} dedicated IPv4 subnet ranges.[/bold green]")
+
+    async def _fetch_acquisitions(self, requester: AsyncRequester):
+        """v58.0: Nuclear Acquisition Recon. Finds companies acquired by the target."""
+        console.print(f"  [cyan]🏢 Hunting for acquired companies and shadow IT brands...[/cyan]")
+        target_name = self.base_domain.split('.')[0]
+        titles = [
+            f"List_of_mergers_and_acquisitions_by_{target_name.capitalize()}",
+            f"List_of_acquisitions_by_{target_name.capitalize()}",
+            f"{target_name.capitalize()}_(company)"
+        ]
+        
+        for title in titles:
+            try:
+                url = f"https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&titles={title}&format=json"
+                resp = await requester.fetch("GET", url)
+                if resp and hasattr(resp, 'text') and resp.status_code == 200:
+                    data = json.loads(resp.text)
+                    pages = data.get("query", {}).get("pages", {})
+                    for page_id, info in pages.items():
+                        if page_id != "-1":
+                            text = info.get("extract", "")
+                            # Heuristics for subsidiary names (often in bold or linked in the intro)
+                            # Matches "acquired <b>X</b>" or similar
+                            subsidiaries = re.findall(r'acquired <b>(.*?)</b>', text)
+                            for s in subsidiaries:
+                                # Clean up HTML tags
+                                s = re.sub('<[^<]+?>', '', s).lower().strip()
+                                if s and s not in self.base_domain:
+                                    self.horizontal_domains.add(f"{s.replace(' ', '')}.com")
+                            
+                            # Standard domain regex
+                            domains = re.findall(r'([a-zA-Z0-9-]+\.(?:com|net|org|io|co))', text)
+                            for d in domains:
+                                if d.lower() not in self.base_domain:
+                                    self.horizontal_domains.add(d.lower())
+                
+                if self.horizontal_domains:
+                    break
+            except Exception as e:
+                console.print(f"  [dim]Acquisition lookup failed for {title}: {e}[/dim]")
+
+        if self.horizontal_domains:
+            console.print(f"  [bold green]✓ Discovered {len(self.horizontal_domains)} acquired/lateral domains.[/bold green]")
+
+    async def _fetch_mobile_endpoints(self, requester: AsyncRequester):
+        """v58.0: Proactive Mobile API Fingerprinting."""
+        console.print(f"  [cyan]📱 Probing for Mobile API endpoints...[/cyan]")
+        base = self.base_domain.split('.')[0]
+        mobile_candidates = [
+            f"api.{base}.com",
+            f"mobile-api.{base}.com",
+            f"ios.{base}.com",
+            f"android.{base}.com",
+            f"v1-mobile.{base}.com",
+            f"prod-api.{base}.com"
+        ]
+        for domain in mobile_candidates:
+            try:
+                # Check for common mobile API patterns
+                resp = await requester.fetch("HEAD", f"https://{domain}/", timeout=5)
+                if resp:
+                    self.subdomains.add(domain)
+                    console.print(f"  [bold green]✓ Mobile Entry Point Verified: {domain}[/bold green]")
+            except:
+                pass
 
     async def _fetch_js_files(self, requester: AsyncRequester):
         console.print(f"  [cyan]🕷️ Finding JavaScript files on {self.target}...[/cyan]")
@@ -221,23 +338,30 @@ class ReconEngine:
             
         console.print(f"  [cyan]🔓 Checking {len(self.subdomains)} subdomains for takeover concurrently...[/cyan]")
         
-        # Determine which subdomains have vulnerable CNAMEs BEFORE making HTTP requests
-        takeover_candidates = []
-        for sub in self.subdomains:
-            if sub in (self.target_domain, self.base_domain): continue
-            
-            cname = self._resolve_cname(sub)
-            if not cname: continue
+        # Determine which subdomains have vulnerable CNAMEs in parallel
+        async def check_sub(sub):
+            if sub in (self.target_domain, self.base_domain): return None
+            cname = await asyncio.to_thread(self._resolve_cname, sub)
+            if not cname: return None
             
             for cname_suffix, (service, body_fingerprint) in TAKEOVER_FINGERPRINTS.items():
                 if cname.endswith(cname_suffix) or cname_suffix.lstrip(".") in cname:
-                    takeover_candidates.append({
+                    return {
                         "subdomain": sub,
                         "cname": cname,
                         "service": service,
                         "fingerprint": body_fingerprint
-                    })
-                    break
+                    }
+            return None
+
+        # Resolve all CNAMEs in parallel (max 50 at a time to avoid DNS flooding)
+        semaphore = asyncio.Semaphore(50)
+        async def sem_check(sub):
+            async with semaphore:
+                return await check_sub(sub)
+
+        tasks = [sem_check(sub) for sub in self.subdomains]
+        takeover_candidates = [c for c in await asyncio.gather(*tasks) if c]
 
         if not takeover_candidates:
             console.print(f"     [green]✅ No subdomain takeover detected among {len(self.subdomains)} processed.[/green]")
@@ -253,7 +377,7 @@ class ReconEngine:
         results = await requester.fetch_all(requests)
 
         for req, resp in zip(requests, results):
-            if not resp: continue
+            if resp is None or not hasattr(resp, 'text'): continue
             candidate = req["meta"]
             if candidate["fingerprint"].lower() in resp.text.lower():
                 finding = {
@@ -301,6 +425,9 @@ class ReconEngine:
             # Phase 1: Initial Discovery
             await asyncio.gather(
                 self._fetch_crt_sh(requester),
+                self._fetch_asn_subnets(requester),
+                self._fetch_acquisitions(requester),
+                self._fetch_mobile_endpoints(requester),
                 self._fetch_js_files(requester),
                 self._probe_buckets(requester)
             )
@@ -413,6 +540,11 @@ class ReconEngine:
             if len(self.subdomains) > 15:
                 table.add_row(f"... and {len(self.subdomains)-15} more")
             console.print(table)
+            
+        if self.horizontal_domains:
+            console.print(f"  [bold magenta]🏢 Acquired/Lateral Domains (Shadow IT):[/bold magenta] [yellow]{', '.join(map(str, sorted(self.horizontal_domains)))}[/yellow]")
+        if self.asn_ranges:
+             console.print(f"  [bold purple]🌐 Owned IP Ranges (ASN):[/bold purple] [yellow]{', '.join(map(str, sorted(self.asn_ranges)))}[/yellow]")
 
         # 2. Open Ports
         if self.open_ports:

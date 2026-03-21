@@ -1,0 +1,16 @@
+{
+  "endpoints": [
+    "https://auth.uber.com/saml",
+    "https://auth.uber.com/applogin",
+    "https://auth.uber.com/",
+    "https://auth.uber.com/unsupported",
+    "https://auth.uber.com/error",
+    "https://auth.uber.com/facebookloginsuccess",
+    "https://auth.uber.com/googleloginsuccess",
+    "https://auth.uber.com/session",
+    "https://auth.uber.com/lite",
+    "https://auth.uber.com/saml/acs/",
+    "https://auth.uber.com/ml"
+  ],
+  "secrets": []
+}

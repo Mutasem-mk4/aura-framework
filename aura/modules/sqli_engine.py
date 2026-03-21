@@ -26,7 +26,7 @@ from typing import Optional
 from rich.console import Console
 import httpx
 
-console = Console()
+from aura.ui.formatter import console
 
 # ─── Payload Lexicon ────────────────────────────────────────────────────────
 

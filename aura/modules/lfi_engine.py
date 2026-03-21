@@ -30,7 +30,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich import box
 
-console = Console()
+from aura.ui.formatter import console
 
 # ─── Configuration & Payloads ────────────────────────────────────────────────
 

@@ -3,7 +3,7 @@ from rich.console import Console
 from aura.core.stealth import AuraSession, StealthEngine
 from aura.core import state
 
-console = Console()
+from aura.ui.formatter import console
 
 class AuraArsenal:
     """Advanced exploitation modules for specific protocols."""

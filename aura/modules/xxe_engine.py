@@ -19,7 +19,7 @@ import hashlib
 import os
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 # Classic XXE — file read reflected in response
 CLASSIC_XXE_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>

@@ -4,7 +4,7 @@ from rich.console import Console
 from aura.core import state
 from typing import List, Dict
 
-console = Console()
+from aura.ui.formatter import console
 
 class AuthMatrix:
     """

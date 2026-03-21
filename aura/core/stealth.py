@@ -1,4 +1,4 @@
-from curl_cffi import requests as curlr
+import httpx
 import random
 import time
 import asyncio
@@ -8,8 +8,8 @@ import requests
 from urllib.parse import urlparse, urljoin
 import concurrent.futures
 from typing import Dict, Optional, List
-from aura.core import state
-from aura.ui.zenith_ui import ZenithUI, console
+from aura.core.context import MissionContext
+from aura.ui.formatter import ZenithUI, console
 
 class MorphicHeaderEngine:
     """v51.0 OMEGA: Generates evolving, high-entropy browser-like header sets."""
@@ -88,12 +88,16 @@ class StealthEngine:
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
     ]
 
-    def __init__(self, proxy_list: Optional[list] = None, proxy_file: Optional[str] = None):
+    def __init__(self, proxy_list: Optional[list] = None, proxy_file: Optional[str] = None, context: Optional[MissionContext] = None):
+        self.context = context
         self.proxy_list = proxy_list or []
         self.active_waf = None
-        self.mobile_mode = getattr(state, "MOBILE_MODE", False) # Enable via GLOBAL_STATE
+        self.mobile_mode = False # Deprecated GLOBAL_STATE hook
         
-        final_proxy_file = proxy_file or state.PROXY_FILE
+        final_proxy_file = proxy_file
+        if self.context and self.context.config.proxy_file:
+            final_proxy_file = self.context.config.proxy_file
+            
         if final_proxy_file:
             self.load_proxies(final_proxy_file)
         
@@ -243,7 +247,7 @@ class ShadowProxyManager:
         for f in fallbacks:
             if f not in self.proxies: self.proxies.append(f)
 
-    def get_shadow_node(self) -> str:
+    async def get_shadow_node(self) -> str:
         now = time.time()
         # Reclaim cooled down nodes
         recovered = [p for p, unlock in list(self.cooldown_pool.items()) if now > unlock]
@@ -256,8 +260,8 @@ class ShadowProxyManager:
         if not available:
             if self.cooldown_pool:
                 console.print("[bold red][⚡] CIRCUIT BREAKER: All nodes in cooldown. Waiting 60s...[/bold red]")
-                time.sleep(60)
-                return self.get_shadow_node()
+                await asyncio.sleep(60)
+                return await self.get_shadow_node()
             return random.choice(self.proxies) if self.proxies else "http://127.0.0.1:8080"
             
         return random.choice(available)
@@ -277,11 +281,18 @@ class ShadowProxyManager:
 
 class AuraSession:
     """v25.0 OMEGA: High-stealth async session with JA3 impersonation."""
-    _semaphore = asyncio.Semaphore(state.GLOBAL_CONCURRENCY_LIMIT)
 
-    def __init__(self, stealth: StealthEngine):
+    def __init__(self, stealth: StealthEngine, context: Optional[MissionContext] = None):
         from aura.core.brain import AuraBrain
         self.stealth = stealth
+        self.context = context
+        
+        # Instance-level semaphore instead of class-level to prevent state bleeding
+        concurrency = 3
+        if self.context:
+            concurrency = self.context.config.global_concurrency_limit
+        self._semaphore = asyncio.Semaphore(concurrency)
+        
         self.brain = AuraBrain()
         self.shadow_manager = ShadowProxyManager()
         self.latency_log = []
@@ -311,7 +322,7 @@ class AuraSession:
         max_attempts = 3
         for attempt in range(max_attempts):
             async with self._semaphore:
-                shadow_node = self.shadow_manager.get_shadow_node()
+                shadow_node = await self.shadow_manager.get_shadow_node()
                 
                 # Dynamic Stealth Parameters
                 params = self.stealth.get_stealth_params()
@@ -328,9 +339,13 @@ class AuraSession:
                     headers.update(req_kwargs["headers"])
                 req_kwargs["headers"] = headers
                 
+                # HTTTPX Native Request mapping
+                req_kwargs.pop("impersonate", None) # Remove curl_cffi param
+                
                 try:
                     start = time.perf_counter()
-                    resp = await asyncio.to_thread(curlr.request, method, url, **req_kwargs)
+                    async with httpx.AsyncClient(proxies=shadow_node, verify=False, timeout=30) as client:
+                        resp = await client.request(method, url, headers=req_kwargs.get("headers"), params=req_kwargs.get("params"), data=req_kwargs.get("data"), json=req_kwargs.get("json"))
                     latency = (time.perf_counter() - start) * 1000
                     
                     if resp and resp.status_code < 400:
@@ -364,6 +379,14 @@ class AuraSession:
                                     await asyncio.sleep(random.uniform(10, 20))
                                     self.consecutive_blocks = 0
                         
+                        # JS Challenge Evasion (Turnstile/Cloudflare) via Playwright Context
+                        if waf == "Cloudflare" and resp.status_code == 403:
+                            bypass_resp = await self._playwright_bypass(method, url, shadow_node, req_kwargs)
+                            if bypass_resp:
+                                self.stats["success"] += 1
+                                self.consecutive_blocks = 0
+                                return bypass_resp
+
                         # Circuit Breaker: If attempt 2 fails, wait longer
                         if attempt == 1:
                             await asyncio.sleep(random.uniform(5, 10))
@@ -376,6 +399,50 @@ class AuraSession:
                         return None
                     continue
         return None
+
+    async def _playwright_bypass(self, method, url, proxy, kwargs):
+        """v58.0 NUCLEAR: Invokes Playwright for JS challenge circumvention."""
+        console.print(f"[bold red][☠️ GHOST] Core WAF triggered. Engaging Playwright for JS Challenge Bypass...[/bold red]")
+        try:
+            import playwright.async_api as pw
+            async with pw.async_playwright() as p:
+                proxy_server = {"server": proxy} if proxy else None
+                browser = await p.chromium.launch(headless=True, proxy=proxy_server, args=["--no-sandbox", "--disable-blink-features=AutomationControlled"])
+                context = await browser.new_context(user_agent=self.active_ua, extra_http_headers=kwargs.get("headers", {}))
+                page = await context.new_page()
+                
+                # Defeat webdriver detection
+                await page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+                
+                await page.goto(url, wait_until="networkidle", timeout=45000)
+                
+                # Check if challenge passed
+                content = await page.content()
+                
+                if "just a moment" not in content.lower() and "verify you are human" not in content.lower():
+                    console.print("[bold green][☠️ GHOST] JS Challenge Bypassed Successfully![/bold green]")
+                    
+                    # Create a mock response object compatible with httpx/curl_cffi
+                    class MockResponse:
+                        def __init__(self, text, status_code):
+                            self.text = text
+                            self.content = text.encode('utf-8')
+                            self.status_code = status_code
+                            self.headers = {}
+                            
+                        def json(self):
+                            import json
+                            return json.loads(self.text)
+                            
+                    resp = MockResponse(content, 200)
+                    await browser.close()
+                    return resp
+                    
+                await browser.close()
+                return None
+        except Exception as e:
+            console.print(f"[dim red]Playwright hook failed: {e}[/dim red]")
+            return None
 
     async def get(self, url, **kwargs): return await self.request("GET", url, **kwargs)
     async def post(self, url, **kwargs): return await self.request("POST", url, **kwargs)

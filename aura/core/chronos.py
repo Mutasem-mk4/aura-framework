@@ -23,7 +23,7 @@ from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
 
-console = Console()
+from aura.ui.formatter import console
 
 # --- Chronos State Storage ---
 CHRONOS_STATE_FILE = "chronos_state.json"

@@ -1,133 +1,21 @@
-# aura/core/state.py
-import os
-from dotenv import load_dotenv
+"""
+aura.core.state
 
-# v19.4: Auto-load environment from project root
-load_dotenv()
+This module has been heavily refactored.
+Mutable global variables and configurations have been moved to `aura.core.context`.
+This file now solely handles:
+1. Process-wide halt signals (emergency stops)
+2. Static, read-only dictionaries (e.g., REMEDIATION_DB, SCAN_METHODOLOGY)
+"""
+
+import os
 
 # Create the halt signal file in the root of the project to be accessible by all processes
 _ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 HALT_FILE = os.path.join(_ROOT_DIR, ".aura_halt_signal")
 
-# v22.4: File-backed Global DNS Circuit Breaker (shared across ALL processes)
-DNS_FAIL_FILE = os.path.join(_ROOT_DIR, ".aura_dns_failures")
-_DNS_FAIL_CACHE = set()  # In-memory cache to minimise disk I/O
 
-def mark_dns_failed(host: str):
-    """Mark a host as DNS-unresolvable so ALL Aura processes skip it."""
-    # Strip port from host
-    bare = host.split(':')[0]
-    if not bare or bare in _DNS_FAIL_CACHE:
-        return
-    _DNS_FAIL_CACHE.add(bare)
-    try:
-        with open(DNS_FAIL_FILE, 'a', encoding='utf-8') as f:
-            f.write(bare + '\n')
-    except Exception:
-        pass
-
-def is_dns_failed(host: str) -> bool:
-    """Return True if the host has been marked dead by any Aura process."""
-    bare = host.split(':')[0]
-    if not bare:
-        return False
-    if bare in _DNS_FAIL_CACHE:
-        return True
-    # Sync from file (other processes may have written to it)
-    try:
-        if os.path.exists(DNS_FAIL_FILE):
-            with open(DNS_FAIL_FILE, 'r', encoding='utf-8') as f:
-                hosts = {l.strip() for l in f if l.strip()}
-            _DNS_FAIL_CACHE.update(hosts)
-            if bare in hosts:
-                return True
-    except Exception:
-        pass
-    return False
-
-def clear_dns_failures():
-    """Reset the DNS failure cache (call at start of new scan)."""
-    _DNS_FAIL_CACHE.clear()
-    try:
-        if os.path.exists(DNS_FAIL_FILE):
-            os.remove(DNS_FAIL_FILE)
-    except Exception:
-        pass
-
-# Global proxy configuration for Phase 5 Deep Proxy Architecture
-PROXY_FILE = None
-TOR_MODE = False
-TOR_PORT = 9050 # Dynamic: verified by stealth engine
-SMART_BYPASS = True
-CLOUD_SWARM_MODE = False
-FAST_MODE = False # v14.2: Optimized rapid-fire mode (skips deep audits)
-AUTO_SUBMIT = False # v19.5: Phase 32 Integrated Submission Gate
-APEX_MODE = False   # v40.0: AI-Driven Zero-False-Positive verification loop
-
-# Network Stability & Performance Scaling
-GLOBAL_CONCURRENCY_LIMIT = 3    # Reduced for Intigriti compliance (Max 5 req/sec)
-REQUEST_JITTER_MODE = True      # Forces subtle random delays to avoid triggering system-wide blocks
-NETWORK_TIMEOUT = 30            # v18.1: Shared Framework-Wide Timeout (Single Source of Truth)
-OAST_POLL_INTERVAL = 15         # v38.0: OAST polling frequency (seconds)
-
-# Phase 16.4: Authentication & Firewall Bypass (User-Defined)
-CUSTOM_HEADERS = {
-    "X-Intigriti-Username": "mutasem_mk4"
-}
-CUSTOM_COOKIES = {}
-
-# v25.0 Apex Automation: BOLA / IDOR Dual-Session Tokens
-AUTH_TOKEN_ATTACKER = os.environ.get("AUTH_TOKEN_ATTACKER")
-AUTH_TOKEN_VICTIM = os.environ.get("AUTH_TOKEN_VICTIM")
-
-# Apex Protocol Phase 1: Ghost Mode (Global Stealth Engine)
-GHOST_MODE = False # Enabled via --ghost CLI flag
-
-# Professional Reporting Options
-CUSTOM_CONSULTANT = "Independent Security Researcher"
-CUSTOM_COMPANY = "Security Assessment Team"
-
-# Gemini AI Configuration: Primary and Secondary mappings for resilience
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-GEMINI_MODEL = "gemini-2.0-flash" 
-
-# Zero-Cost Local AI Configuration (Ollama)
-OLLAMA_HOST = os.environ.get("OLLAMA_HOST")
-# v4.0 Beginner Enablement
-BEGINNER_MODE = True # Default to true for newcomers
-CLINIC_MODE = False
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5-coder:7b")
-
-# Zero-Cost AI (OpenRouter Free Tier)
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
-OPENROUTER_FREE_MODE = False # Enabled via --free-ai CLI flag
-ZENITH_FREE_STACK = [
-    "google/gemini-2.0-flash-exp:free",
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "mistralai/mistral-7b-instruct:free",
-    "openrouter/auto"
-]
-
-# OSINT API Keys (read from environment or .env)
-SHODAN_API_KEY = os.environ.get("SHODAN_API_KEY")
-VIRUSTOTAL_API_KEY = os.environ.get("VIRUSTOTAL_API_KEY")
-OTX_API_KEY = os.environ.get("OTX_API_KEY")
-CENSYS_API_ID = os.environ.get("CENSYS_API_ID")
-CENSYS_API_SECRET = os.environ.get("CENSYS_API_SECRET")
-GREYNOISE_API_KEY = os.environ.get("GREYNOISE_API_KEY")
-SECURITYTRAILS_API_KEY = os.environ.get("SECURITYTRAILS_API_KEY")
-BINARYEDGE_API_KEY = os.environ.get("BINARYEDGE_API_KEY")
-INTELX_API_KEY = os.environ.get("INTELX_API_KEY")
-HUNTERIO_API_KEY = os.environ.get("HUNTERIO_API_KEY")
-FULLHUNT_API_KEY = os.environ.get("FULLHUNT_API_KEY")
-
-# v40.0 OMEGA: Bounty Platform Target
-BOUNTY_PLATFORM = os.environ.get("BOUNTY_PLATFORM", "hackerone") # hackerone, intigriti, bugcrowd, generic
-
-# v21.0 Cloud Swarm Phase (DigitalOcean Orchestration)
-DIGITALOCEAN_TOKEN = os.environ.get("DIGITALOCEAN_TOKEN")
-
-def is_halted():
+def is_halted() -> bool:
     """Checks the filesystem for the halt signal marker."""
     return os.path.exists(HALT_FILE)
 
@@ -146,6 +34,11 @@ def reset_operations():
             os.remove(HALT_FILE)
         except Exception as e:
             print(f"Error resetting state: {e}")
+
+
+# =====================================================================
+# STATIC DEFINITIONS (Read-Only)
+# =====================================================================
 
 # Professional SOC Remediation Database
 REMEDIATION_DB = {
@@ -294,25 +187,30 @@ SCAN_METHODOLOGY = {
 # Supported OSINT Sources for Coverage Tracking
 OSINT_SOURCES = ["Shodan", "VirusTotal", "AlienVault OTX", "Censys", "GreyNoise"]
 
-class WorkflowTracker:
-    """Phase 29: Tracks multi-step transactions (e.g., checkout flows) to detect stateful flaws."""
-    def __init__(self):
-        self.transactions = [] # List of {'url': str, 'method': str, 'params': dict, 'cookies': dict}
-        self.active_session_cookies = {}
+# =====================================================================
+# BACKWARD COMPATIBILITY
+# =====================================================================
+NETWORK_TIMEOUT = 30
+PROXY_FILE = None
+CUSTOM_HEADERS = {}
+CUSTOM_COOKIES = {}
+TOR_MODE = False
+CLOUD_SWARM_MODE = False
+FAST_MODE = False
+GHOST_MODE = False
+BEGINNER_MODE = False
+CLINIC_MODE = False
+AUTO_SUBMIT = False
+OPENROUTER_FREE_MODE = False
+AUTH_TOKEN_ATTACKER = None
+AUTH_TOKEN_VICTIM = None
 
-    def record_step(self, url: str, method: str, params: dict, cookies: dict):
-        self.transactions.append({
-            "url": url,
-            "method": method,
-            "params": params,
-            "cookies": cookies.copy()
-        })
-        if cookies:
-            self.active_session_cookies.update(cookies)
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5-coder:7b")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+ZENITH_FREE_STACK = ["google/gemini-2.0-flash-exp:free", "meta-llama/llama-3.3-70b-instruct:free", "mistralai/mistral-7b-instruct:free", "openrouter/auto"]
+GEMINI_MODEL = "gemini-2.0-flash"
+DIGITALOCEAN_TOKEN = os.environ.get("DIGITALOCEAN_TOKEN")
 
-    def get_last_transaction(self):
-        return self.transactions[-1] if self.transactions else None
-
-    def clear(self):
-        self.transactions = []
-        self.active_session_cookies = {}
+from aura.core.context import WorkflowTracker

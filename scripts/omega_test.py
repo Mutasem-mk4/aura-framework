@@ -12,7 +12,7 @@ from aura.core.orchestrator import NeuralOrchestrator
 from aura.modules.semantic_ast_engine import SemanticASTAnalyzer
 from aura.modules.stateful_logic_fuzzer import StatefulLogicFuzzer, WorkflowStep, SessionState
 
-console = Console()
+from aura.ui.formatter import console
 
 async def test_storage_agnostic():
     """Verify database-agnostic zipping logic."""

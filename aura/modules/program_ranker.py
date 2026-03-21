@@ -19,7 +19,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 
-console = Console()
+from aura.ui.formatter import console
 
 CACHE_FILE = os.path.join(os.path.expanduser("~"), ".aura", "programs_cache.json")
 CACHE_TTL  = 3600 * 6  # 6 hours

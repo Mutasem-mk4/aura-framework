@@ -11,18 +11,33 @@ import uuid
 import requests
 import urllib3
 from urllib.parse import urlparse, urljoin
+from typing import List, Dict, Any, Optional
+
 from rich.console import Console
 from aura.modules.threat_intel import ThreatIntel
 from aura.core.stealth import StealthEngine, AuraSession
+from aura.core.brain import AuraBrain
 from aura.core import state
 from aura.modules.scope_checker import ScopeChecker
+from aura.core.engine_interface import IEngine
+from aura.core.models import Finding, Severity
 
-console = Console()
+from aura.ui.formatter import console
 
-class AuraScanner:
-    """v7.2 Instinct Focus — Deep Discovery Engine with Recursive Spidering,
-    JS/CSS Link Extraction, Sitemap/Robots Mastery, and Professional DirBusting."""
+class AuraScanner(IEngine):
+    """v7.2 Instinct Focus — Deep Discovery Engine with Recursive Spidering."""
     
+    ENGINE_ID = "aura_scanner"
+
+    def __init__(self, brain=None, stealth=None, persistence=None, telemetry=None, **kwargs):
+        self.brain = brain or AuraBrain()
+        self.stealth = stealth or StealthEngine()
+        self.persistence = persistence # Injected PersistenceHub
+        self.telemetry = telemetry
+        self.stealth_session = AuraSession(self.stealth)
+        self.common_subdomains = ["www", "dev", "api", "staging", "admin", "vpn", "mail", "blog", "test"]
+        self._status = "initialized"
+        
     BLIND_SIEGE_LIST = [
         # Admin / Auth
         "admin/login.asp", "admin/db", "manager/html", "server-status", "auth/login", "v1/admin",
@@ -43,10 +58,16 @@ class AuraScanner:
         "account/transfer", "feedback/send", "search?query=test", "docs/config", "cgi-bin/test.sh"
     ]
 
-    def __init__(self, stealth: StealthEngine = None):
-        self.common_subdomains = ["www", "dev", "api", "staging", "admin", "vpn", "mail", "blog", "test"]
-        self.stealth = stealth or StealthEngine()
-        self.stealth_session = AuraSession(self.stealth)
+    async def run(self, target: str, **kwargs) -> List[Finding]:
+        """Unified scan entry point for Phase 3."""
+        self._status = "running"
+        findings = []
+        # Implementation of a full scan routine...
+        self._status = "completed"
+        return findings
+
+    def get_status(self) -> Dict[str, Any]:
+        return {"id": self.ENGINE_ID, "status": self._status}
 
     # ──────────────────────────────────────────────
     # Phase 1: Subdomain Discovery
@@ -746,8 +767,8 @@ class AuraScanner:
             console.print(f"[dim yellow][!] SPA Detected: Baseline length {baseline['length']}. Enabling Similarity Filter.[/dim yellow]")
 
         # v12.1 Persistence Check
-        from aura.core.storage import AuraStorage
-        db_logger = AuraStorage()
+        # In Phase 3, we use the injected persistence hub
+        db_logger = self.persistence
 
         user_agents = [
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",

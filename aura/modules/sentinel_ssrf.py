@@ -14,7 +14,7 @@ from rich.panel import Panel
 import httpx
 from aura.core.brain import AuraBrain
 
-console = Console()
+from aura.ui.formatter import console
 
 class SentinelSSRF:
     """

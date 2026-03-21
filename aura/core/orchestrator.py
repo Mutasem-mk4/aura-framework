@@ -4,16 +4,19 @@ import os
 import random
 import gc
 import time
-from aura.core.provisioner import AuraProvisioner
+from typing import Any, List, Dict, Optional, Tuple, Set, Callable
 from aura.core.brain import AuraBrain
 from aura.core.stealth import StealthEngine, AuraSession
-from aura.modules.scanner import AuraScanner
-from aura.modules.exploiter import AuraExploiter
-from aura.modules.dast import AuraDAST
-from aura.modules.dast_v2 import AuraSingularity
-from aura.modules.vision import VisualEye
+from aura.core.telemetry import Telemetry
+from aura.core.provisioner import AuraProvisioner
+from aura.core.context import MissionContext, AuraConfig, FeatureFlags
+from aura.core.storage import AuraStorage
+from aura.core.oast_server import OASTManager
+from aura.core.registry import get_registry
+from aura.modules.submitter import BountySubmitter
+from aura.modules.profit_engine import ProfitEngine
 from aura.core.vuln_intel import CVEProvider
-from aura.core.nexus_bridge import NexusBridge
+from aura.core.nexus_bridge import NexusBridge, BurpController
 from aura.core.omega_crawler import OMEGACrawler
 from aura.modules.safety import ScopeManager
 from aura.core.exploit_chain import ChainOfThoughtExploiter
@@ -23,11 +26,12 @@ from aura.modules.threat_intel import ThreatIntel
 from aura.modules.bounty import BountyHunter
 from aura.modules.banner_grabber import BannerGrabber
 from aura.modules.pivoting import AuraLink
+# from aura.modules.dorks_intel import DorksIntel
+# from aura.modules.takeover import SubdomainTakeoverHunter
 from aura.modules.recon_pipeline import ReconPipeline
 from aura.modules.secret_hunter import SecretHunter
 from aura.modules.power_stack import PowerStack
 from aura.modules.poc_engine import PoCEngine
-from aura.modules.cloud_recon import AuraCloudRecon
 from aura.modules.logic_engine import AILogicEngine
 from aura.modules.synthesizer import ProtocolSynthesizer
 from aura.modules.lateral_engine import LateralEngine
@@ -41,25 +45,6 @@ from aura.core.markdown_reporter import MarkdownReporter
 from aura.modules.race_condition_hunter import RaceConditionHunter
 from aura.modules.evidence_dumper import EvidenceDumper
 from aura.modules.artifact_builder import ArtifactBuilder
-from aura.modules.cache_poisoning_engine import CachePoisoningEngine
-from aura.modules.logic_hunter import LogicHunter
-from aura.modules.xxe_engine import XXEEngine
-from aura.modules.prototype_pollution_engine import PrototypePollutionEngine
-from aura.modules.dom_hunter import DOMHunter
-from aura.modules.graphql_engine import GraphQLBreaker
-from aura.modules.mfa_bypass_engine import MFABypassEngine
-from aura.modules.business_logic_engine import BusinessLogicEngine
-from aura.modules.host_header_engine import HostHeaderEngine
-from aura.modules.open_redirect_engine import OpenRedirectEngine
-from aura.modules.file_upload_engine import FileUploadEngine
-from aura.modules.deserialize_engine import DeserializationEngine
-from aura.modules.ws_oauth_engine import WSAndOAuthEngine
-from aura.modules.ssti_engine import SSTIEngine
-from aura.modules.smuggling_engine import SmugglingEngine
-from aura.modules.exploit_radar import ExploitRadar
-from aura.modules.dorks_intel import DorksIntel
-from aura.modules.subdomain_takeover import SubdomainTakeoverHunter
-from aura.modules.nuclei_engine import NucleiEngine
 from aura.core.weaponization_engine import WeaponizationEngine
 from aura.core.apex_sentinel import ApexSentinel
 from aura.core.shadow_state import ShadowStateModeler
@@ -67,12 +52,8 @@ from aura.core.bounty_reporter import BountyReporter
 from aura.core.fleet_manager import FleetManager
 from aura.core.mission_hunter import MissionHunter
 from aura.core.sentinel_watch import SentinelWatch
-from aura.core import state
-from aura.core.storage import AuraStorage
-from aura.core.oast_server import OASTManager
-from aura.modules.submitter import BountySubmitter
-from aura.modules.profit_engine import ProfitEngine
-from aura.ui.zenith_ui import ZenithUI, console
+from aura.core.zenith_reporter import ZenithReporter
+from aura.ui.formatter import ZenithUI, console
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 from rich.panel import Panel
 from rich.console import Console
@@ -83,99 +64,10 @@ from aura.core.metrics import METRICS
 # v38.0: Semantic Analysis Engines
 from aura.modules.semantic_ast_engine import SemanticASTAnalyzer, ASTVisualizer
 from aura.modules.stateful_logic_fuzzer import StatefulLogicFuzzer, WorkflowBuilder
+from aura.core.injector import get_container
 
 import logging
 logger = logging.getLogger("aura.orchestrator")
-
-class AsyncDBProxy:
-    """v36.0: Asynchronous Database Queue Proxy to eliminate SQLite WAL write-locks."""
-    def __init__(self, real_db, broadcast_callback=None):
-        self.real_db = real_db
-        self.broadcast_callback = broadcast_callback
-        self._queue = None
-
-    def _get_queue(self):
-        if self._queue is None:
-            import asyncio
-            self._queue = asyncio.Queue()
-        return self._queue
-
-    def add_finding(self, target, content_obj, finding_type="Vulnerability", severity="HIGH", campaign_id=None):
-        data = {
-            "method": "add_finding",
-            "args": (target, content_obj, finding_type, severity, campaign_id)
-        }
-        try:
-            self._get_queue().put_nowait(data)
-            if self.broadcast_callback:
-                import asyncio
-                from aura.core.profit_engine import profit_engine
-                roi = profit_engine.calculate_roi(finding_type, severity)
-                payout = profit_engine.estimate_payout(finding_type, severity)
-                
-                asyncio.create_task(self.broadcast_callback({
-                    "type": "finding",
-                    "level": "critical" if severity == "CRITICAL" else "success",
-                    "content": f"New Finding: {finding_type} on {target} | ROI: {roi} | Est: {payout}",
-                    "icon": "bug",
-                    "data": {"roi": roi, "payout": payout}
-                }))
-                
-                # Update Mission HUD Stats
-                asyncio.create_task(self.broadcast_callback({
-                    "type": "stats",
-                    "data": {"roi_score": roi, "est_payout": payout}
-                }))
-        except Exception:
-            self.real_db.add_finding(target, content_obj, finding_type, severity, campaign_id)
-
-    def update_finding_metadata(self, target, content_obj, severity):
-        data = {
-            "method": "update_finding_metadata",
-            "args": (target, content_obj, severity)
-        }
-        try:
-            self._get_queue().put_nowait(data)
-        except Exception:
-            self.real_db.update_finding_metadata(target, content_obj, severity)
-
-    def save_finding(self, target, content, finding_type="Vulnerability", severity="HIGH", campaign_id=None):
-        data = {
-            "method": "save_finding",
-            "args": (target, content, finding_type, severity, campaign_id)
-        }
-        try:
-            self._get_queue().put_nowait(data)
-        except Exception:
-            if hasattr(self.real_db, "save_finding"):
-                self.real_db.save_finding(target, content, finding_type, severity, campaign_id)
-            else:
-                self.real_db.add_finding(target, content, finding_type, severity, campaign_id)
-
-    async def _db_worker(self):
-        queue = self._get_queue()
-        while True:
-            try:
-                task = await queue.get()
-                method = task.get("method")
-                args = task.get("args", tuple())
-                if method == "add_finding":
-                    self.real_db.add_finding(*args)
-                elif method == "update_finding_metadata":
-                    self.real_db.update_finding_metadata(*args)
-                elif method == "save_finding":
-                     if hasattr(self.real_db, 'save_finding'):
-                          self.real_db.save_finding(*args)
-                     else:
-                          self.real_db.add_finding(*args)
-                queue.task_done()
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                console.print(f"[red]DB Async Writer Error: {e}[/red]")
-
-    def __getattr__(self, item):
-        return getattr(self.real_db, item)
 
 class MirrorSimulator:
     def __init__(self, brain):
@@ -205,7 +97,7 @@ class SovereignDecisionEngine:
         self.brain = brain
         self.db = db
 
-    async def autonomous_mission_planning(self, domain: str = None) -> list:
+    async def autonomous_mission_planning(self, domain: Optional[str] = None) -> List[Any]:
         console.print("[bold purple][[BRAIN] SOVEREIGN] Analyzing Global Battlefield for Autonomous Target Selection...[/bold purple]")
         if domain:
             selected = [domain]
@@ -218,101 +110,170 @@ from aura.modules.api_reaper import APIReaper
 from aura.modules.frontend_deconstructor import FrontendDeconstructor
 from aura.modules.graphql_reaper import GraphQLReaper
 
-from aura.core.zenith_reporter import ZenithReporter
-
 class NeuralOrchestrator:
-    def __init__(self, whitelist: list = None, blacklist: list = None, broadcast_callback=None):
-        from aura.core.provisioner import AuraProvisioner
-        from aura.core.brain import AuraBrain
-        from aura.core.storage import AuraStorage
-        from aura.core.profit_engine import profit_engine
-        AuraProvisioner.check_and_provision()
-        self.brain = AuraBrain()
+    """
+    v40.0: Enterprise Re-architected Orchestrator.
+    Now uses Dependency Injection and Dynamic Module Discovery.
+    """
+    def __init__(self, container: Any = None, whitelist: Optional[List[str]] = None, blacklist: Optional[List[str]] = None, broadcast_callback: Optional[Any] = None, context: Optional[MissionContext] = None):
+        self.container = container or get_container()
+        self.persistence = self.container.persistence
+        self.telemetry = self.container.telemetry
+        self.registry = self.container.registry
+        self.context = context or MissionContext(target_url="unknown")
+        
+        # Dependency Mappings (Legacy support)
+        self.db = self.persistence
+        self.storage = self.persistence
         self.broadcast_callback = broadcast_callback or self._default_remote_broadcast
-        self.db = AsyncDBProxy(AuraStorage(), broadcast_callback=self.broadcast_callback)
-        self.profit_engine = profit_engine
-        self.api_reaper = APIReaper(None) # Session will be assigned later
-        self.frontend_miner = FrontendDeconstructor(None)
-        self.gql_reaper = GraphQLReaper(None)
-        self.cot = ChainOfThoughtExploiter(self.brain)
-        self.memory = DeepMemoryFuzzer(self.db)
+        
+        # Infrastructure
+        self.brain = AuraBrain()
         self.stealth = StealthEngine()
         self.session = AuraSession(self.stealth)
-        self.scanner = AuraScanner(stealth=self.stealth)
-        self.exploiter = AuraExploiter()
-        self.dast = AuraDAST()
-        self.singularity = AuraSingularity()
-        self.vision = VisualEye()
-        self.vuln_intel = CVEProvider()
         self.scope = ScopeManager(whitelist=whitelist, blacklist=blacklist)
-        self.leaks = LeakProber()
-        self.intel = ThreatIntel(stealth=self.stealth)
-        self.bounty = BountyHunter()
-        self.link = AuraLink()
-        from aura.modules.heavy_weapons import HeavyWeaponry
-        self.heavy_weapons = HeavyWeaponry(self.db)
-        self.banner_grabber = BannerGrabber()
-        self.recon_pipeline = ReconPipeline()
-        self.secret_hunter  = SecretHunter()
-        self.power_stack    = PowerStack(stealth=self.stealth)
-        self.poc_engine     = PoCEngine(stealth=self.stealth)
-        self.cloud_recon    = AuraCloudRecon(self.db)
-        self.logic_engine   = AILogicEngine(self.session)
-        self.synthesizer    = ProtocolSynthesizer(self.brain)
-        self.lateral        = LateralEngine(self.brain)
-        from aura.modules.ghost_ops import GhostOps
-        self.ghost_ops      = GhostOps(self)
+        self.oast = OASTManager.get_instance()
+        
+        # Standardized Engines via Registry
+        self.scanner     = self._init_engine("aura_scanner", stealth=self.stealth)
+        self.exploiter   = self._init_engine("aura_exploiter")
+        self.dast        = self._init_engine("aura_dast")
+        self.singularity = self._init_engine("aura_singularity")
+        self.vision      = self._init_engine("aura_vision")
+        self.leaks       = self._init_engine("leaks")
+        self.recon_pipeline = self._init_engine("recon_pipeline")
+        self.secret_hunter = self._init_engine("secret_hunter")
+        
+        # Extended/Specialized Engines (Transitioning to Registry)
+        self.vuln_intel   = self._init_engine("cve_provider") or CVEProvider()
+        self.intel        = self._init_engine("threat_intel", stealth=self.stealth) or ThreatIntel(stealth=self.stealth)
+        self.bounty       = self._init_engine("bounty_hunter") or BountyHunter()
+        self.link         = self._init_engine("aura_link") or AuraLink()
+        self.banner_grabber = self._init_engine("banner_grabber") or BannerGrabber()
+        self.power_stack  = self._init_engine("power_stack", stealth=self.stealth) or PowerStack(stealth=self.stealth)
+        self.poc_engine    = self._init_engine("poc_engine", stealth=self.stealth) or PoCEngine(stealth=self.stealth)
+        self.logic_engine  = self._init_engine("ai_logic_engine") or AILogicEngine(self.session)
+        self.synthesizer   = self._init_engine("protocol_synthesizer") or ProtocolSynthesizer(self.brain)
+        self.lateral       = self._init_engine("lateral_engine") or LateralEngine(self.brain)
+        self.dorks_intel   = self._init_engine("dorks_intel") 
+        self.takeover_hunter = self._init_engine("subdomain_takeover") 
+        self.nuclei_engine = self._init_engine("nuclei_engine") 
+        self.submitter     = self._init_engine("bounty_submitter") 
+        self.profit_engine = self._init_engine("profit_engine") 
+        self.weapon_engine = self._init_engine("weaponization_engine") 
+        self.ssti_engine   = self._init_engine("ssti_engine") 
+        self.smuggling_engine = self._init_engine("smuggling_engine") 
+        self.ws_oauth_engine = self._init_engine("ws_oauth_engine")
+        self.fleet_manager = self._init_engine("fleet_manager") or FleetManager()
+        self.mission_hunter = self._init_engine("mission_hunter") or MissionHunter()
+        self.sentinel_watch = self._init_engine("sentinel_watch") or SentinelWatch(self.persistence.findings)
+        self.nexus_bridge  = self._init_engine("nexus_bridge") or NexusBridge()
+        self.burp_bridge   = BurpController()  # v25.2: Burp Suite REST API integration
+        self.omega_crawler = self._init_engine("omega_crawler") or OMEGACrawler(proxy_url="http://127.0.0.1:8081")
+        self.apex          = self._init_engine("apex_sentinel") or ApexSentinel(self.brain)
+        self.shadow_state  = self._init_engine("shadow_state_modeler") or ShadowStateModeler(self.brain)
+        self.bounty_reporter = self._init_engine("bounty_reporter") or BountyReporter(self.brain, platform=self.context.config.bounty_platform)
+        self.cot           = self._init_engine("exploit_chain") or ChainOfThoughtExploiter(self.brain)
+        self.logic_fuzzer  = self._init_engine("logic_fuzzer")
+
+        self.reporter  = ZenithReporter(self.brain)
+        self.mirror    = MirrorSimulator(self.brain)
+        self.deception = DeceptionOrchestrator(self.stealth.swarm)
+        self.sovereign = SovereignDecisionEngine(self.brain, self.persistence)
+        
+        self.telemetry.log_audit("SYSTEM", "NeuralOrchestrator", "Core engines initialized via registry.")
+        
+        self.active_missions = []
+        self.stats = {"findings": 0, "urls": 0}
+        self.knowledge_base = {
+            "redirects": [],
+            "sinks": [],
+            "idor_vectors": [],
+            "auth_flows": []
+        }
+        self._guard_active = False
+        self.mission_state = {}
+        self._active_tasks = set()
         self.dast_semaphore = asyncio.Semaphore(10)
         self.sing_semaphore = asyncio.Semaphore(5)
         self.scope_checker  = ScopeChecker()
-        self.oast = OASTManager.get_instance()
         self.oast_task = None
-        from aura.modules.dorks_intel import DorksIntel
-        self.dorks_intel    = DorksIntel()
-        from aura.modules.subdomain_takeover import SubdomainTakeoverHunter
-        self.takeover_hunter = SubdomainTakeoverHunter()
-        self.nuclei_engine   = NucleiEngine()
-        from aura.modules.submitter import BountySubmitter
-        self.submitter       = BountySubmitter()
-        from aura.modules.profit_engine import ProfitEngine
-        self.profit_engine   = ProfitEngine()
-        self.weapon_engine   = WeaponizationEngine(self.brain)
-        self.ssti_engine     = SSTIEngine(target="") # Target will be set or passed during run
-        self.smuggling_engine = SmugglingEngine(self.session)
-        self.ws_oauth_engine = WSAndOAuthEngine(self.session)
-        self.fleet_manager = FleetManager()
-        self.mission_hunter = MissionHunter()
-        self.sentinel_watch = SentinelWatch(self.db)
-        self.plugins = []
-        self._load_plugins()
         self.current_campaign = None
-        self.broadcast_callback = broadcast_callback
-        self.reporter = ZenithReporter(self.brain)
-        self.mission_state = {}
-        self.mirror = MirrorSimulator(self.brain)
-        self.deception = DeceptionOrchestrator(self.stealth.swarm)
-        self.sovereign = SovereignDecisionEngine(self.brain, self.db)
-        self.nexus_bridge = NexusBridge()
-        self.omega_crawler = OMEGACrawler(proxy_url="http://127.0.0.1:8081")
-        self.apex = ApexSentinel(self.brain)
-        self.shadow_state = ShadowStateModeler(self.brain)
-        self.bounty_reporter = BountyReporter(self.brain, platform=getattr(state, "BOUNTY_PLATFORM", "generic"))
-        self.knowledge_base = {"redirects": [], "sinks": [], "leaks": [], "idor_vectors": []}
-        self._guard_active = False
+        self.plugins = []
         
-        # v45.0: Integrated Broadcast Bridge (CLI -> Background Nexus)
-        if self.broadcast_callback is None:
-            self.broadcast_callback = self._default_remote_broadcast
-        
-        # v25.0: Register custom API signers from environment
-        from aura.core.signers import SignerManager, CoinhakoSigner
-        coinhako_key = os.getenv("COINHAKO_API_KEY")
-        coinhako_secret = os.getenv("COINHAKO_API_SECRET")
-        if coinhako_key and coinhako_secret:
-            SignerManager.register("coinhako.com", CoinhakoSigner(coinhako_key, coinhako_secret))
-            console.print("[bold green][[OK]] Coinhako API Signer active.[/bold green]")
+        # Dynamic Modules
+        self.heavy_weapons = self._init_engine("heavy_weapons", db=self.db)
+        self.cloud_recon   = self._init_engine("aura_cloud_recon", db=self.db)
+        self.ghost_ops     = self._init_engine("ghost_ops", orchestrator=self)
+        self.api_reaper    = self._init_engine("api_reaper")
+        self.frontend_miner = self._init_engine("frontend_deconstructor")
+        self.gql_reaper    = self._init_engine("graphql_reaper")
 
-    async def _broadcast(self, content, type="status", level="info", icon="info", data=None):
+        self._load_plugins()
+        console.print("[bold green][+][/] NeuralOrchestrator initialized with IOC Container.")
+
+    def _init_engine(self, engine_id: str, **kwargs) -> Any:
+        """Helper to initialize an engine from registry with dependencies."""
+        import os
+        debug_mode = os.getenv("AURA_DEBUG", "").lower() == "true"
+        
+        engine_cls = self.registry.get_engine(engine_id)
+        if engine_cls:
+            try:
+                # Inject persistence, telemetry, and brain automatically
+                return engine_cls(persistence=self.persistence, telemetry=self.telemetry, brain=self.brain, **kwargs)
+            except Exception as e:
+                if debug_mode:
+                    self.telemetry.log_error("ORCHESTRATOR", f"Dependency Error in {engine_id}: {e}")
+                    from rich.console import Console
+                    Console().print(f"[dim yellow][Graceful Fallback] {engine_id} missing library/dependency: {e}.[/dim yellow]")
+        else:
+            if debug_mode:
+                self.telemetry.log_error("ORCHESTRATOR", f"Failed to initialize engine: {engine_id} (Not found in registry)")
+                from rich.console import Console
+                Console().print(f"[dim yellow][Graceful Fallback] Engine '{engine_id}' not found in registry. Using Mock.[/dim yellow]")
+
+        # Return a MockEngine to prevent cascade failure
+        class MockEngine:
+            def __init__(self, eid): 
+                self.engine_id = eid
+                self.engine_name = eid
+                self._status = "mocked"
+            
+            def __getattr__(self, name):
+                """Return an async function that returns appropriate empty value."""
+                if name.startswith("__") and name.endswith("__"):
+                    raise AttributeError(f"MockEngine has no attribute {name}")
+                async def noop(*args, **kwargs):
+                    # Return empty list for scan/spider/run methods, None otherwise
+                    if 'scan' in name or 'spider' in name or 'run' in name:
+                        return []
+                    return None
+                return noop
+            
+            async def run(self, *args, **kwargs): return []
+            async def setup(self, *args, **kwargs): pass
+            async def teardown(self, *args, **kwargs): pass
+            
+            # Additional common methods as async
+            async def stop_veritas(self): pass
+            async def scan(self, *args, **kwargs): return []
+            async def spider(self, *args, **kwargs): return []
+            async def probe(self, *args, **kwargs): return []
+        return MockEngine(engine_id)
+
+    def _track_task(self, coro, name: str = "engine_task") -> asyncio.Task:
+        """
+        Create an asyncio Task and register it for lifecycle tracking.
+        Tasks auto-remove from the set when they complete (done callback).
+        This ensures close() can cancel ALL running tasks without leaking ghost processes.
+        """
+        task = asyncio.create_task(coro, name=name)
+        self._active_tasks.add(task)
+        task.add_done_callback(self._active_tasks.discard)
+        return task
+
+    async def _broadcast(self, content: Any, type: str = "status", level: str = "info", icon: str = "info", data: Optional[Dict[str, Any]] = None):
         """Unified broadcast interface with remote bridge support."""
         message = {
             "type": type,
@@ -328,7 +289,7 @@ class NeuralOrchestrator:
             else:
                 self.broadcast_callback(message)
 
-    async def _default_remote_broadcast(self, message):
+    async def _default_remote_broadcast(self, message: Dict[str, Any]):
         """Bridge CLI events to the background Nexus API server."""
         import httpx
         try:
@@ -337,7 +298,7 @@ class NeuralOrchestrator:
         except Exception:
             pass
 
-    async def _process_exploit_chain(self, domain, finding_type, content_obj):
+    async def _process_exploit_chain(self, domain: str, finding_type: str, content_obj: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         campaign_id = getattr(self, 'current_campaign', None)
         if "redirect" in str(finding_type).lower():
             self.knowledge_base["redirects"].append(content_obj.get("evidence_url"))
@@ -371,7 +332,7 @@ class NeuralOrchestrator:
         await self._perform_oracle_chaining_synthesis(domain)
         
         # v4.0 Beginner Enablement: Mentor Engine
-        if state.BEGINNER_MODE:
+        if self.context.flags.beginner_mode:
             await self._display_mentor_guide(content_obj)
         
         return None
@@ -534,7 +495,7 @@ class NeuralOrchestrator:
                 logger.debug(f"Resource Guard poll error: {e}")
                 await asyncio.sleep(60)
 
-    async def activate_sentient_mode(self, domain: str):
+    async def activate_sentient_mode(self, domain: str) -> None:
         console.print(f"[bold red][[OMEGA] OMEGA] Activating Sentient Singularity Mode for {domain}...[/bold red]")
         exposure = await self.mirror.predict_exposure(self.session.latency_log)
         if exposure["alert_triggered"]:
@@ -542,18 +503,18 @@ class NeuralOrchestrator:
         objectives = await self.sovereign.autonomous_mission_planning(domain)
         console.print("[bold green][[DNA]] Genetic Payload Mutator active.[/bold green]")
 
-    async def broadcast(self, content, type="status", level="info", icon="info-circle", **kwargs):
+    async def broadcast(self, content: Any, type: str = "status", level: str = "info", icon: str = "info-circle", **kwargs: Any) -> None:
         if self.broadcast_callback:
             msg = {"content": content, "type": type, "level": level, "icon": icon}
             msg.update(kwargs)
             if asyncio.iscoroutinefunction(self.broadcast_callback): await self.broadcast_callback(msg)
             else: self.broadcast_callback(msg)
 
-    def _save_mission_state(self, domain: str, step: str, findings_count: int, urls_count: int):
+    def _save_mission_state(self, domain: str, step: str, findings_count: int, urls_count: int) -> None:
         stats = {"findings": findings_count, "urls": urls_count}
         self.db.save_mission_state(domain, step, stats, self.mission_state)
 
-    def _load_plugins(self):
+    def _load_plugins(self) -> None:
         import os, importlib.util
         plugins_dir = os.path.join(os.path.dirname(__file__), "..", "plugins")
         if not os.path.exists(plugins_dir): return
@@ -574,6 +535,13 @@ class NeuralOrchestrator:
     async def close(self):
         """v25.0 OMEGA: Graceful framework shutdown."""
         console.print("[dim cyan][*] NeuralOrchestrator: Initiating graceful shutdown...[/dim cyan]")
+        
+        # Ghost Process Elimination
+        if hasattr(self, '_active_tasks'):
+            for task in self._active_tasks:
+                if not task.done():
+                    task.cancel()
+        
         try:
             if hasattr(self, 'session'):
                 # AuraSession might be using curl_cffi or aiohttp
@@ -588,8 +556,8 @@ class NeuralOrchestrator:
         except Exception as e:
             console.print(f"[dim red][!] Shutdown warning: {e}[/dim red]")
 
-    async def _phase_preflight(self, domain, status):
-        if state.CLINIC_MODE:
+    async def _phase_preflight(self, domain: str, status: Any) -> Tuple[Optional[str], Optional[str], Optional[str], bool]:
+        if self.context.flags.clinic_mode:
             ZenithUI.clinic_info("Phase 0: Pre-Flight", "This phase checks if the target is alive and determines its IP. If a firewall is detected, Aura attempts to find the 'Origin IP' to bypass it.")
         ZenithUI.phase_banner("Phase 0: Stealth Pre-Flight Recon", domain, icon="⚡")
         status.update(f"[bold cyan]Initializing pre-flight telemetry for {domain}...")
@@ -599,11 +567,11 @@ class NeuralOrchestrator:
             resp = await self.session.get(target_url, timeout=30)
             is_live = True
             recon_domain = domain
-            if getattr(state, "SMART_BYPASS", False) and resp and resp.status_code in [403, 401]:
+            if self.context.config.smart_bypass and resp and resp.status_code in [403, 401]:
                 origin_ips = await self.stealth.hunt_origin_ip(domain)
                 if origin_ips:
                     best_ip = origin_ips[0]
-                    state.CUSTOM_HEADERS["Host"] = domain
+                    self.context.custom_headers["Host"] = domain
                     domain = best_ip
                     target_url = f"https://{best_ip}"
                     resp_bypass = await self.session.get(target_url, timeout=30, verify=False)
@@ -660,7 +628,7 @@ class NeuralOrchestrator:
         return intel_data
 
     async def _phase_recon(self, recon_domain: str | None, target_ip: str | None, intel_data, status, campaign_id, swarm_mode):
-        if state.CLINIC_MODE:
+        if self.context.flags.clinic_mode:
             ZenithUI.clinic_info("Phase 2: Active Recon", "Here we map the infrastructure. We look for hidden subdomains and services that might be vulnerable or forgotten by the owner.")
         ZenithUI.phase_banner("Phase 2: Active Reconnaissance", recon_domain, icon="[SATELLITE]")
         await self._broadcast(recon_domain, type="stats", data={"progress": 30})
@@ -669,10 +637,10 @@ class NeuralOrchestrator:
         recon_data = await self.recon_pipeline.run(
             recon_domain, 
             target_ip, 
-            intel_data=intel_data, 
-            stealth_mode=getattr(self, "effective_fast_mode", False),
-            beginner_mode=state.BEGINNER_MODE
-        )
+                    intel_data=intel_data, 
+                    stealth_mode=getattr(self, "effective_fast_mode", False),
+                    beginner_mode=self.context.flags.beginner_mode
+                )
         all_subs = recon_data.get("subdomains", [])
         if all_subs: await self.takeover_hunter.run(all_subs)
         
@@ -710,7 +678,7 @@ class NeuralOrchestrator:
 
     async def _phase_0day_radar(self, recon_domain, tech_stack, campaign_id):
         """v40.0 OMEGA: Global Threat Feed 0-Day PoC check."""
-        if not tech_stack or state.FAST_MODE: return []
+        if not tech_stack or self.context.flags.fast_mode: return []
         
         ZenithUI.phase_banner("Phase 3.9: 0-Day Radar Scanning", recon_domain, icon="[RADAR]")
         try:
@@ -815,25 +783,28 @@ class NeuralOrchestrator:
                 self.db.add_finding(recon_domain, f, f["type"], f["severity"], campaign_id)
         except Exception as e: console.print(f"[dim red]WS+OAuth Engine error: {e}[/dim red]")
 
-        # Neural-Chain: Feed to StatefulLogicFuzzer
-        if endpoints_to_fuzz:
-            status.update(f"[bold red][⛓️] Neural-Chain: Feeding {len(endpoints_to_fuzz)} precise routes to StatefulLogicFuzzer...")
-            fuzzer = StatefulLogicFuzzer(base_url=target_url)
-            workflow = fuzzer.define_workflow("Deconstruction_Workflow", endpoints_to_fuzz)
-            await fuzzer.execute_workflow(workflow, mutate_only=True)
+        # Neural-Chain v38.0: Autonomous Logic Synthesis & Execution
+        if endpoints_to_fuzz and self.logic_fuzzer:
+            status.update(f"[bold red][⛓️] Neural-Chain: Synthesizing autonomous workflow for {len(endpoints_to_fuzz)} endpoints...")
             
-            for finding in fuzzer.findings:
-                # v38.0: Logic findings are dicts, not objects
-                f_type = finding.get("type", "Logic Flaw")
-                f_sev = finding.get("severity", "HIGH")
-                f_desc = finding.get("description", "Unknown logic vulnerability")
-                f_ev = finding.get("evidence", "")
+            # 1. AI Synthesis
+            workflow_json = await asyncio.to_thread(self.brain.synthesize_workflow, endpoints_to_fuzz)
+            
+            if workflow_json:
+                console.print(f"[bold cyan]🧠 [Brain] Workflow synthesized with {len(workflow_json)} steps.[/bold cyan]")
                 
-                f_dict = {"type": f_type, "severity": f_sev, "content": f_desc, "evidence": f_ev}
-                all_findings.append(f_dict)
-                self.db.add_finding(recon_domain, f_dict, f_type, f_sev, campaign_id)
-                # Note: Autonomous PoC Generation is already handled by API Reaper and GraphQL reaper natively,
-                # and in phase_exploit for general findings.
+                # 2. Execute via centralized LogicFuzzer engine
+                status.update(f"[bold red][💥] Neural-Chain: Launching stateful logic fuzzer...")
+                findings = await self.logic_fuzzer.run(
+                    target=target_url, 
+                    workflow_json=workflow_json
+                )
+                
+                for f in findings:
+                    all_findings.append(f.model_dump() if hasattr(f, "model_dump") else f)
+                    console.print(f"[bold red][[!!!]] Logic Flaw Detected: {f.content}[/bold red]")
+            else:
+                console.print("[yellow][!] AI failed to synthesize a valid workflow. Skipping autonomous fuzzer.[/yellow]")
                 
         return all_findings
 
@@ -1003,7 +974,7 @@ class NeuralOrchestrator:
         return final_vulns
 
     async def _phase_exploit(self, recon_domain, vulns, status, campaign_id):
-        if state.CLINIC_MODE:
+        if self.context.flags.clinic_mode:
             ZenithUI.clinic_info("Phase 5: Exploitation", "This is where we confirm the vulnerabilities. Aura creates safe 'Proof of Concepts' to prove the flaw exists without damaging the server.")
         ZenithUI.phase_banner("Phase 5: Autonomous Exploitation", recon_domain, icon="exploit")
         status.update(f"[bold purple]Synthesizing custom exploit chains...")
@@ -1042,7 +1013,7 @@ class NeuralOrchestrator:
 
     async def execute_advanced_chain(self, domain, campaign_id=None, swarm_mode=False):
         await self._broadcast(f"Mission Initiated: Target {domain}", type="system", level="success", icon="start")
-        self.effective_fast_mode = state.FAST_MODE
+        self.effective_fast_mode = self.context.flags.fast_mode
         self.current_campaign = campaign_id
         domain = self.db.normalize_target(domain)
         if not self.scope.is_in_scope(domain): return {"status": "blocked"}
@@ -1067,7 +1038,7 @@ class NeuralOrchestrator:
                     target_ip, 
                     intel_data=intel_data, 
                     stealth_mode=self.effective_fast_mode,
-                    beginner_mode=state.BEGINNER_MODE
+                    beginner_mode=self.context.flags.beginner_mode
                 )
                 METRICS.phase_duration.labels(phase_name="recon").observe(time.time() - _t2)
                 _t3 = time.time()
@@ -1149,3 +1120,31 @@ class NeuralOrchestrator:
             try: await self.oast.poll(db_callback=self.db.save_finding)
             except Exception: pass
             await asyncio.sleep(30)
+
+    async def smart_route_finding(self, finding: Dict[str, Any]):
+        """
+        Analyzes a finding and triggers subsequent engines based on the finding type.
+        This enables autonomous escalation (e.g., Subdomain -> ThreatIntel).
+        """
+        finding_type = finding.get("type", "").lower()
+        registry = get_registry()
+        
+        # Resolve which engines to run next
+        target_engines = registry.resolve_routing(finding_type)
+        
+        if not target_engines:
+            return
+            
+        console.print(f"[bold cyan][ROUTE] Triggering {len(target_engines)} downstream engines for: {finding_type}...[/bold cyan]")
+        
+        # Prepare dependencies for the engines
+        kwargs = {
+            "persistence": self.persistence,
+            "telemetry": self.telemetry,
+            "brain": self.brain
+        }
+        
+        # Run them in parallel (Async Execution)
+        task = asyncio.create_task(registry.run_parallel(target_engines, self.context, **kwargs))
+        self._active_tasks.add(task)
+        task.add_done_callback(self._active_tasks.discard)

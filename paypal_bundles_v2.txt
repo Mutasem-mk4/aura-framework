@@ -1,0 +1,11 @@
+https&#x3a;&#x2f;&#x2f;www&#x2e;paypalobjects&#x2e;com&#x2f;WEBSCR&#x2d;640&#x2d;20180225&#x2d;1/js/lib/min/global.js
+https&#x3a;&#x2f;&#x2f;www&#x2e;paypalobjects&#x2e;com&#x2f;WEBSCR&#x2d;640&#x2d;20180225&#x2d;1/js/lib/min/widgets.js
+https&#x3a;&#x2f;&#x2f;www&#x2e;paypalobjects&#x2e;com&#x2f;WEBSCR&#x2d;640&#x2d;20180225&#x2d;1/js/opinionlab/oo_engine.js
+https&#x3a;&#x2f;&#x2f;www&#x2e;paypalobjects&#x2e;com&#x2f;WEBSCR&#x2d;640&#x2d;20180225&#x2d;1/js/pp_naturalsearch.js
+https&#x3a;&#x2f;&#x2f;www&#x2e;paypalobjects&#x2e;com&#x2f;WEBSCR&#x2d;640&#x2d;20180225&#x2d;1/js/site_catalyst/pp_jscode_080706.js?v=1
+https://c.paypal.com/da/r/fb.js
+https://ct.ddc.paypal.com/c.js
+https://www.paypalobjects.com/checkout/js/checkout.js
+https://www.paypalobjects.com/upstream/bizcomponents/js/modal.js
+https://www.paypalobjects.com/webcaptcha/ngrlCaptcha.min.js
+https://www.paypalobjects.com/webstatic/en_US/developer/docs/js/checkout.js

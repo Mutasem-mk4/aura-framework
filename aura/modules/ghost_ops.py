@@ -3,16 +3,26 @@ import random
 from aura.core import state
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
+from aura.core.engine_base import AbstractEngine
 
-class GhostOps:
+class GhostOps(AbstractEngine):
     """
     v19.0 THE SINGULARITY
     Ghost-Ops - Cognitive Deception & Tactical Diversion Engine.
     """
-    def __init__(self, orchestrator):
-        self.orchestrator = orchestrator
+    ENGINE_ID = "ghost_ops"
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self.orchestrator = kwargs.get("orchestrator")
         self.decoys_active = False
+
+    async def run(self):
+        """Standard run method as required by AbstractEngine."""
+        if self.context and self.context.target_url:
+            await self.launch_diversion(self.context.target_url)
+        return []
 
     async def launch_diversion(self, target_url: str):
         """Launches loud decoy attacks to saturate Blue Team monitoring."""

@@ -1,0 +1,63 @@
+﻿ΓòöΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòù
+Γòæ                             Γòæ
+Γòæ  Uber Auth Logic Strike     Γòæ
+Γòæ  Sentient Offensive Engine  Γòæ
+Γòæ                             Γòæ
+ΓòÜΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓò¥
+                                                                                                                        
+   ΓÜí Defining Auth Workflow  Γ»ê  Analyzing v2/submit-form state transitions...                                          
+                                                                                                                        
+python : Traceback (most 
+recent call last):
+At line:1 char:1
++ python -u 
+fuzz_uber_auth.py 2>&1 | 
+Out-File -Encoding UTF8 
+traceback. ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~
+    + CategoryInfo          
+    : NotSpecified: (Trace  
+  back (most recent call    
+ last)::String) [], Remo    
+teException
+    + FullyQualifiedErrorId 
+    : NativeCommandError
+ 
+  File "C:\Users\User\.gemin
+i\antigravity\scratch\aura\f
+uzz_uber_auth.py", line 76, 
+in <module>
+    asyncio.run(run_auth_str
+ike())
+  File "C:\Users\User\AppDat
+a\Local\Programs\Python\Pyth
+on312\Lib\asyncio\runners.py
+", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\User\AppDat
+a\Local\Programs\Python\Pyth
+on312\Lib\asyncio\runners.py
+", line 118, in run
+    return self._loop.run_un
+til_complete(task)
+           ^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^
+  File "C:\Users\User\AppDat
+a\Local\Programs\Python\Pyth
+on312\Lib\asyncio\base_event
+s.py", line 691, in 
+run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\User\.gemin
+i\antigravity\scratch\aura\f
+uzz_uber_auth.py", line 57, 
+in run_auth_strike
+    fuzzer.define_workflow(w
+orkflow)
+TypeError: StatefulLogicFuzz
+er.define_workflow() 
+missing 1 required 
+positional argument: 'steps'

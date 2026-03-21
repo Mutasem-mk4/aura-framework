@@ -14,7 +14,7 @@ from aura.core.config import cfg
 import sqlite3
 import os
 
-console = Console()
+from aura.ui.formatter import console
 
 class AuraIntegrityGuard:
     """

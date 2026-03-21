@@ -51,7 +51,16 @@ class NexusBridge:
     Orchestrates the execution of the Go-based networking core for maximum speed.
     """
     
-    def __init__(self):
+    # Burp API configuration
+    BURP_API_URL = "http://127.0.0.1:8090"
+    
+    def __init__(self, persistence=None, telemetry=None, brain=None, **kwargs):
+        # Store dependencies
+        self.db = persistence  # Legacy compatibility
+        self.persistence = persistence
+        self.telemetry = telemetry
+        self.brain = brain
+        
         # Paths are absolute to prevent resolution errors
         self.base_dir = os.path.dirname(os.path.abspath(__file__))
         self.nexus_path = os.path.join(self.base_dir, "nexus", "nexus.exe")
@@ -59,8 +68,39 @@ class NexusBridge:
         self.veritas_port = 50051
         self.veritas = VeritasClient(port=self.veritas_port)
         
+        # Graceful handling if nexus binary is missing
         if not os.path.exists(self.nexus_path):
-            raise FileNotFoundError(f"Nexus binary not found at {self.nexus_path}")
+            import logging
+            logging.getLogger("aura.nexus").warning(f"Nexus binary not found at {self.nexus_path}. Running in stub mode.")
+    
+    def route_finding_to_burp(self, finding: Dict[str, Any]) -> bool:
+        """Route a finding to Burp Suite via REST API (port 8090)."""
+        try:
+            import requests
+            url = finding.get("target_value") or finding.get("url")
+            if not url:
+                return False
+            
+            # Send to Burp proxy for further analysis
+            response = requests.post(
+                f"{self.BURP_API_URL}/proxy",
+                json={"url": url},
+                timeout=10
+            )
+            return response.status_code == 200
+        except Exception:
+            return False
+    
+    def get_burp_sitemap(self) -> List[Dict[str, Any]]:
+        """Fetch sitemap from Burp Suite API."""
+        try:
+            import requests
+            response = requests.get(f"{self.BURP_API_URL}/sitemap", timeout=10)
+            if response.status_code == 200:
+                return response.json().get("sitemap", [])
+        except Exception:
+            pass
+        return []
 
     def start_veritas(self, port: int = 50051):
         """Starts the long-running Veritas service backbone."""
@@ -191,6 +231,89 @@ class NexusBridge:
     def get_health(self):
         """Query Veritas for system and engine health status."""
         return self.veritas.call("get_health")
+
+
+class BurpController:
+    """
+    Aura-Burp Bridge: Integrates with Burp Suite Professional/Community REST API (port 8090).
+    Enables passive scanning, sitemap access, and active proxying.
+    Note: Community Edition has limited API functionality.
+    """
+    
+    def __init__(self, host: str = "127.0.0.1", port: int = 8090):
+        self.host = host
+        self.port = port
+        self.base_url = f"http://{host}:{port}"
+        self._session = None
+    
+    @property
+    def session(self):
+        if self._session is None:
+            import requests
+            self._session = requests.Session()
+        return self._session
+    
+    def is_available(self) -> bool:
+        """Check if Burp REST API is accessible."""
+        try:
+            resp = self.session.get(f"{self.base_url}/sitemap", timeout=2)
+            return resp.status_code in [200, 401, 403]
+        except Exception:
+            return False
+    
+    def get_sitemap(self) -> list:
+        """Fetch the current sitemap from Burp."""
+        try:
+            resp = self.session.get(f"{self.base_url}/sitemap", timeout=10)
+            if resp.status_code == 200:
+                return resp.json().get("sitemap", [])
+            return []
+        except Exception as e:
+            print(f"[!] Burp API Error: {e}")
+            return []
+    
+    def send_to_proxy(self, url: str, method: str = "GET", headers: dict = None, data: str = None) -> bool:
+        """Send a request through Burp's proxy for interception."""
+        try:
+            payload = {
+                "url": url,
+                "method": method,
+            }
+            if headers:
+                payload["headers"] = headers
+            if data:
+                payload["body"] = data
+            
+            resp = self.session.post(f"{self.base_url}/proxy", json=payload, timeout=10)
+            return resp.status_code == 200
+        except Exception as e:
+            print(f"[!] Burp Proxy Error: {e}")
+            return False
+    
+    def scan(self, url: str) -> dict:
+        """Trigger an active scan on a target URL (Professional only)."""
+        try:
+            resp = self.session.post(
+                f"{self.base_url}/scan", 
+                json={"urls": [url]},
+                timeout=30
+            )
+            return resp.json() if resp.status_code == 200 else {}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def async_scan(self, url: str) -> dict:
+        """Async wrapper for scan."""
+        import asyncio
+        return await asyncio.to_thread(self.scan, url)
+    
+    async def async_get_sitemap(self) -> list:
+        """Async wrapper for get_sitemap."""
+        return await asyncio.to_thread(self.get_sitemap)
+
+    async def async_send_to_proxy(self, url: str, method: str = "GET", headers: dict = None, data: str = None) -> bool:
+        """Async wrapper for send_to_proxy."""
+        return await asyncio.to_thread(self.send_to_proxy, url, method, headers, data)
 
 if __name__ == "__main__":
     bridge = NexusBridge()

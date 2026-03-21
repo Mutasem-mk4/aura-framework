@@ -5,7 +5,7 @@ from curl_cffi import requests
 from rich.console import Console
 from rich.table import Table
 
-console = Console()
+from aura.ui.formatter import console
 load_dotenv()
 
 async def test_api(name, url, method="GET", headers=None, auth=None, params=None, json_data=None):

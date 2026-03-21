@@ -4,7 +4,7 @@ from typing import List, Dict
 from urllib.parse import urlparse
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 class LLMHijacker:
     """

@@ -23,7 +23,7 @@ import httpx
 import re
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 # Timing threshold: a desync causes backend to wait for more data
 TIMING_THRESHOLD_SECONDS = 4.0

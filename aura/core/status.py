@@ -13,7 +13,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.columns import Columns
 
-console = Console()
+from aura.ui.formatter import console
 
 
 def _check_token(token: str, service: str) -> str:

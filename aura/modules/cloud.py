@@ -4,7 +4,7 @@ from rich.console import Console
 from aura.core.stealth import StealthEngine, AuraSession
 from aura.core import state
 
-console = Console()
+from aura.ui.formatter import console
 
 stealth = StealthEngine()
 session = AuraSession(stealth)

@@ -11,7 +11,7 @@ from rich.console import Console
 import dns.resolver
 import dns.asyncresolver
 
-console = Console()
+from aura.ui.formatter import console
 logger = logging.getLogger("aura")
 
 class NativeSubfinder:

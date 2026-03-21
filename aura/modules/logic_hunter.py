@@ -7,7 +7,7 @@ from rich.console import Console
 from aura.core.brain import AuraBrain
 
 logger = logging.getLogger("aura")
-console = Console()
+from aura.ui.formatter import console
 
 class LogicHunter:
     """

@@ -1,20 +1,59 @@
 import asyncio
 import os
 import re
+import uuid
 from playwright.async_api import async_playwright
-from aura.core.storage import AuraStorage
 from aura.core import state
 from rich.console import Console
+from typing import List, Dict, Any, Optional
+from aura.core.brain import AuraBrain
+from aura.core.stealth import StealthEngine, AuraSession
+from aura.core.engine_interface import IEngine
+from aura.core.models import Finding, Severity
 
-console = Console()
+from aura.ui.formatter import console
 
-class VisualEye:
+class VisualEye(IEngine):
     """The 'Recon Eye' engine for automated target visualization with OCR Intelligence."""
     
-    def __init__(self, output_dir="screenshots"):
+    ENGINE_ID = "aura_vision"
+
+    def __init__(self, brain=None, stealth=None, persistence=None, telemetry=None, output_dir="screenshots", **kwargs):
+        self.brain = brain or AuraBrain()
+        self.stealth = stealth or StealthEngine()
+        self.persistence = persistence
+        self.telemetry = telemetry
         self.output_dir = output_dir
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
+        self._status = "initialized"
+
+    async def run(self, target: str, **kwargs) -> List[Finding]:
+        """Unified vision entry point for Phase 3."""
+        self._status = "running"
+        findings = []
+        
+        filename = kwargs.get("filename", f"scan_{int(asyncio.get_event_loop().time())}")
+        result = await self.capture_screenshot(target, filename)
+        
+        if result and result.get("ocr") and result["ocr"].get("findings"):
+            for f in result["ocr"]["findings"]:
+                findings.append(Finding(
+                    id=str(uuid.uuid4()),
+                    engine_id=self.ENGINE_ID,
+                    target=target,
+                    type=f.get("type", "Visual Finding"),
+                    severity=Severity[f.get("severity", "MEDIUM")],
+                    description=f.get("content", ""),
+                    remediation=f.get("remediation_fix", ""),
+                    raw_data=f
+                ))
+        
+        self._status = "completed"
+        return findings
+
+    def get_status(self) -> Dict[str, Any]:
+        return {"id": self.ENGINE_ID, "status": self._status}
 
     def analyze_screenshot_content(self, page_text: str) -> dict:
         """
@@ -140,9 +179,6 @@ class VisualEye:
         """
         Tier 3: Auto-captures a screenshot of the vulnerable URL for every confirmed finding.
         Embeds the screenshot path into the finding dict as 'screenshot_path'.
-
-        This single feature raises acceptance rates significantly — triagers
-        can SEE the vulnerability without re-testing it manually.
         """
         url = finding.get("evidence_url") or finding.get("tampered_url") or finding.get("url")
         if not url:

@@ -5,7 +5,7 @@ import httpx
 import re
 from typing import List, Dict, Any, Optional
 from aura.core.brain import AuraBrain
-from aura.ui.zenith_ui import ZenithUI
+from aura.ui.formatter import ZenithUI
 
 logger = logging.getLogger("aura")
 

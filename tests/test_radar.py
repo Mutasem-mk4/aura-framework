@@ -5,7 +5,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 from aura.modules.threat_intel import ThreatIntel
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 async def test_0day_radar():
     console.print("[+] Initializing 0-Day Radar (ThreatIntel)...")

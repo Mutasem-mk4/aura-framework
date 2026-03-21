@@ -1,14 +1,22 @@
 import os
+import asyncio
+import uuid
+import socket
+from typing import List, Dict, Any, Optional
 from aura.core.stealth import AuraSession, StealthEngine
 from aura.core import state
+from aura.core.engine_interface import IEngine
+from aura.core.models import Finding, Severity
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
-class ThreatIntel:
+class ThreatIntel(IEngine):
     """Module for gathering passive threat intelligence from external APIs."""
     
-    def __init__(self, stealth: StealthEngine = None):
+    ENGINE_ID = "threat_intel"
+
+    def __init__(self, stealth: StealthEngine = None, persistence=None, telemetry=None, brain=None, **kwargs):
         self.shodan_api_key = os.getenv("SHODAN_API_KEY")
         self.vt_api_key = os.getenv("VIRUSTOTAL_API_KEY")
         self.otx_api_key = os.getenv("OTX_API_KEY")
@@ -22,7 +30,63 @@ class ThreatIntel:
         self.hunterio_api_key = os.getenv("HUNTERIO_API_KEY")
         self.fullhunt_api_key = os.getenv("FULLHUNT_API_KEY")
         self.stealth = stealth or StealthEngine()
+        self.persistence = persistence
+        self.telemetry = telemetry
+        self.brain = brain
         self.session = AuraSession(self.stealth)
+        self._status = "initialized"
+
+    async def run(self, target: str, **kwargs) -> List[Finding]:
+        """Unified entry point for IEngine (Phase 3 Integration)."""
+        self._status = "running"
+        findings = []
+        
+        # Determine if target is IP or domain
+        is_ip = False
+        try:
+            socket.inet_aton(target)
+            is_ip = True
+        except socket.error:
+            is_ip = False
+            
+        tasks = []
+        if is_ip:
+            tasks = [
+                self.query_shodan(target),
+                self.query_abuseipdb(target),
+                self.query_censys(target),
+                self.query_greynoise(target),
+                self.query_otx(target)
+            ]
+        else:
+            tasks = [
+                self.query_virustotal(target),
+                self.query_securitytrails(target),
+                self.query_fullhunt(target),
+                self.query_hunterio(target),
+                self.query_otx(target)
+            ]
+            
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        for res in results:
+            if not res or isinstance(res, Exception):
+                continue
+            
+            # Convert OSINT results to Findings
+            findings.append(Finding(
+                content=f"Passive intelligence gathered for {target}: {str(res)[:200]}...",
+                finding_type="OSINT Intel Discovery",
+                severity=Severity.INFO,
+                target_value=target,
+                meta={"engine": self.ENGINE_ID, "remediation": "Review passive intelligence for target fingerprinting.", "raw": res}
+            ))
+            
+        self._status = "completed"
+        return findings
+
+    def get_status(self) -> Dict[str, Any]:
+        return {"id": self.ENGINE_ID, "status": self._status}
 
     def _warn_missing_key(self, service):
         # Only warn if it's a critical missing core key

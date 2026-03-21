@@ -4,13 +4,17 @@ import os
 from typing import List, Dict
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
+from aura.core.engine_base import AbstractEngine
 
-class HeavyWeaponry:
+class HeavyWeaponry(AbstractEngine):
     """Aura v7.0: Integration module for Nuclei and Sqlmap."""
+    ENGINE_ID = "heavy_weapons"
     
-    def __init__(self, storage):
-        self.db = storage
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        # Retrieve injected persistence if provided, fallback to directly passed db
+        self.db = kwargs.get("persistence") or kwargs.get("db")
 
     async def run_nuclei(self, target: str) -> List[Dict]:
         """Runs Nuclei on a target and imports results."""

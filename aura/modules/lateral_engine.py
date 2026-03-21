@@ -1,14 +1,16 @@
 import asyncio
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 class LateralEngine:
     """
     v18.0 NEBULA GHOST
     Lateral Sovereignty - Autonomous Pivoting & Privilege Escalation Engine.
     """
-    def __init__(self, brain):
+    def __init__(self, persistence=None, telemetry=None, brain=None, **kwargs):
+        self.persistence = persistence
+        self.telemetry = telemetry
         self.brain = brain
         self.footholds = [] # List of RCE/SSRF findings
         self.internal_map = {} # {internal_ip: [services]}

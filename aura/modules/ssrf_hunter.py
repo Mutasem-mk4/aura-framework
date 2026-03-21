@@ -18,7 +18,7 @@ import urllib.parse
 from rich.console import Console
 from aura.core import state
 
-console = Console()
+from aura.ui.formatter import console
 
 # Parameters likely to accept URLs
 URL_PARAMS = [

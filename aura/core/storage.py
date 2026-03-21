@@ -2,6 +2,7 @@ import sqlite3
 import os
 import json
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Union, Tuple
 from aura.core.poc_generator import PoCSynthesizer
 
 from sqlalchemy import create_engine, MetaData
@@ -11,9 +12,9 @@ from sqlalchemy.pool import NullPool
 class AuraStorage:
     """Persistent storage engine for Aura using SQLite or PostgreSQL (Swarm Mode)."""
     
-    def __init__(self, db_path=None):
+    def __init__(self, db_path: Optional[str] = None):
         self.db_url = os.getenv("DATABASE_URL")
-        self.is_postgres = self.db_url and self.db_url.startswith("postgres")
+        self.is_postgres = bool(self.db_url and self.db_url.startswith("postgres"))
         
         if self.is_postgres:
             # Swarm Mode: Connect to centralized PostgreSQL DB
@@ -33,7 +34,7 @@ class AuraStorage:
             
         self._init_db()
 
-    def _get_connection(self):
+    def _get_connection(self) -> sqlite3.Connection:
         """v27.0: Returns a configured raw DBAPI connection tailored for extreme concurrency."""
         conn = self.engine.raw_connection()
         if not self.is_postgres:
@@ -42,7 +43,7 @@ class AuraStorage:
             conn.execute('PRAGMA synchronous=NORMAL;')
         return conn
 
-    def _execute(self, cursor, query, params=None):
+    def _execute(self, cursor: Any, query: str, params: Optional[Union[tuple, list, dict]] = None):
         """Abstraction for query parameters (? for sqlite, %s for postgres)."""
         if self.is_postgres and params:
             query = query.replace("?", "%s")
@@ -215,7 +216,7 @@ class AuraStorage:
         except Exception as e:
             pass
 
-    def normalize_target(self, value):
+    def normalize_target(self, value: Union[str, Any]) -> str:
         """Universal normalization: strips protocol, www, and trailing slashes."""
         if not value: return ""
         v = str(value).lower().strip()
@@ -225,7 +226,7 @@ class AuraStorage:
         v = v.split("/")[0] # Keep only domain part
         return v.rstrip("/")
 
-    def save_target(self, target_data):
+    def save_target(self, target_data: Dict[str, Any]) -> Optional[int]:
         """Saves or updates a target in the database. Normalizes value to prevent fragmentation."""
         now = datetime.now().isoformat()
         raw_val = target_data.get("target") or target_data.get("value")
@@ -267,7 +268,7 @@ class AuraStorage:
                 row = cursor.fetchone()
                 return row[0] if row else None
 
-    def log_action(self, action: str, target: str, details: str = "", campaign_id: int = None):
+    def log_action(self, action: str, target: str, details: str = "", campaign_id: Optional[int] = None) -> None:
         """Logs an operational action for audit compliance."""
         now = datetime.now().isoformat()
         with self._get_connection() as conn:
@@ -278,7 +279,7 @@ class AuraStorage:
             ''', (now, action, target, details, campaign_id))
             conn.commit()
 
-    def get_stats(self) -> dict:
+    def get_stats(self) -> Dict[str, int]:
         """v17.0: Quick stats for the Omni-Hub dashboard."""
         try:
             with self._get_connection() as conn:
@@ -311,18 +312,18 @@ class AuraStorage:
             ''', (now, path, payload, status_code))
             conn.commit()
 
-    def _to_dict(self, cursor, row):
+    def _to_dict(self, cursor: Any, row: Optional[Tuple]) -> Optional[Dict[str, Any]]:
         """v25.0 OMEGA: Centrally converts a database row to a dictionary using column/row zipping."""
         if row is None: return None
         columns = [col[0] for col in cursor.description]
         return dict(zip(columns, row))
 
-    def _to_list(self, cursor):
+    def _to_list(self, cursor: Any) -> List[Dict[str, Any]]:
         """v25.0 OMEGA: Centrally converts all database rows to a list of dictionaries."""
         columns = [col[0] for col in cursor.description]
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-    def get_operation_logs(self):
+    def get_operation_logs(self) -> List[Dict[str, Any]]:
         """Fetches all operation logs."""
         try:
             with self._get_connection() as conn:
@@ -332,7 +333,7 @@ class AuraStorage:
         except:
             return []
 
-    def create_campaign(self, name: str, target_config: dict = None):
+    def create_campaign(self, name: str, target_config: Optional[Dict[str, Any]] = None) -> Optional[int]:
         """Creates a new mission campaign."""
         now = datetime.now().isoformat()
         with self._get_connection() as conn:
@@ -349,7 +350,7 @@ class AuraStorage:
                 row = cursor.fetchone()
                 return row[0] if row else None
 
-    def add_finding(self, target_value, content, finding_type="Vulnerability", campaign_id=None, proof=None, **kwargs):
+    def add_finding(self, target_value: str, content: Union[str, Dict[str, Any]], finding_type: str = "Vulnerability", campaign_id: Optional[int] = None, proof: Optional[str] = None, **kwargs) -> None:
         """
         Adds a finding linked to a target value, preventing duplicates and normalizing targets.
         v33.0 Zenith Update: Added **kwargs and default finding_type for extreme stability.
@@ -377,7 +378,7 @@ class AuraStorage:
             else:
                 target_id = row[0]
             
-            content_str = content if isinstance(content, str) else __import__("json").dumps(content)
+            content_str = content if isinstance(content, str) else json.dumps(content)
             
             # Check for existing identical finding in this campaign to prevent inflation
             if campaign_id:
@@ -446,9 +447,9 @@ class AuraStorage:
             
             conn.commit()
 
-    def update_finding_metadata(self, target_value, content, severity):
+    def update_finding_metadata(self, target_value: str, content: Union[str, Dict[str, Any]], severity: str) -> None:
         """Updates the severity of a specific finding."""
-        content_str = content if isinstance(content, str) else __import__("json").dumps(content)
+        content_str = content if isinstance(content, str) else json.dumps(content)
         with self._get_connection() as conn:
             cursor = conn.cursor()
             self._execute(cursor, '''
@@ -459,7 +460,7 @@ class AuraStorage:
             ''', (severity, target_value, content_str))
             conn.commit()
 
-    def get_audit_logs(self, campaign_id: int | None = None):
+    def get_audit_logs(self, campaign_id: Optional[int] = None) -> List[Dict[str, Any]]:
         """Retrieves audit logs, optionally filtered by campaign."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -469,29 +470,29 @@ class AuraStorage:
                 self._execute(cursor, "SELECT * FROM audit_log ORDER BY timestamp DESC")
             return self._to_list(cursor)
 
-    def update_finding_status(self, finding_id: int, status: str):
+    def update_finding_status(self, finding_id: int, status: str) -> bool:
         """Updates the triage status of a specific finding."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             self._execute(cursor, "UPDATE findings SET status = ? WHERE id = ?", (status, finding_id))
             conn.commit()
-            return cursor.rowcount > 0
+            return bool(cursor.rowcount > 0)
 
-    def get_battle_plan(self):
+    def get_battle_plan(self) -> List[Dict[str, Any]]:
         """Retrieves high-risk targets for the Battle Plan."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             self._execute(cursor, "SELECT * FROM targets WHERE risk_score > 0 ORDER BY risk_score DESC")
             return self._to_list(cursor)
 
-    def get_target_by_id(self, target_id):
+    def get_target_by_id(self, target_id: int) -> Optional[Dict[str, Any]]:
         """Retrieves a single target by its DB ID."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             self._execute(cursor, "SELECT * FROM targets WHERE id = ?", (target_id,))
             return self._to_dict(cursor, cursor.fetchone())
 
-    def get_all_targets(self):
+    def get_all_targets(self) -> List[Dict[str, Any]]:
         """Retrieves all targets for the Nexus Intelligence Feed."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -509,7 +510,7 @@ class AuraStorage:
                 return True
             return False
 
-    def is_duplicate_finding(self, target_value: str, finding_type: str, content: str) -> bool:
+    def is_duplicate_finding(self, target_value: str, finding_type: str, content: Union[str, Dict[str, Any]]) -> bool:
         """v33 Zenith: Signature-based dupe detection to prevent multi-campaign double-counting."""
         norm_val = self.normalize_target(target_value)
         content_str = content if isinstance(content, str) else json.dumps(content)
@@ -523,14 +524,14 @@ class AuraStorage:
             ''', (norm_val, finding_type, content_str))
             return cursor.fetchone() is not None
 
-    def get_all_findings(self):
+    def get_all_findings(self) -> List[Dict[str, Any]]:
         """Retrieves all findings for the Nexus overview."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             self._execute(cursor, "SELECT * FROM findings")
             return self._to_list(cursor)
             
-    def get_findings_by_target(self, target_value: str):
+    def get_findings_by_target(self, target_value: str) -> List[Dict[str, Any]]:
         """Retrieves all findings for a specific target value."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -544,7 +545,7 @@ class AuraStorage:
             self._execute(cursor, "SELECT * FROM findings WHERE target_id = ?", (target_id,))
             return self._to_list(cursor)
 
-    def get_osint_for_target(self, target_value: str):
+    def get_osint_for_target(self, target_value: str) -> Dict[str, Any]:
         """Retrieves aggregated OSINT data from audit logs for a target."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -569,7 +570,7 @@ class AuraStorage:
                     pass
             return intel_summary
 
-    def save_mission_state(self, target_value: str, current_step: str, stats: dict, full_state: dict):
+    def save_mission_state(self, target_value: str, current_step: str, stats: Optional[Dict[str, int]], full_state: Optional[Dict[str, Any]]) -> None:
         """v20.0: Persist the current state of a mission for self-healing/resuming."""
         now = datetime.now().isoformat()
         norm_val = self.normalize_target(target_value)
@@ -587,7 +588,7 @@ class AuraStorage:
             ''', (norm_val, current_step, stats.get("findings", 0) if stats else 0, stats.get("urls", 0) if stats else 0, now, json.dumps(full_state or {})))
             conn.commit()
 
-    def get_mission_state(self, target_value: str) -> dict | None:
+    def get_mission_state(self, target_value: str) -> Optional[Dict[str, Any]]:
         """v20.0: Retrieve the persisted state for a target."""
         norm_val = self.normalize_target(target_value)
         with self._get_connection() as conn:
@@ -596,11 +597,12 @@ class AuraStorage:
             row = cursor.fetchone()
             if row:
                 res = self._to_dict(cursor, row)
-                res["state_json"] = json.loads(res["state_json"])
-                return res
+                if res and res.get("state_json"):
+                    res["state_json"] = json.loads(res["state_json"])
+                    return res
         return None
 
-    def save_sovereign_intel(self, tech_stack: str, vuln_type: str, payload: str):
+    def save_sovereign_intel(self, tech_stack: str, vuln_type: str, payload: str) -> None:
         """v20.0: Index a successful attack pattern for cross-domain reuse."""
         now = datetime.now().isoformat()
         with self._get_connection() as conn:
@@ -614,7 +616,7 @@ class AuraStorage:
             ''', (tech_stack, vuln_type, payload, now, now))
             conn.commit()
 
-    def get_sovereign_intel(self, tech_stack: str) -> list:
+    def get_sovereign_intel(self, tech_stack: str) -> List[Dict[str, Any]]:
         """v20.0: Retrieve high-probability payloads for a detected tech stack."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -639,7 +641,7 @@ class AuraStorage:
             return self._to_list(cursor)
 
 
-    def sync_nexus_intel(self, peer_payload: dict):
+    def sync_nexus_intel(self, peer_payload: Dict[str, Any]) -> bool:
         """
         v24.0: Nexus Synchronization (Infinisync).
         Merges intelligent findings from other swarms into the local database.

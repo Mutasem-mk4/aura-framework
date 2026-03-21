@@ -6,12 +6,7 @@ import random
 from pathlib import Path
 from urllib.parse import urlparse
 
-from rich.console import Console
-from rich import box
-from aura.ui.zenith_ui import ZenithUI
-import time
-
-console = Console()
+from aura.ui.formatter import ZenithUI, console, ui, Table, Panel, box
 
 class Web3Engine:
     """v33.0 Phase 33: Web3 Smart Contract Auditing Engine (Optimized)"""

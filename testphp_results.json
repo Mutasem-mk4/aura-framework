@@ -1,0 +1,5 @@
+{
+  "target": "http://testphp.vulnweb.com",
+  "frontend_vulns": [],
+  "mutator_vulns": []
+}

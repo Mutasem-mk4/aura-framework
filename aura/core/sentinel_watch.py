@@ -2,19 +2,14 @@ import asyncio
 import logging
 import json
 import time
-from typing import List, Dict, Any
-from aura.core.storage import AuraStorage
+from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger("aura")
 
 class SentinelWatch:
-    """
-    v40.0 OMEGA: Sentinel Watch Asset Tracking.
-    Monitors known targets for changes (Delta Discovery) and alerts on fresh attack surfaces.
-    """
-
-    def __init__(self, db: AuraStorage):
-        self.db = db
+    """v2.0: Real-time autonomous finding monitor using SQLAlchemy Repository."""
+    def __init__(self, findings_repo):
+        self.repo = findings_repo
         self.history_cache = {} # domain -> last_known_state
 
     async def snapshot_target(self, domain: str, current_data: Dict[str, Any]):
@@ -76,7 +71,9 @@ class SentinelWatch:
                 if deltas:
                     # If changes found, we trigger an immediate Targeted Audit
                     logger.warning(f"[SentinelWatch] Triggering priority re-scan for {domain} due to changes!")
-                    await orchestrator._phase_audit(f"https://{domain}", domain, [], ZenithUI.status(f"Sentinel Alert: {domain}"), None, False)
+                    # In Enterprise v40, we use the orchestrator's unified broadcast
+                    await orchestrator._broadcast(f"Sentinel Alert: Delta detected on {domain}", type="alert", level="critical")
+                    await orchestrator._phase_audit(f"https://{domain}", domain, [], None, None, False)
             
             # Wait 4 hours between full asset monitoring rounds
             await asyncio.sleep(14400)

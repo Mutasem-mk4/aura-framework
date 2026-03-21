@@ -5,7 +5,7 @@ from rich.console import Console
 from aura.core import state
 from urllib.parse import urljoin, urlparse
 
-console = Console()
+from aura.ui.formatter import console
 
 class APIReaper:
     """

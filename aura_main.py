@@ -37,13 +37,50 @@ from rich.table import Table
 from rich.live import Live
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
 
-console = Console(file=sys.stdout, force_terminal=False)
+from aura.ui.formatter import console
 
-async def _run_mission(target: str):
-    from aura.core.orchestrator import NeuralOrchestrator
-    orchestrator = NeuralOrchestrator()
-    console.print(f"[bold cyan][MISSION] Initializing Omni-Sovereign Mission on: {target}[/bold cyan]")
-    await orchestrator.execute_advanced_chain(target)
+async def _run_mission(target: str, args: argparse.Namespace = None):
+    use_new_pipeline = True  # v40.0 Nuclear Mode Force Enabled
+
+    if use_new_pipeline:
+        console.print("[bold green][v40.0 BETA] Engaging Decoupled Mission Pipeline...[/bold green]")
+        from aura.core.context import MissionContext, FeatureFlags
+        from aura.core.pipeline import MissionPipeline
+        from aura.phases.recon import ReconPhase
+        from aura.phases.deconstruction import DeconstructionPhase
+        from aura.phases.audit import AuditPhase
+        
+        flags = FeatureFlags(
+            fast_mode=getattr(args, 'fast', False) if args else False,
+            beginner_mode=getattr(args, 'clinic', True) if args else True,
+            auto_submit=getattr(args, 'auto_submit', False) if args else False
+        )
+        context = MissionContext(target_url=target, flags=flags)
+        pipeline = MissionPipeline(context)
+        
+        # We instantiate empty mocks for the dependencies for now.
+        # In a real DI container setup, these would be auto-injected.
+        from aura.modules.recon_pipeline import ReconPipeline
+        from aura.modules.secret_hunter import SecretHunter
+        pipeline.add_phase(ReconPhase(recon_pipeline=ReconPipeline(), secret_hunter=SecretHunter(), takeover_hunter=None))
+        pipeline.add_phase(DeconstructionPhase(ssti_engine=None, smuggling_engine=None, ws_oauth_engine=None, logic_fuzzer=None, brain=None))
+        pipeline.add_phase(AuditPhase(power_stack=None, nuclei_engine=None, singularity=None, dast=None, fleet_manager=None, apex=None, bounty_reporter=None))
+        
+        import time
+        _t0 = time.time()
+        result = await pipeline.execute_all()
+        elapsed = time.time() - _t0
+        
+        if result.get("status") == "COMPLETE":
+            console.print(f"\n[bold green][MISSION SUCCESS][/bold green] Target: {target} | Findings: {result.get('findings', 0)} | Time: {elapsed:.2f}s")
+        else:
+            console.print(f"\n[bold red][MISSION FAILED][/bold red] Target: {target} | Error: {result.get('error')}")
+            
+    else:
+        from aura.core.orchestrator import NeuralOrchestrator
+        orchestrator = NeuralOrchestrator()
+        console.print(f"[bold cyan][MISSION] Initializing Omni-Sovereign Mission on: {target}[/bold cyan]")
+        await orchestrator.execute_advanced_chain(target)
 
 def _launch_nexus_background():
     import webbrowser
@@ -88,6 +125,33 @@ def _launch_nexus_background():
     else:
         console.print("[bold red][!] Server took too long to start. Please open manually: http://localhost:8000[/bold red]")
 
+def _launch_zenith_ui():
+    """v3.0: Launch the React-based Nexus Zenith Dashboard."""
+    import subprocess
+    import webbrowser
+    import time
+    
+    ui_path = os.path.join(os.getcwd(), "nexus_zenith")
+    if not os.path.exists(ui_path):
+        console.print("[bold red][!] Nexus Zenith UI directory not found![/bold red]")
+        return
+        
+    console.print("[bold magenta][ZENITH] Initializing Tactical UI...[/bold magenta]")
+    
+    # Launch Vite dev server in background
+    subprocess.Popen(
+        ["npm", "run", "dev", "--", "--host"],
+        cwd=ui_path,
+        shell=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
+    )
+    
+    time.sleep(3)
+    console.print("[bold cyan][DASHBOARD] Opening Nexus Zenith at http://localhost:5173[/bold cyan]")
+    webbrowser.open("http://localhost:5173")
+
 async def _run_crawl(target: str, victim: bool = False):
     from dotenv import load_dotenv
     load_dotenv()
@@ -117,6 +181,7 @@ def main():
     parser.add_argument("--nexus", action="store_true", help="Launch the Nexus C2 Dashboard")
     parser.add_argument("--auto-submit", action="store_true", help="Enable autonomous submission")
     parser.add_argument("--free-ai", action="store_true", help="Use local AI (Ollama)")
+    parser.add_argument("--fast", action="store_true", help="Enable stealth & speed optimization")
     
     # v2 new flags
     parser.add_argument("--crawl", action="store_true", help="Authenticated API crawler")
@@ -147,13 +212,15 @@ def main():
     parser.add_argument("--targets", action="store_true", help="[v3] Target Hunter: Fetch and display fresh, profitable bug bounty programs")
     parser.add_argument("--experimental-orchestrator", action="store_true", help="[Dev] Run the new decoupled Mission Pipeline")
     parser.add_argument("--clinic", action="store_true", help="[v4] CLINIC MODE: Educational tooltips for beginners")
+    parser.add_argument("--ui", action="store_true", help="[v3] Launch the Nexus Zenith Tactical Dashboard (React v3.0)")
 
     args = parser.parse_args()
 
-    from aura.core import state
-    if args.free_ai: state.OPENROUTER_FREE_MODE = True
-    if args.auto_submit: state.AUTO_SUBMIT = True
-    if args.clinic: state.CLINIC_MODE = True
+    # Legacy support mappings for state
+    if args.free_ai: os.environ["OPENROUTER_FREE_MODE"] = "1"
+    if args.auto_submit: os.environ["AUTO_SUBMIT"] = "1"
+    if args.clinic: os.environ["CLINIC_MODE"] = "1"
+    if args.fast: os.environ["FAST_MODE"] = "1"
 
     if args.setup:
         console.print(Panel("[bold cyan]Zenith OS: Global Environment Initialization[/bold cyan]"))
@@ -181,7 +248,7 @@ def main():
             f"Aura v33 Zenith [Pulse: STABLE]\n"
             f"Findings Captured: {stats['findings']}\n"
             f"Targets Mapped: {stats['targets']}\n"
-            f"Autopilot: {'ENABLED' if not args.no_auto else 'DISABLED'}\n"
+            f"Autopilot: {'ENABLED' if args.auto else 'DISABLED'}\n"
             f"AI Validation: {'ACTIVE' if os.getenv('GEMINI_API_KEY') or os.getenv('OLLAMA_HOST') else 'OFFLINE'}",
             title="Zenith System Status"
         ))
@@ -215,6 +282,10 @@ def main():
         console.print(Panel(f"Target: {args.target}\nROI Score: {score}\nMax Potential: {payout}", title="Zenith ROI Analysis"))
         return
 
+    if args.ui:
+        _launch_zenith_ui()
+        return
+
     if args.nexus:
         _launch_nexus_background()
         if not args.target and not args.hunt and not args.targets:
@@ -225,7 +296,7 @@ def main():
 
     if args.auto and args.target:
         console.print(f"[bold red][!] AUTO FLAG DETECTED - ENGAGING ZENITH PROTOCOL[/bold red]")
-        asyncio.run(_run_mission(args.target))
+        asyncio.run(_run_mission(args.target, args))
     elif args.targets:
         from aura.modules.target_hunter import run_hunter
         run_hunter()
@@ -284,13 +355,13 @@ def main():
         from aura.modules.web3_engine import run_web3_audit
         asyncio.run(run_web3_audit(args.target))
     elif args.logic_fuzz and args.target:
-        from aura.modules.logic_fuzzer import run_logic_fuzz
+        from aura.modules.stateful_logic_fuzzer import run_logic_fuzz
         asyncio.run(run_logic_fuzz(args.target, workflow_path=args.workflow))
     elif args.ast and args.target:
         from aura.modules.semantic_ast_engine import run_ast_audit
         asyncio.run(run_ast_audit(args.target))
     elif args.target:
-        asyncio.run(_run_mission(args.target))
+        asyncio.run(_run_mission(args.target, args))
     else:
         parser.print_help()
 

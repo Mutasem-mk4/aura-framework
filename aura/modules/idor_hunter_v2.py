@@ -21,7 +21,7 @@ import httpx
 from aura.core.brain import AuraBrain
 from aura.core.nexus_bridge import NexusBridge
 
-console = Console()
+from aura.ui.formatter import console
 
 class IDORHunterV2:
     """

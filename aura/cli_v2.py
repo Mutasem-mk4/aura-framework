@@ -8,17 +8,19 @@ import asyncio
 import sys
 import argparse
 import os
-from rich.console import Console
-
-console = Console()
+from aura.ui.formatter import ZenithUI, console, ui, Table, Panel, box
 
 
 async def _run_mission(target: str, swarm: bool = False):
-    from aura.ui.zenith_ui import ZenithUI
+    from aura.ui.formatter import ZenithUI, dashboard
     from aura.core.orchestrator import NeuralOrchestrator
-    orchestrator = NeuralOrchestrator()
-    ZenithUI.banner(f"OMNI-SOVEREIGN MISSION", f"Target: {target} | Swarm Mode: {swarm}")
-    await orchestrator.execute_advanced_chain(target, swarm_mode=swarm)
+    try:
+        dashboard.start(target)
+        orchestrator = NeuralOrchestrator()
+        ZenithUI.banner(f"OMNI-SOVEREIGN MISSION", f"Target: {target} | Swarm Mode: {swarm}")
+        await orchestrator.execute_advanced_chain(target, swarm_mode=swarm)
+    finally:
+        dashboard.stop()
 
 
 async def _run_crawl(target: str, victim: bool = False):
@@ -107,12 +109,12 @@ Examples:
 
     args = parser.parse_args()
 
-    from aura.ui.zenith_ui import ZenithUI
+    from aura.ui.formatter import ZenithUI, console, ui, Table, Panel, box
     ZenithUI.show_startup_banner()
 
     if args.setup:
-        from rich.panel import Panel
-        from rich.table import Table
+        # from rich.panel import Panel
+        # from rich.table import Table
         console.print(Panel("[bold cyan]Zenith OS: Global Environment Initialization[/bold cyan]"))
         checks = [
             ("Brain Engine (Gemini)", os.getenv("GEMINI_API_KEY")),

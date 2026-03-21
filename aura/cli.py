@@ -3,10 +3,8 @@ import sys
 import os
 import asyncio
 import json
-from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
-from rich.table import Table
+# UI and Formatter imports
+from aura.ui.formatter import ui, console, ZenithUI
 from dotenv import load_dotenv
 
 # Load environment variables from .env if it exists
@@ -66,26 +64,26 @@ from aura.core.status import show_status            # Status dashboard
 from aura.core.target_profiles import TargetProfiles  # Hunt profiles
 
 # UI imports
-from aura.ui.dashboard import show_banner, simulate_analysis_flow, render_battle_plan
+# UI imports (Migrated to ZenithFormatter)
 
 
 import sys
 import io
 # Windows: ensure Rich can write unicode without crashing on cp1252 encoding
-if sys.platform == "win32" and hasattr(sys.stdout, "buffer"):
+if sys.platform == "win32" and hasattr(sys.stdout, "buffer") and "pytest" not in sys.modules and not os.getenv("PYTEST_CURRENT_TEST"):
     try:
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
     except Exception:
         pass
 
-console = Console()
+# from aura.ui.formatter import console # Now using global console from aura.ui.formatter
 db = AuraStorage()
 
 class AuraHelpGroup(click.Group):
     def format_help(self, ctx, formatter):
-        show_banner()
-        console.print(Panel(
+        ui.show_banner()
+        ui.console.print(ui.Panel(
             "[bold red]AURA v25.0 (THE OMEGA PROTOTYPE)[/bold red]\n"
             "Sentient Singularity: Autonomous Strategic Warfare & Absolute Omniscience.",
             title="[bold red]SENTIENT CONTROL CENTER[/bold red]",
@@ -103,7 +101,7 @@ class AuraHelpGroup(click.Group):
         }
 
         for cat_name, cmd_list in categories.items():
-            table = Table(title=f"\n[bold cyan]{cat_name}[/bold cyan]", show_header=True, header_style="bold magenta", box=None)
+            table = ui.Table(title=f"\n[bold cyan]{cat_name}[/bold cyan]", show_header=True, header_style="bold magenta", box=None)
             table.add_column("Command", style="bold green", width=15)
             table.add_column("Description", style="white")
             
@@ -112,12 +110,12 @@ class AuraHelpGroup(click.Group):
                 if cmd:
                     desc = cmd.help.split('\n')[0].strip() if cmd.help else ""
                     table.add_row(cmd_name, desc)
-            console.print(table)
+            ui.console.print(table)
 
-        console.print("\n[bold yellow]PRO USAGE EXAMPLES[/bold yellow]")
-        console.print("  $ aura scan target.com")
-        console.print("  $ aura zenith target.com")
-        console.print("  $ aura brain 1 --ai\n")
+        ui.console.print("\n[bold yellow]PRO USAGE EXAMPLES[/bold yellow]")
+        ui.console.print("  $ aura scan target.com")
+        ui.console.print("  $ aura zenith target.com")
+        ui.console.print("  $ aura brain 1 --ai\n")
 
 def resolve_target(target_input):
     """Helper to resolve target from ID (int) or Value (string/domain)."""
@@ -136,30 +134,44 @@ def resolve_target(target_input):
 @click.group(cls=AuraHelpGroup)
 @click.option('--proxies', type=click.Path(exists=True), help="Path to proxy list.")
 @click.option('--free-ai', is_flag=True, help="Engage Zero-Cost Multi-Model AI (OpenRouter Free Tier)")
-def cli(proxies, free_ai):
+@click.option('--ui', is_flag=True, help="Launch the Nexus Zenith Tactical Dashboard (React v3.0)")
+def cli(proxies, free_ai, ui):
     """[bold magenta]AURA - Vanguard Edition[/bold magenta]"""
+    if ui:
+        from aura_main import _launch_zenith_ui
+        _launch_zenith_ui()
+        sys.exit(0)
     if proxies:
         state.PROXY_FILE = proxies
     if free_ai:
         state.OPENROUTER_FREE_MODE = True
-        console.print("[bold cyan][AI] Zero-Cost Multi-Model Engine engaged.[/bold cyan]")
+        ui.console.print("[bold cyan][AI] Zero-Cost Multi-Model Engine engaged.[/bold cyan]")
 
 @cli.command()
 @click.option('-f', '--file', type=click.Path(exists=True), help="Analyze data file.")
 def analyze(file):
     """[Phase 1] Analyze raw data to identify high-risk attack paths."""
-    show_banner()
+    ui.show_banner()
     input_data = Ingestor.read_stdin() if not file else open(file, 'r').read()
     if not input_data: return
     results = Ingestor.process_input(input_data)
     for res in results:
         if "raw" in res and "." in res["raw"]:
             res["type"], res["source"], res["value"] = "Target", "OSINT", res["raw"]
-    simulate_analysis_flow(results)
+    
+    # Simulate analysis flow using ZenithFormatter
+    with ui.status("Analyzing attack paths...") as status:
+        import time
+        time.sleep(1.5)
+        status.update("Generating battle plan...")
+        time.sleep(0.5)
+    
+    ui.console.print(ui.render_results_table(results))
+    
     engine = CorrelationEngine()
     paths = engine.correlate(results)
     if paths:
-        console.print("\n"); console.print(render_battle_plan(paths))
+        ui.console.print("\n"); ui.console.print(ui.render_battle_plan(paths))
         for path in paths: db.save_target(path)
 
 @cli.command()
@@ -172,20 +184,20 @@ def scan(domain, header, cookie):
     
     for h in header:
         try: k, v = h.split(":", 1); state.CUSTOM_HEADERS[k.strip()] = v.strip()
-        except: console.print(f"[yellow][!] Invalid header format: {h}[/yellow]")
+        except: ui.console.print(f"[yellow][!] Invalid header format: {h}[/yellow]")
     for c in cookie:
         try: k, v = c.split("=", 1); state.CUSTOM_COOKIES[k.strip()] = v.strip()
-        except: console.print(f"[yellow][!] Invalid cookie format: {c}[/yellow]")
+        except: ui.console.print(f"[yellow][!] Invalid cookie format: {c}[/yellow]")
 
-    show_banner()
+    ui.show_banner()
     scanner = AuraScanner()
     results = asyncio.run(scanner.discover_subdomains(domain))
     engine = CorrelationEngine()
     paths = engine.correlate(results)
     if results:
-        simulate_analysis_flow(results)
+        #    # ui.simulate_analysis_flow(results) # Replaced with logic in analyze
         if paths:
-            console.print("\n"); console.print(render_battle_plan(paths))
+            ui.console.print("\n"); ui.console.print(ui.render_battle_plan(paths))
             for path in paths: db.save_target(path)
 
 @cli.command()
@@ -197,11 +209,11 @@ def brain(target_input, ai):
     if not target: return
     target_data = {"value": target["value"], "type": target["type"], "risk_score": target["risk_score"]}
     if ai:
-        console.print("[bold cyan][*] Activating Neural Arsenal AI...[/bold cyan]")
+        ui.console.print("[bold cyan][*] Activating Neural Arsenal AI...[/bold cyan]")
         advice = NeuralArsenal().generate_strategy(target_data)
     else:
         advice = AuraBrain().reason({"target": target["value"]})
-    console.print(Panel(advice, title=f"AURA BRAIN: {target['value']}", border_style="magenta"))
+    ui.console.print(ui.Panel(advice, title=f"AURA BRAIN: {target['value']}", border_style="magenta"))
 
 def _open_report_file(path):
     """v14.2: Cross-platform auto-open helper."""
@@ -214,7 +226,7 @@ def _open_report_file(path):
         else:
             subprocess.run(["xdg-open", path])
     except Exception as e:
-        console.print(f"[dim yellow]Could not auto-open {path}: {e}[/dim yellow]")
+        ui.console.print(f"[dim yellow]Could not auto-open {path}: {e}[/dim yellow]")
 
 @cli.command()
 @click.argument('target_input')
@@ -256,7 +268,7 @@ def exploit(target_input):
         db.add_finding(target["value"], f"TAKEOVER: {takeover['service']}", "Bounty-Critical")
 
     if potential_total > 0:
-        console.print(f"[bold green][💰] BOUNTY ESTIMATE: ${potential_total}[/bold green]")
+        ui.console.print(f"[bold green][💰] BOUNTY ESTIMATE: ${potential_total}[/bold green]")
     if vulns:
         for v in vulns: db.add_finding(target["value"], v, "Exploit-Result")
 
@@ -272,7 +284,7 @@ def bounty(target_input):
     takeover = asyncio.run(takeover_hunter.check_takeover(target["value"]))
     total = sum([hunter.estimate_value(s["type"]) for s in secrets]) + (takeover["bounty_estimate"] if takeover else 0)
     if total > 0:
-        console.print(f"[bold green][💰] SUCCESS: Estimated total value ${total}[/bold green]")
+        ui.console.print(f"[bold green][💰] SUCCESS: Estimated total value ${total}[/bold green]")
 
 @cli.command()
 @click.argument('target_input')
@@ -285,24 +297,24 @@ def cloud(target_input):
     buckets = asyncio.run(hunter.scan_s3(target["value"]))
     if buckets:
         total = sum([hunter.estimate_cloud_bounty(b) for b in buckets])
-        console.print(f"[bold green][[CLOUD]] SUCCESS: Found {len(buckets)} buckets. Bounty: ${total}[/bold green]")
+        ui.console.print(f"[bold green][[CLOUD]] SUCCESS: Found {len(buckets)} buckets. Bounty: ${total}[/bold green]")
 
 @cli.command()
 @click.argument('domain')
 def scope(domain):
     """[STRATEGIC INTEL] Check if a domain is in-scope for Bug Bounty payouts."""
     from aura.modules.scope_checker import ScopeChecker
-    show_banner()
-    console.print(f"[cyan][*] Verifying target against public bug bounty programs...[/cyan]")
+    ui.show_banner()
+    ui.console.print(f"[cyan][*] Verifying target against public bug bounty programs...[/cyan]")
     res = asyncio.run(ScopeChecker().check_scope(domain))
     if res.get("in_scope"):
-        console.print(f"[bold green][[SUCCESS]] {res['warning']}[/bold green]")
-        console.print(f"[bold green]    Platform:  {res['platform']}[/bold green]")
-        console.print(f"[bold green]    Program:   {res['program']}[/bold green]")
-        console.print(f"[bold green]    Scope URL: {res['scope_url']}[/bold green]")
+        ui.console.print(f"[bold green][[SUCCESS]] {res['warning']}[/bold green]")
+        ui.console.print(f"[bold green]    Platform:  {res['platform']}[/bold green]")
+        ui.console.print(f"[bold green]    Program:   {res['program']}[/bold green]")
+        ui.console.print(f"[bold green]    Scope URL: {res['scope_url']}[/bold green]")
     else:
-        console.print(f"[bold red][!] {res['warning']}[/bold red]")
-        console.print("[yellow]    Note: This target is NOT indexed in public H1/Bugcrowd lists.[/yellow]")
+        ui.console.print(f"[bold red][!] {res['warning']}[/bold red]")
+        ui.console.print("[yellow]    Note: This target is NOT indexed in public H1/Bugcrowd lists.[/yellow]")
 
 @cli.command()
 @click.argument('target_id', type=int)
@@ -315,14 +327,14 @@ def scan_vuln(target_id, header, cookie):
     
     for h in header:
         try: k, v = h.split(":", 1); state.CUSTOM_HEADERS[k.strip()] = v.strip()
-        except: console.print(f"[yellow][!] Invalid header format: {h}[/yellow]")
+        except: ui.console.print(f"[yellow][!] Invalid header format: {h}[/yellow]")
     for c in cookie:
         try: k, v = c.split("=", 1); state.CUSTOM_COOKIES[k.strip()] = v.strip()
-        except: console.print(f"[yellow][!] Invalid cookie format: {c}[/yellow]")
+        except: ui.console.print(f"[yellow][!] Invalid cookie format: {c}[/yellow]")
 
     findings = asyncio.run(AuraDAST().scan_target(target["value"]))
     if findings:
-        for f in findings: console.print(f" - {f['type']}")
+        for f in findings: ui.console.print(f" - {f['type']}")
 
 @cli.command()
 @click.argument('domain')
@@ -341,7 +353,7 @@ def zenith(domain, plugin=None, campaign=None, whitelist=None, blacklist=None, h
     check_safety(domain)
     if tor:
         state.TOR_MODE = True
-        console.print("[bold red][STEALTH] ABSOLUTE STEALTH ENGAGED: Routing via Tor (socks5h). IP Kill-Switch ACTIVE.[/bold red]")
+        ui.console.print("[bold red][STEALTH] ABSOLUTE STEALTH ENGAGED: Routing via Tor (socks5h). IP Kill-Switch ACTIVE.[/bold red]")
         # Pre-flight OpSec Check
         try:
             from aura.core.stealth import StealthEngine, AuraSession
@@ -349,22 +361,22 @@ def zenith(domain, plugin=None, campaign=None, whitelist=None, blacklist=None, h
         except BaseException as e:
             from aura.core.stealth import AuraOpSecError
             if isinstance(e, AuraOpSecError): return
-            console.print(f"[bold red][!] Pre-flight OpSec Check Failed: {e}[/bold red]")
+            ui.console.print(f"[bold red][!] Pre-flight OpSec Check Failed: {e}[/bold red]")
             return
     if cloud_swarm:
         state.CLOUD_SWARM_MODE = True
-        console.print("[bold cyan][CLOUD] CLOUD SWARM ENGAGED: Rotating requests via High-Reputation Cloud Nodes.[/bold cyan]")
+        ui.console.print("[bold cyan][CLOUD] CLOUD SWARM ENGAGED: Rotating requests via High-Reputation Cloud Nodes.[/bold cyan]")
     
     if header:
         for h in header:
             try: k, v = h.split(":", 1); state.CUSTOM_HEADERS[k.strip()] = v.strip()
-            except: console.print(f"[yellow][!] Invalid header format: {h}[/yellow]")
+            except: ui.console.print(f"[yellow][!] Invalid header format: {h}[/yellow]")
     if cookie:
         for c in cookie:
             try: k, v = c.split("=", 1); state.CUSTOM_COOKIES[k.strip()] = v.strip()
-            except: console.print(f"[yellow][!] Invalid cookie format: {c}[/yellow]")
+            except: ui.console.print(f"[yellow][!] Invalid cookie format: {c}[/yellow]")
 
-    show_banner()
+    ui.show_banner()
     if state.is_halted(): return
     
     # Resolve Campaign ID
@@ -374,9 +386,9 @@ def zenith(domain, plugin=None, campaign=None, whitelist=None, blacklist=None, h
             campaign_id = int(campaign)
         else:
             campaign_id = db.create_campaign(campaign, {"whitelist": whitelist, "blacklist": blacklist})
-            console.print(f"[bold cyan][*] New Campaign Created: {campaign} (ID: {campaign_id})[/bold cyan]")
+            ui.console.print(f"[bold cyan][*] New Campaign Created: {campaign} (ID: {campaign_id})[/bold cyan]")
 
-    console.print(f"[bold red][!] INITIALIZING ZENITH PROTOCOL FOR: {domain}[/bold red]")
+    ui.console.print(f"[bold red][!] INITIALIZING ZENITH PROTOCOL FOR: {domain}[/bold red]")
     orchestrator = NeuralOrchestrator(whitelist=list(whitelist) if whitelist else None, blacklist=list(blacklist) if blacklist else None)
     
     if plugin:
@@ -396,15 +408,15 @@ def zenith(domain, plugin=None, campaign=None, whitelist=None, blacklist=None, h
         status = result.get("status", "UNKNOWN") if result else "ERROR"
         
         if status != "COMPLETE":
-            console.print(f"\n[bold red][!] Mission Terminated Early: {status}[/bold red]")
+            ui.console.print(f"\n[bold red][!] Mission Terminated Early: {status}[/bold red]")
             if result and result.get("reason"):
-                console.print(f"[yellow][?] Reason: {result.get('reason')}[/yellow]")
+                ui.console.print(f"[yellow][?] Reason: {result.get('reason')}[/yellow]")
             
         # v12.0 Hardcoded Execution: Verbose Operation Logs output
         op_logs = db.get_operation_logs()
         if op_logs:
-            console.print("\n[bold magenta]Aura v12.0 Hardcoded Execution: Verbose Operation Logs[/bold magenta]")
-            op_table = Table(show_header=True, header_style="bold magenta", border_style="grey39")
+            ui.console.print("\n[bold magenta]Aura v12.0 Hardcoded Execution: Verbose Operation Logs[/bold magenta]")
+            op_table = ui.Table(show_header=True, header_style="bold magenta", border_style="grey39")
             op_table.add_column("Timestamp", style="dim", width=20)
             op_table.add_column("Path", style="cyan")
             op_table.add_column("Payload", style="red")
@@ -417,22 +429,22 @@ def zenith(domain, plugin=None, campaign=None, whitelist=None, blacklist=None, h
                     str(log["payload"])[:60] if log["payload"] else "N/A", 
                     str(log["status_code"])
                 )
-            console.print(op_table)
+            ui.console.print(op_table)
             
     except KeyboardInterrupt:
-        console.print("\n[bold red][!] SCAN ABORTED BY USER (Ctrl+C). Generating partial report...[/bold red]")
+        ui.console.print("\n[bold red][!] SCAN ABORTED BY USER (Ctrl+C). Generating partial report...[/bold red]")
     except BaseException as e:
         from aura.core.stealth import AuraOpSecError
         if isinstance(e, AuraOpSecError):
             return # Exit quietly, message already printed
-        console.print(f"\n[bold red][!] FATAL SCAN ERROR: {e}. Generating partial report...[/bold red]")
+        ui.console.print(f"\n[bold red][!] FATAL SCAN ERROR: {e}. Generating partial report...[/bold red]")
     finally:
         # [v25.0] OMEGA CONSOLIDATED REPORTING: Guarantees delivery even on crash.
         try:
             from aura.core.zenith_reporter import ZenithReporter
             from aura.core.markdown_reporter import MarkdownReporter
             
-            console.print(f"\n[bold magenta][✍️] Compiling Professional Offensive Intelligence Report...[/bold magenta]")
+            ui.console.print(f"\n[bold magenta][✍️] Compiling Professional Offensive Intelligence Report...[/bold magenta]")
             
             # v25.0 Standard: Zenith Markdown Reporting
             reporter = ZenithReporter()
@@ -441,21 +453,21 @@ def zenith(domain, plugin=None, campaign=None, whitelist=None, blacklist=None, h
             report_paths = asyncio.run(reporter.finalize_mission(domain, findings))
             
             for path in report_paths:
-                console.print(f"[bold green][[SUCCESS]] Zenith Report: {os.path.basename(path)}[/bold green]")
+                ui.console.print(f"[bold green][[SUCCESS]] Zenith Report: {os.path.basename(path)}[/bold green]")
             
             # Legacy Markdown (Consolidated)
             md_reporter = MarkdownReporter(db.db_path)
             md_path = md_reporter.generate_report(target_filter=domain)
             if md_path:
-                console.print(f"[bold green][[SUCCESS]] Consolidated Intel: {md_path}[/bold green]")
+                ui.console.print(f"[bold green][[SUCCESS]] Consolidated Intel: {md_path}[/bold green]")
             
             if open_report and report_paths:
                 import time
-                console.print("[cyan][*] Mission complete. Opening report in 3 seconds...[/cyan]")
+                ui.console.print("[cyan][*] Mission complete. Opening report in 3 seconds...[/cyan]")
                 time.sleep(3)
                 _open_report_file(report_paths[0])
         except Exception as e:
-            console.print(f"[dim red][!] Reporting failed: {e}[/dim red]")
+            ui.console.print(f"[dim red][!] Reporting failed: {e}[/dim red]")
 
 @cli.command(name="omega")
 @click.argument('domain')
@@ -474,13 +486,13 @@ def omega(domain, plugin=None, campaign=None, whitelist=None, blacklist=None, to
 @click.option('--port', default=9050, help="Local port for SOCKS5 pivot.")
 def pivot(port):
     """[ZENITH] Aura-Link: Establish a SOCKS5 pivot point."""
-    show_banner()
+    ui.show_banner()
     AuraLink(bind_port=port).start_pivot()
 
 @cli.command()
 def nexus():
     """[ZENITH] Launch Aura Nexus Dashboard."""
-    show_banner()
+    ui.show_banner()
     from aura.api.server import app
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
@@ -568,7 +580,7 @@ def c2_dashboard():
 @cli.command(name="fix-network")
 def fix_network():
     """[UTILITY] EMERGENCY: Reset network settings and flush DNS."""
-    show_banner()
+    ui.show_banner()
     console.print("[bold yellow][!] Initiating Network Stability Protocol...[/bold yellow]")
     
     # 1. Flush DNS Cache
@@ -601,13 +613,79 @@ def fix_network():
 
     console.print("\n[bold magenta][*] Stability Fix Complete. Restart Google Drive if issue persists.[/bold magenta]")
 
+@cli.command(name="ollama-check")
+@click.option('--model', default=None, help="Override model name to test (e.g. llama3.2:3b).")
+def ollama_check(model):
+    """[UTILITY] Verify Ollama local AI engine status and connectivity."""
+    import httpx
+    from aura.core import state as aura_state
+    from rich.table import Table
+
+    host = aura_state.OLLAMA_HOST or "http://localhost:11434"
+    mdl  = model or aura_state.OLLAMA_MODEL
+
+    console.print(f"\n[bold cyan]🧠 Aura Ollama Connectivity Check[/bold cyan]")
+    console.print(f"  Host   : [yellow]{host}[/yellow]")
+    console.print(f"  Model  : [yellow]{mdl}[/yellow]\n")
+
+    # 1. Check /api/tags (list models)
+    try:
+        with httpx.Client(timeout=8) as client:
+            resp = client.get(f"{host}/api/tags")
+        if resp.status_code == 200:
+            data = resp.json()
+            models = [m["name"] for m in data.get("models", [])]
+            console.print("[bold green][✓] Ollama server is ONLINE[/bold green]")
+            if models:
+                tbl = Table(title="Available Models", header_style="bold magenta")
+                tbl.add_column("Model Name", style="cyan")
+                for m in models:
+                    tbl.add_row(m)
+                console.print(tbl)
+                if mdl not in models:
+                    console.print(f"\n[bold yellow][!] Warning:[/bold yellow] Model [cyan]{mdl}[/cyan] not found locally.")
+                    console.print(f"    Pull it with: [green]ollama pull {mdl}[/green]")
+            else:
+                console.print("[yellow][!] No models found. Pull one with: ollama pull qwen2.5-coder:7b[/yellow]")
+        else:
+            console.print(f"[bold red][!] Ollama returned HTTP {resp.status_code}[/bold red]")
+            return
+    except httpx.ConnectError:
+        console.print(f"[bold red][✗] Cannot reach Ollama at {host}[/bold red]")
+        console.print("    Fix: Run [green]ollama serve[/green] in a separate terminal.")
+        console.print(f"    Tip: Set [cyan]OLLAMA_HOST=http://localhost:11434[/cyan] if using a custom port.\n")
+        return
+    except Exception as e:
+        console.print(f"[bold red][!] Unexpected error: {e}[/bold red]")
+        return
+
+    # 2. Quick inference test
+    console.print(f"\n[cyan][*] Sending test inference to model [bold]{mdl}[/bold]...[/cyan]")
+    try:
+        with httpx.Client(timeout=60) as client:
+            resp = client.post(f"{host}/api/generate", json={
+                "model": mdl,
+                "prompt": "Reply with only: AURA_OK",
+                "stream": False
+            })
+        if resp.status_code == 200:
+            result = resp.json().get("response", "").strip()
+            console.print(f"[bold green][✓] Model Response:[/bold green] {result}")
+            console.print("\n[bold green]✅ Ollama is fully operational and ready for Aura.[/bold green]\n")
+        else:
+            console.print(f"[bold red][!] Inference failed: HTTP {resp.status_code}[/bold red]")
+    except httpx.TimeoutException:
+        console.print(f"[bold yellow][!] Inference timed out for {mdl}. Model may be loading — try again.[/bold yellow]")
+    except Exception as e:
+        console.print(f"[bold red][!] Inference error: {e}[/bold red]")
+
 @cli.command()
 @click.argument('target', required=False)
 @click.option('--list', 'list_only', is_flag=True, help="List plugins.")
 @click.option('--generate', help="Generate plugin using AI.")
 def forge(target, list_only, generate):
     """[ZENITH] Aura Forge: Manage, run, and GENERATE custom plugins."""
-    show_banner()
+    ui.show_banner()
     from aura.modules.forge.manager import ForgeManager
     manager = ForgeManager()
     if generate:
@@ -630,7 +708,7 @@ def forge(target, list_only, generate):
 def auto(target, enforce_scope, tor, cloud_swarm, fast, open_report):
     """[BOUNTY MACHINE] One-Click Auto-Hunter: Discover & scan all subdomains."""
     if fast: state.FAST_MODE = True
-    show_banner()
+    ui.show_banner()
     console.print(f"[bold magenta][AUTO] INITIALIZING AUTO-HUNTER ON {target} [AUTO][/bold magenta]")
 
     async def run_auto():
@@ -752,7 +830,7 @@ def auto(target, enforce_scope, tor, cloud_swarm, fast, open_report):
 def mass(file_path, enforce_scope, concurrency, tor, cloud_swarm, fast, open_report):
     """[BOUNTY MACHINE] Mass-Scale Parallel Target Ingestion from a file."""
     if fast: state.FAST_MODE = True
-    show_banner()
+    ui.show_banner()
     console.print(f"[bold magenta][MASS] INITIALIZING MASS-SCALE HUNTER [MASS][/bold magenta]")
     
     # v14.1: Robust Encoding Discovery (Handles UTF-8, BOM, and UTF-16-LE/BE)

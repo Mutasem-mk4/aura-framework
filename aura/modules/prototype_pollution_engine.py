@@ -23,7 +23,7 @@ import re
 import httpx
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 CANARY = "AURA_PP_29"
 

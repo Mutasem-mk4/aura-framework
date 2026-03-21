@@ -32,7 +32,7 @@ from aura.core.storage import AuraStorage
 from aura.core import state
 from aura.modules.key_validator import KeyValidator
 
-console = Console()
+from aura.ui.formatter import console
 db_logger = AuraStorage()
 
 

@@ -2,7 +2,7 @@ import os
 from typing import Dict, Optional
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 class PoCSynthesizer:
     """

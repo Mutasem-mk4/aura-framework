@@ -4,7 +4,7 @@ from typing import List, Dict, Set
 from urllib.parse import urlparse, urljoin
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 class JSDecompiler:
     """

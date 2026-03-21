@@ -7,17 +7,49 @@ from rich.console import Console
 from aura.core.brain import AuraBrain
 from aura.core.stealth import StealthEngine, AuraSession
 from aura.core import state
-from aura.core import state
+import uuid
+from typing import List, Dict, Any, Optional
+from aura.core.engine_interface import IEngine
+from aura.core.models import Finding, Severity
 
-console = Console()
+from aura.ui.formatter import console
 
-class AuraSingularity:
+class AuraSingularity(IEngine):
     """Ghost v6: The Autonomous Singularity Engine for Chain-of-Thought exploitation."""
     
-    def __init__(self):
-        self.brain = AuraBrain()
+    ENGINE_ID = "aura_singularity"
+
+    def __init__(self, brain=None, stealth=None, persistence=None, telemetry=None, **kwargs):
+        self.brain = brain or AuraBrain()
+        self.stealth = stealth or StealthEngine()
+        self.persistence = persistence
+        self.telemetry = telemetry
         self.intercepted_requests = []
         self.campaign_findings = []
+        self._status = "initialized"
+
+    async def run(self, target: str, **kwargs) -> List[Finding]:
+        """Unified Singularity entry point for Phase 3."""
+        self._status = "running"
+        results = await self.execute_singularity(target)
+        findings = []
+        
+        for r in results:
+            findings.append(Finding(
+                id=str(uuid.uuid4()),
+                engine_id=self.ENGINE_ID,
+                target=target,
+                type=r.get("type", "Exploit Success"),
+                severity=Severity.CRITICAL if r.get("confidence") == "Critical" else Severity.HIGH,
+                description=r.get("content", ""),
+                raw_data=r
+            ))
+            
+        self._status = "completed"
+        return findings
+
+    def get_status(self) -> Dict[str, Any]:
+        return {"id": self.ENGINE_ID, "status": self._status}
 
     async def _handle_request(self, request):
         """Intercepts and logs XHR/Fetch requests for AI analysis."""

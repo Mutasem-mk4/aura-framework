@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 CONFIG_PATH = Path.home() / ".aura.yml"
 
@@ -53,6 +53,10 @@ class AuraConfig:
     # ── Watchlist ──────────────────────────────────────────────────────
     watchlist_programs:    list  = field(default_factory=list)
 
+    # ── Local AI (Ollama) ──────────────────────────────────────────────
+    ollama_host:           str   = ""          # e.g. http://localhost:11434
+    ollama_model:          str   = "qwen2.5-coder:7b"
+
     # ── Internal ───────────────────────────────────────────────────────
     _loaded_from:          str   = field(default="defaults", repr=False, compare=False)
 
@@ -81,6 +85,8 @@ def _load_env() -> dict:
         "auto_submit":        "AURA_AUTO_SUBMIT",
         "stealth_mode":       "AURA_STEALTH",
         "notify_telegram":    "AURA_NOTIFY_TELEGRAM",
+        "ollama_host":        "OLLAMA_HOST",
+        "ollama_model":       "OLLAMA_MODEL",
     }
     result = {}
     for field_name, env_var in env_map.items():

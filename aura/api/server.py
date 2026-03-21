@@ -13,16 +13,42 @@ from datetime import datetime
 # Fix: Add current working directory to path to resolve 'aura' module
 sys.path.append(os.getcwd())
 
-from aura.core.storage import AuraStorage
-from aura.modules.scanner import AuraScanner
-from aura.modules.exploiter import AuraExploiter
-from aura.core.reporter import AuraReporter
-from aura.core.orchestrator import NeuralOrchestrator
 from aura.core import state
+# Deferred imports for faster API startup
+# from aura.core.storage import AuraStorage
+# from aura.modules.scanner import AuraScanner
+# from aura.modules.exploiter import AuraExploiter
+# from aura.core.reporter import AuraReporter
+# from aura.core.orchestrator import NeuralOrchestrator
 
 app = FastAPI(title="Aura Nexus API", version="4.0.0")
-db = AuraStorage()
-reporter = AuraReporter()
+
+# Add CORS Middleware IMMEDIATELY after app creation
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Initialize storage and reporter lazily
+_db = None
+_reporter = None
+
+def get_db():
+    global _db
+    if _db is None:
+        from aura.core.storage import AuraStorage
+        _db = AuraStorage()
+    return _db
+
+def get_reporter():
+    global _reporter
+    if _reporter is None:
+        from aura.core.reporter import AuraReporter
+        _reporter = AuraReporter()
+    return _reporter
 
 # WebSocket Manager for live streaming
 class ConnectionManager:
@@ -45,6 +71,8 @@ class ConnectionManager:
                 pass
 
 manager = ConnectionManager()
+
+# Removed redundant middleware block
 
 # Middleware...
 # In-memory session stats
@@ -96,6 +124,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 async def run_zenith_background(domain: str, campaign_id: int = None):
     """Background task to run Zenith scan and stream logs via WS."""
+    from aura.core.orchestrator import NeuralOrchestrator
     orchestrator = NeuralOrchestrator(
         whitelist=GLOBAL_WHITELIST, 
         blacklist=GLOBAL_BLACKLIST,
@@ -135,7 +164,7 @@ async def launch_scan(request: ScanRequest, background_tasks: BackgroundTasks):
 
 @app.post("/campaigns")
 def create_campaign(request: CampaignRequest):
-    cid = db.create_campaign(request.name, {"whitelist": request.whitelist, "blacklist": request.blacklist})
+    cid = get_db().create_campaign(request.name, {"whitelist": request.whitelist, "blacklist": request.blacklist})
     return {"message": "Campaign created", "id": cid}
 
 @app.post("/api/broadcast")
@@ -152,32 +181,32 @@ async def broadcast_message(message: dict):
 
 @app.get("/audit/logs")
 def get_audit_logs(campaign_id: Optional[int] = None):
-    return db.get_audit_logs(campaign_id)
+    return get_db().get_audit_logs(campaign_id)
 
 @app.get("/targets")
 def get_targets():
-    return db.get_all_targets()
+    return get_db().get_all_targets()
 
 @app.get("/findings")
 def get_all_findings():
-    return db.get_all_findings()
+    return get_db().get_all_findings()
 
 @app.get("/findings/{target_id}")
 def get_findings_by_id(target_id: int):
-    target = db.get_target_by_id(target_id)
+    target = get_db().get_target_by_id(target_id)
     if not target:
         raise HTTPException(status_code=404, detail="Target not found")
-    findings = db.get_findings_by_target(target["value"])
+    findings = get_db().get_findings_by_target(target["value"])
     return {"target": target, "findings": findings}
 
 @app.get("/report/pdf")
 def get_pdf_report():
-    path = reporter.generate_pdf_report()
+    path = get_reporter().generate_pdf_report()
     return FileResponse(path, media_type="application/pdf")
 
 @app.get("/report/html")
 def get_html_report():
-    path = reporter.generate_report()
+    path = get_reporter().generate_report()
     return FileResponse(path, media_type="text/html")
 
 @app.post("/stop")

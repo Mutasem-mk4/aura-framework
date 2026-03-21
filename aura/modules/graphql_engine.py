@@ -22,7 +22,7 @@ from urllib.parse import urlparse
 import httpx
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 GRAPHQL_PATHS = [
     "/graphql", "/api/graphql", "/v1/graphql", "/v2/graphql",

@@ -21,7 +21,7 @@ rich._windows_renderer.LegacyWindowsTerm = None
 
 from rich.console import Console
 
-console = Console(file=sys.stdout, force_terminal=False)
+from aura.ui.formatter import console
 
 class AuraProvisioner:
     """v25.0 OMEGA: Autonomous Dependency Provisioner."""

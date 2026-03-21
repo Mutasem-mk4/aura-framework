@@ -1,11 +1,14 @@
 import cmd
 import asyncio
+import os
+import tarfile
+import zipfile
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.markdown import Markdown
 
-console = Console()
+from aura.ui.formatter import console
 
 class NexusShell(cmd.Cmd):
     """v25.1: Nexus War Room - Interactive AI C2 Interface."""
@@ -23,6 +26,57 @@ class NexusShell(cmd.Cmd):
             return
             
         asyncio.run(self._process_ai_command(arg))
+
+    def do_analyze(self, arg):
+        """AI Command: /analyze <url> <optional_filepath>
+        Analyzes a target website and optionally reads its source code archive (.zip, .tar.gz) for Whitebox testing."""
+        args = arg.split()
+        if not args:
+            console.print("[yellow][!] Usage: /analyze <url> [filepath][/yellow]")
+            return
+            
+        url = args[0]
+        filepath = args[1] if len(args) > 1 else None
+        
+        source_context = ""
+        if filepath and os.path.exists(filepath):
+            console.print(f"[cyan][*] Extracting source code from {filepath}...[/cyan]")
+            extracted_text = ""
+            allowed_exts = {".py", ".js", ".php", ".html", ".ts", ".go", ".java", ".c", ".cpp", ".txt"}
+            
+            try:
+                if filepath.endswith('.tar.gz') or filepath.endswith('.tar'):
+                    with tarfile.open(filepath, 'r:*') as tar:
+                        for member in tar.getmembers():
+                            if member.isfile() and any(member.name.endswith(ext) for ext in allowed_exts):
+                                f = tar.extractfile(member)
+                                if f:
+                                    content = f.read().decode('utf-8', errors='ignore')
+                                    extracted_text += f"\\n--- {member.name} ---\\n{content[:5000]}"
+                elif filepath.endswith('.zip'):
+                    with zipfile.ZipFile(filepath, 'r') as z:
+                        for name in z.namelist():
+                            if any(name.endswith(ext) for ext in allowed_exts):
+                                with z.open(name) as f:
+                                    content = f.read().decode('utf-8', errors='ignore')
+                                    extracted_text += f"\\n--- {name} ---\\n{content[:5000]}"
+                else:
+                    with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                        extracted_text = f.read()
+                        
+                if extracted_text:
+                    if len(extracted_text) > 80000:
+                        extracted_text = extracted_text[:80000] + "\\n...[TRUNCATED]..."
+                    source_context = f"\\n\\nSource Code Context:\\n{extracted_text}"
+            except Exception as e:
+                console.print(f"[red][!] Error reading file: {e}[/red]")
+                
+        instruction = f"Please perform a thorough Whitebox analysis on the target URL: {url}."
+        if source_context:
+            instruction += f" I am providing you with the source code of the application. Locate any vulnerabilities (like IDOR, XXE, SQLi, Logic flaws) and provide the exact payload or exploit steps targeting {url}.{source_context}"
+            
+        asyncio.run(self._process_ai_command(instruction))
+
 
     async def _process_ai_command(self, instruction):
         # Prevent trivial commands from wasting AI calls or triggering filters

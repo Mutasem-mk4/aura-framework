@@ -13,7 +13,7 @@ import re
 from rich.console import Console
 from aura.core import state
 
-console = Console()
+from aura.ui.formatter import console
 
 # Max historical JS files to scan per target (prevent excessive runtime)
 MAX_WAYBACK_FILES = 50

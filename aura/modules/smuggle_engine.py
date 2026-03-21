@@ -26,7 +26,7 @@ from pathlib import Path
 
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 # ─── Low-Level Payloads ──────────────────────────────────────────────────
 

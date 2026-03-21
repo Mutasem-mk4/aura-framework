@@ -11,7 +11,7 @@ from rich.console import Console
 from rich.panel import Panel
 from typing import List, Dict, Any, Optional
 
-console = Console()
+from aura.ui.formatter import console
 
 class InfraReaper:
     """

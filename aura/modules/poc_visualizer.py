@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 from rich.console import Console
 
-console = Console()
+from aura.ui.formatter import console
 
 class PoCVisualizer:
     """

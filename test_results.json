@@ -1,0 +1,676 @@
+{
+  "frontend_vulns": [
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/deluxe-membership",
+      "value": "https://demo.owasp-juice.shop/deluxe-membership",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/api/Complaints",
+      "value": "https://demo.owasp-juice.shop/api/Complaints",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/admin/application-configuration",
+      "value": "https://demo.owasp-juice.shop/rest/admin/application-configuration",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/wallet/balance",
+      "value": "https://demo.owasp-juice.shop/rest/wallet/balance",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/photo-wall",
+      "value": "https://demo.owasp-juice.shop/photo-wall",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/api/Deliverys",
+      "value": "https://demo.owasp-juice.shop/api/Deliverys",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/accounting",
+      "value": "https://demo.owasp-juice.shop/accounting",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/web3-sandbox",
+      "value": "https://demo.owasp-juice.shop/web3-sandbox",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/api/Hints",
+      "value": "https://demo.owasp-juice.shop/api/Hints",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/user/whoami",
+      "value": "https://demo.owasp-juice.shop/rest/user/whoami",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/admin",
+      "value": "https://demo.owasp-juice.shop/rest/admin",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/api/Recycles",
+      "value": "https://demo.owasp-juice.shop/api/Recycles",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/api/Challenges/",
+      "value": "https://demo.owasp-juice.shop/api/Challenges/",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/captcha",
+      "value": "https://demo.owasp-juice.shop/rest/captcha",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/wallet",
+      "value": "https://demo.owasp-juice.shop/wallet",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/user/login",
+      "value": "https://demo.owasp-juice.shop/rest/user/login",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/complain",
+      "value": "https://demo.owasp-juice.shop/complain",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/address/select",
+      "value": "https://demo.owasp-juice.shop/address/select",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/address/saved",
+      "value": "https://demo.owasp-juice.shop/address/saved",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/web3",
+      "value": "https://demo.owasp-juice.shop/rest/web3",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/search",
+      "value": "https://demo.owasp-juice.shop/search",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/repeat-notification",
+      "value": "https://demo.owasp-juice.shop/rest/repeat-notification",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/order-history",
+      "value": "https://demo.owasp-juice.shop/rest/order-history",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/score-board",
+      "value": "https://demo.owasp-juice.shop/score-board",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/memories",
+      "value": "https://demo.owasp-juice.shop/rest/memories",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/user/reset-password",
+      "value": "https://demo.owasp-juice.shop/rest/user/reset-password",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/order-summary",
+      "value": "https://demo.owasp-juice.shop/order-summary",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/api/Addresss",
+      "value": "https://demo.owasp-juice.shop/api/Addresss",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/deluxe-membership",
+      "value": "https://demo.owasp-juice.shop/rest/deluxe-membership",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/user/authentication-details/",
+      "value": "https://demo.owasp-juice.shop/rest/user/authentication-details/",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/api/Challenges",
+      "value": "https://demo.owasp-juice.shop/api/Challenges",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/wallet-web3",
+      "value": "https://demo.owasp-juice.shop/wallet-web3",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/track-result",
+      "value": "https://demo.owasp-juice.shop/track-result",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/forgot-password",
+      "value": "https://demo.owasp-juice.shop/forgot-password",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/continue-code-fixIt/apply/",
+      "value": "https://demo.owasp-juice.shop/rest/continue-code-fixIt/apply/",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/track-result/new",
+      "value": "https://demo.owasp-juice.shop/track-result/new",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/api/Products",
+      "value": "https://demo.owasp-juice.shop/api/Products",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/hacking-instructor",
+      "value": "https://demo.owasp-juice.shop/hacking-instructor",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/",
+      "value": "https://demo.owasp-juice.shop/",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/api/Users",
+      "value": "https://demo.owasp-juice.shop/api/Users",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/api/SecurityAnswers",
+      "value": "https://demo.owasp-juice.shop/api/SecurityAnswers",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/privacy-policy",
+      "value": "https://demo.owasp-juice.shop/privacy-policy",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/products",
+      "value": "https://demo.owasp-juice.shop/rest/products",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/two-factor-authentication",
+      "value": "https://demo.owasp-juice.shop/two-factor-authentication",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/api/SecurityQuestions",
+      "value": "https://demo.owasp-juice.shop/api/SecurityQuestions",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/last-login-ip",
+      "value": "https://demo.owasp-juice.shop/last-login-ip",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/track-order",
+      "value": "https://demo.owasp-juice.shop/rest/track-order",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/api/Feedbacks",
+      "value": "https://demo.owasp-juice.shop/api/Feedbacks",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/2fa/enter",
+      "value": "https://demo.owasp-juice.shop/2fa/enter",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/about",
+      "value": "https://demo.owasp-juice.shop/about",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/image-captcha/",
+      "value": "https://demo.owasp-juice.shop/rest/image-captcha/",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/address/create",
+      "value": "https://demo.owasp-juice.shop/address/create",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/continue-code-findIt",
+      "value": "https://demo.owasp-juice.shop/rest/continue-code-findIt",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/administration",
+      "value": "https://demo.owasp-juice.shop/administration",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/country-mapping",
+      "value": "https://demo.owasp-juice.shop/rest/country-mapping",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/403",
+      "value": "https://demo.owasp-juice.shop/403",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/chatbot",
+      "value": "https://demo.owasp-juice.shop/rest/chatbot",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/recycle",
+      "value": "https://demo.owasp-juice.shop/recycle",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/login",
+      "value": "https://demo.owasp-juice.shop/login",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/api/BasketItems",
+      "value": "https://demo.owasp-juice.shop/api/BasketItems",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/order-history",
+      "value": "https://demo.owasp-juice.shop/order-history",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/juicy-nft",
+      "value": "https://demo.owasp-juice.shop/juicy-nft",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/saved-payment-methods",
+      "value": "https://demo.owasp-juice.shop/saved-payment-methods",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/continue-code/apply/",
+      "value": "https://demo.owasp-juice.shop/rest/continue-code/apply/",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/delivery-method",
+      "value": "https://demo.owasp-juice.shop/delivery-method",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/contact",
+      "value": "https://demo.owasp-juice.shop/contact",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/continue-code-fixIt",
+      "value": "https://demo.owasp-juice.shop/rest/continue-code-fixIt",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/bee-haven",
+      "value": "https://demo.owasp-juice.shop/bee-haven",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/data-export",
+      "value": "https://demo.owasp-juice.shop/data-export",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/register",
+      "value": "https://demo.owasp-juice.shop/register",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/continue-code-findIt/apply/",
+      "value": "https://demo.owasp-juice.shop/rest/continue-code-findIt/apply/",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/continue-code",
+      "value": "https://demo.owasp-juice.shop/rest/continue-code",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/api/Cards",
+      "value": "https://demo.owasp-juice.shop/api/Cards",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/basket",
+      "value": "https://demo.owasp-juice.shop/basket",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/privacy-security",
+      "value": "https://demo.owasp-juice.shop/privacy-security",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/chatbot",
+      "value": "https://demo.owasp-juice.shop/chatbot",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/engine.io",
+      "value": "https://demo.owasp-juice.shop/engine.io",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/user",
+      "value": "https://demo.owasp-juice.shop/rest/user",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/rest/saveLoginIp",
+      "value": "https://demo.owasp-juice.shop/rest/saveLoginIp",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/api/Quantitys",
+      "value": "https://demo.owasp-juice.shop/api/Quantitys",
+      "confirmed": true
+    },
+    {
+      "type": "Discovered Hidden Endpoint",
+      "severity": "INFO",
+      "url": "https://demo.owasp-juice.shop",
+      "content": "Source Mining: Discovered hidden API/Frontend endpoint: https://demo.owasp-juice.shop/change-password",
+      "value": "https://demo.owasp-juice.shop/change-password",
+      "confirmed": true
+    }
+  ],
+  "mutator_vulns": [
+    {
+      "type": "AI-Mutated SQLi",
+      "severity": "CRITICAL",
+      "url": "https://demo.owasp-juice.shop/rest/products/search?q=apple",
+      "content": "The AURA Brain natively bypassed a WAF (Heroku) using payload: apple')) OR 1=1--",
+      "evidence": {
+        "original_blocked_status": 500,
+        "ai_payload_success": "apple')) OR 1=1--",
+        "reason": "AI Payload successfully caused SQL anomaly (200 OK)."
+      }
+    },
+    {
+      "type": "AI-Mutated SQLi",
+      "severity": "CRITICAL",
+      "url": "https://demo.owasp-juice.shop/rest/products/search?q=apple",
+      "content": "The AURA Brain natively bypassed a WAF (Heroku) using payload: apple')) OR 1=1--",
+      "evidence": {
+        "original_blocked_status": 500,
+        "ai_payload_success": "apple')) OR 1=1--",
+        "reason": "AI Payload successfully caused SQL anomaly (200 OK)."
+      }
+    }
+  ]
+}

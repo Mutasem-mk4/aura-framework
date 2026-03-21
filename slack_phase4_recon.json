@@ -1,0 +1,5 @@
+{
+    "Internal API Paths": [
+        "/v1/list_of_spans/json"
+    ]
+}

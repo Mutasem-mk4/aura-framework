@@ -9,7 +9,10 @@ from typing import Dict, Any, Optional, List
 
 import httpx
 from google import genai
+from rich.console import Console
 from aura.core import state
+
+from aura.ui.formatter import console
 
 logger = logging.getLogger("aura")
 
@@ -29,30 +32,36 @@ class AuraBrain:
     REASONING_PATTERNS = {
         "admin": "Administrative panels are entry points for lateral movement and credential harvesting. Recommendation: Brute-force discovery of sub-directories (/admin, /wp-admin) or check for default credentials.",
         "jenkins": "Jenkins instances often contain CI/CD secrets and SSH keys. If accessed, it could lead to a full Supply Chain compromise.",
-        "api": "Unprotected APIs often suffer from Broken Object Level Authorization (BOLA). Recommendation: Fuzz endpoints for IDOR vulnerabilities.",
-        "logic_flaw": "State-changing APIs (POST/PUT) handling quantities, prices, or roles can be bypassed. Mutate numeric values to negative bounds and append highly privileged boolean flags.",
-        "staging": "Staging environments are often less protected than production and may contain legacy data or debug symbols.",
-        "docker": "Exposed Docker registries or sockets can lead to container escape and host takeover.",
-        "vpn": "VPN endpoints are high-value targets for initial access. Recommendation: Check for known CVEs in the underlying software (Pulse Secure, Fortinet, etc.)."
+        "api": "Unprotected APIs often suffer from Broken Object Level Authorization (BOLA). Recommendation: Fuzz endpoints for IDOR vulnerabilities and parameter pollution.",
+        "logic_flaw": "State-changing APIs (POST/PUT) handling quantities, prices, or roles can be bypassed. Mutate numeric values to negative/overflow bounds and append highly privileged boolean flags.",
+        "staging": "Staging environments are often less protected than production and may contain legacy data, debug symbols, or weaker auth configs.",
+        "docker": "Exposed Docker registries or sockets can lead to container escape and host takeover. Check for /v2/_catalog.",
+        "vpn": "VPN endpoints are high-value targets for initial access. Recommendation: Check for known CVEs in the underlying software (Pulse Secure, Fortinet, etc.) and perform credential stuffing.",
+        "idor": "IDOR vulnerabilities occur when an application provides direct access to objects based on user-supplied input. Recommendation: Mutate resource IDs to access other users' data.",
+        "bola": "BOLA (Broken Object Level Authorization) is critical in modern APIs. Recommendation: Attempt to access, modify, or delete resources belonging to other users by manipulating object IDs in requests.",
+        "race_condition": "Race conditions occur when multiple processes access shared data concurrently. Recommendation: Concurrent requests to state-changing endpoints like /withdraw, /transfer, or /redeem."
     }
 
     def __init__(self):
         self.enabled = False
-        self.tactical_memory = [] # Phase 18: Tactical Memory
-        self.payload_cache = {}  # Initialize payload cache for Level 1 & 2
-        self.ai_cache = {} # v19.2: General AI query cache
-        self.active_provider = None
+        self.tactical_memory: List[str] = [] # Phase 18: Tactical Memory
+        self.payload_cache: Dict[str, str] = {}  # Initialize payload cache for Level 1 & 2
+        self.ai_cache: Dict[str, str] = {} # v19.2: General AI query cache
+        self.active_provider: Optional[str] = None
         
         # Zero-Cost Local AI (Ollama) - MANDATORY PRIORITY
-        if state.OLLAMA_HOST:
+        ollama_host = state.OLLAMA_HOST or os.environ.get("OLLAMA_HOST")
+        if ollama_host:
             self.enabled = True
             self.active_provider = "ollama"
-            logger.info(f"AuraBrain Singularity: Local Ollama Engine online at {state.OLLAMA_HOST}")
+            ollama_model = state.OLLAMA_MODEL or os.environ.get("OLLAMA_MODEL", "qwen2.5-coder:7b")
+            logger.info(f"AuraBrain Singularity: Local Ollama Engine online at {ollama_host} (model: {ollama_model})")
         
         # Primary Gemini SDK - Fallback
-        if state.GEMINI_API_KEY:
+        gemini_key = state.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY")
+        if gemini_key:
             try:
-                self.client = genai.Client(api_key=state.GEMINI_API_KEY)
+                self.client = genai.Client(api_key=gemini_key)
                 self.enabled = True
                 if not self.active_provider:
                     self.active_provider = "gemini"
@@ -120,8 +129,9 @@ class AuraBrain:
                 res_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                 return res_text
             except Exception as e:
-                if "400" in str(e) or "API key not valid" in str(e):
-                    logger.warning(f"AuraBrain: Gemini API Key Invalid/Expired (400). Failing over...")
+                if "400" in str(e) or "API key not valid" in str(e) or "401" in str(e):
+                    logger.warning(f"AuraBrain: Gemini API Key Invalid/Expired (400). Circuit Breaker Activated, Disabling AI...")
+                    self.enabled = False
                     return None
                 if attempt == max_retries - 1:
                     logger.error(f"AuraBrain: Gemini SDK Error: {e}")
@@ -160,7 +170,7 @@ class AuraBrain:
         """v25.0 OMEGA: Local Ollama Engine with 300s timeout."""
         url = f"{state.OLLAMA_HOST}/api/generate"
         payload = {
-            "model": getattr(state, "OLLAMA_MODEL", "qwen2.5-coder:7b"),
+            "model": state.OLLAMA_MODEL,
             "prompt": f"{system_instruction or self.SYSTEM_PROMPT}\n\nUser: {prompt}\nAI:",
             "stream": False
         }
@@ -173,8 +183,18 @@ class AuraBrain:
                     res_text = data.get('response', '').strip()
                     res_text = res_text.replace("```json", "").replace("```", "").strip()
                     return res_text
+                else:
+                    logger.warning(f"Ollama returned HTTP {resp.status_code}: {resp.text[:200]}")
+        except httpx.ConnectError:
+            self.enabled = False
+            console.print(f"[bold yellow][!] Ollama Offline:[/bold yellow] Cannot reach {state.OLLAMA_HOST}. Circuit Breaker Activated.")
+            logger.error(f"Ollama connection refused at {state.OLLAMA_HOST}. Ensure Ollama is running: `ollama serve`")
+        except httpx.TimeoutException:
+            self.enabled = False
+            console.print(f"[bold yellow][!] Ollama Timeout:[/bold yellow] Model [cyan]{state.OLLAMA_MODEL}[/cyan] took too long. Circuit Breaker Activated.")
+            logger.error(f"Ollama inference timed out for model {state.OLLAMA_MODEL}")
         except Exception as e:
-            logger.error(f"Ollama inference failed (Timeout/Error): {e}")
+            logger.error(f"Ollama inference failed (Unexpected Error): {e}")
         return None
 
     def autonomous_plan(self, url: str, dom_context: str, network_context: list) -> dict:
@@ -226,7 +246,7 @@ class AuraBrain:
         
         return "\n\n".join(insights)
 
-    def reason_json(self, prompt: str, system_instruction: str = None) -> str:
+    def reason_json(self, prompt: str, system_instruction: Optional[str] = None) -> str:
         """v5.1 / v19.4: Synchronized JSON reasoning natively supporting Ollama."""
         if not self.enabled: return "[]"
 
@@ -268,8 +288,13 @@ class AuraBrain:
         """Suggests a sequence of actions to exploit a discovered vulnerability."""
         if not self.enabled: return "Manual verification required."
         prompt = f"Given this security context: {context}\nGenerate a step-by-step exploit path for a professional report."
-        try: return self._call_ai(prompt)
-        except: return "See PoC steps in finding details."
+        try: 
+            res = self._call_ai(prompt)
+            return res if res else "Manual verification required."
+        except: 
+            return "See PoC steps in finding details."
+
+    def validate_behavior(self, payload: str, url: str, delay_ms: int, length: int, status: int, body: str) -> Dict[str, Any]:
         """Deep behavioral analysis for Blind vulnerabilities and WAF evasion indicators."""
         if not self.enabled: return {"vulnerable": False}
         
@@ -316,6 +341,36 @@ class AuraBrain:
             parsed = self._clean_json(raw)
             return parsed if isinstance(parsed, list) else []
         except Exception: return []
+
+    def synthesize_workflow(self, endpoints: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        v38.0 OMEGA: Autonomous Workflow Generator.
+        Translates a list of discovered endpoints into a structured LogicFuzzer workflow.
+        """
+        if not self.enabled or not endpoints:
+            return []
+
+        console.print(f"[bold cyan]🧠 [Brain] Synthesizing autonomous workflow for {len(endpoints)} endpoints...[/bold cyan]")
+        
+        prompt = (
+            "As AURA-Zenith, analyze these endpoints and synthesize a stateful security workflow (JSON).\n"
+            "Combine related endpoints into a logical sequence (e.g., login -> profile -> update).\n"
+            "Assign 'fuzz_params' and 'fuzz_types' (sqli, xss, logic, auth_bypass) based on parameter names.\n"
+            f"Endpoints: {json.dumps(endpoints[:20])}\n\n"
+            "Respond ONLY with a JSON array of steps, where each step follows this structure:\n"
+            "{"
+            "  'id': 'unique_id', 'method': 'GET/POST', 'path': '/path', "
+            "  'name': 'readable_name', 'fuzz_params': [], 'fuzz_types': []"
+            "}"
+        )
+        
+        try:
+            raw = self._call_ai(prompt, use_cache=False)
+            workflow = self._clean_json(raw)
+            return workflow if isinstance(workflow, list) else []
+        except Exception as e:
+            logger.error(f"AuraBrain Workflow Synthesis failed: {e}")
+            return []
 
     def analyze_business_logic(self, request_data: dict, response_data: dict) -> list:
         """v15.0: Deep analysis of HTTP transactions for complex business logic flaws."""

@@ -1,0 +1,14 @@
+{
+    "OpenID / OAuth Constants": [
+        "\"Email\"",
+        "\"State\"",
+        "\"nonce\"",
+        "\"prompt\""
+    ],
+    "Internal & Beta Flags": [
+        "\"InternalError\""
+    ],
+    "Hardcoded Secrets": [
+        "canaryFlowToken"
+    ]
+}

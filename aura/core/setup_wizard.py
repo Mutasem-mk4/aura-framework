@@ -12,7 +12,7 @@ from rich.console import Console
 from rich.panel import Panel
 from aura.core.config import save_config, CONFIG_PATH
 
-console = Console()
+from aura.ui.formatter import console
 
 
 async def _test_intigriti(token: str) -> tuple[bool, str]:

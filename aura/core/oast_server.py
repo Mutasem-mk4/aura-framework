@@ -10,7 +10,7 @@ import aiohttp
 from rich.console import Console
 
 logger = logging.getLogger("aura")
-console = Console()
+from aura.ui.formatter import console
 
 class OASTClient:
     """

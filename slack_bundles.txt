@@ -1,0 +1,13 @@
+https://a.slack-edge.com/bv1-13-br/marketing-page-index-revamped-25.5db168dd7b945dc690be.marketing.min.js
+https://a.slack-edge.com/bv1-13-br/marketing-component-content-switcher.dea5d85bd86a678ee8fc.marketing.min.js
+https://a.slack-edge.com/bv1-13-br/manifest.d68b24c63341223a3b09.marketing.min.js
+https://a.slack-edge.com/bv1-13-br/swiper.c790778cd9fb4f6b41e1.marketing.min.js
+https://a.slack-edge.com/bv1-13-br/marketing-autoscroll-asset-text-carousel.c173b1b7830ea8f8f5e3.marketing.min.js
+https://a.slack-edge.com/bv1-13-br/marketing-page-index.c74a9a30ca5bbd0b4f24.marketing.min.js
+https://a.slack-edge.com/bv1-13-br/expanded-marketing-page-footer.4dc8130328de8c4f4298.marketing.min.js
+https://a.slack-edge.com/bv1-13-br/marketing-page-yext-search.f378e3360deaae8f0400.marketing.min.js
+https://a.slack-edge.com/bv1-13-br/marketing-customer-videos.c547a581ff0c64e6cfa8.marketing.min.js
+https://a.slack-edge.com/bv1-13-br/expanded-marketing-page-navigation.a86f5e4149b0ddf2c583.marketing.min.js
+https://a.slack-edge.com/bv1-13-br/marketing-core.4d0a8af6846e089653dd.marketing.min.js
+https://a.slack-edge.com/bv1-13-br/marketing-sticky-toc.81446c905e6fa46978b0.marketing.min.js
+https://a.slack-edge.com/bv1-13-br/rollup-marketing.cda9255210719ea94075.marketing.min.js

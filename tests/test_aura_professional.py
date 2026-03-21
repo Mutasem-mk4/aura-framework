@@ -213,11 +213,17 @@ class TestCLI:
     """Test CLI functionality."""
     
     def test_cli_import(self):
-        """Test CLI module can be imported."""
+        """Test CLI module can be imported with state protection."""
+        # v38.0: Avoid side effects on Windows if stdout is redirected
+        import sys
+        old_stdout = sys.stdout
         try:
             from aura import cli
+            assert cli is not None
         except Exception as e:
-            pytest.skip(f"CLI import failed (non-critical): {e}")
+            pytest.skip(f"CLI import skipped or failed: {e}")
+        finally:
+            sys.stdout = old_stdout
 
 
 class TestIntegration:
@@ -225,14 +231,17 @@ class TestIntegration:
     
     def test_full_pipeline_imports(self):
         """Verify all major components can be imported together."""
-        from aura.core.storage import AuraStorage
-        from aura.modules.profit_engine import ProfitEngine
-        from aura.core.brain import AuraBrain
-        
-        # Just verify imports work
-        assert AuraStorage is not None
-        assert ProfitEngine is not None
-        assert AuraBrain is not None
+        # Use importlib to avoid potential side effects caching issues
+        import importlib
+        try:
+            storage = importlib.import_module("aura.core.storage")
+            profit = importlib.import_module("aura.modules.profit_engine")
+            brain = importlib.import_module("aura.core.brain")
+            assert storage is not None
+            assert profit is not None
+            assert brain is not None
+        except Exception as e:
+            pytest.fail(f"Integration import failed: {e}")
         
     def test_storage_integration(self):
         """Test storage can be instantiated."""
@@ -244,32 +253,41 @@ class TestIntegration:
         )
         
         if os.path.exists(db_path):
-            storage = AuraStorage(db_path)
-            targets = storage.get_all_targets()
-            print(f"\nStorage connected: {len(targets)} targets loaded")
+            try:
+                storage = AuraStorage(db_path)
+                targets = storage.get_all_targets()
+                # Use logging instead of print to avoid I/O issues in some envs
+                import logging
+                logging.info(f"Storage connected: {len(targets)} targets loaded")
+            except Exception as e:
+                pytest.fail(f"Storage instantiation failed: {e}")
 
 
 # Test execution summary
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
     """Custom test summary."""
-    print("\n" + "="*60)
-    print("AURA TEST SUMMARY")
-    print("="*60)
-    
-    passed = len(terminalreporter.stats.get('passed', []))
-    failed = len(terminalreporter.stats.get('failed', []))
-    skipped = len(terminalreporter.stats.get('skipped', []))
-    
-    print(f"Passed:  {passed}")
-    print(f"Failed:  {failed}")
-    print(f"Skipped: {skipped}")
-    
-    if failed == 0:
-        print("\nSTATUS: ALL TESTS PASSED")
-    else:
-        print("\nSTATUS: SOME TESTS FAILED - Review output above")
-    
-    print("="*60)
+    try:
+        print("\n" + "="*60)
+        print("AURA TEST SUMMARY")
+        print("="*60)
+        
+        passed = len(terminalreporter.stats.get('passed', []))
+        failed = len(terminalreporter.stats.get('failed', []))
+        skipped = len(terminalreporter.stats.get('skipped', []))
+        
+        print(f"Passed:  {passed}")
+        print(f"Failed:  {failed}")
+        print(f"Skipped: {skipped}")
+        
+        if failed == 0:
+            print("\nSTATUS: ALL TESTS PASSED")
+        else:
+            print("\nSTATUS: SOME TESTS FAILED - Review output above")
+        
+        print("="*60)
+    except Exception:
+        # Avoid crashing on Windows if stdout/stderr are closed during teardown
+        pass
 
 
 if __name__ == "__main__":

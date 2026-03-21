@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from rich.console import Console
 from rich.table import Table
 
-console = Console()
+from aura.ui.formatter import console
 
 # Profile DB — stored alongside Aura's main DB
 PROFILES_DB = os.path.join(os.path.expanduser("~"), ".aura_profiles.db")
