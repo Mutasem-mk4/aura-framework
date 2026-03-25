@@ -5,11 +5,14 @@ This script acts as the primary runner for the Aura framework.
 It dispatches commands to the specialized modules in the `aura/` package.
 """
 
-import asyncio
-import sys
-import argparse
 import os
-import io
+import asyncio
+import argparse
+import socket
+import subprocess
+import sys
+import time
+import webbrowser
 
 # v33: Fix Windows Unicode/Encoding issues for Rich/CMD
 if sys.platform == "win32":
@@ -21,21 +24,25 @@ if sys.platform == "win32":
         import codecs
         sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
         sys.stderr = codecs.getwriter("utf-8")(sys.stderr.detach())
-os.environ['TERM'] = 'dumb'
-os.environ['NO_COLOR'] = '1'
-os.environ['RICH_DISABLE_JUPYTER'] = '1'
-import colorama
-colorama.just_fix_windows_console()
+os.environ["TERM"] = "dumb"
+os.environ["NO_COLOR"] = "1"
+os.environ["RICH_DISABLE_JUPYTER"] = "1"
+try:
+    import colorama
 
-# Patch out Windows-specific rendering
-import rich._windows_renderer
-rich._windows_renderer.LegacyWindowsTerm = None
+    colorama.just_fix_windows_console()
+except ImportError:
+    pass
 
-from rich.console import Console
+try:
+    import rich._windows_renderer
+
+    rich._windows_renderer.LegacyWindowsTerm = None
+except (AttributeError, ImportError):
+    pass
+
 from rich.panel import Panel
 from rich.table import Table
-from rich.live import Live
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
 
 from aura.ui.formatter import console
 
@@ -45,6 +52,7 @@ async def _run_mission(target: str, args: argparse.Namespace = None):
     if use_new_pipeline:
         console.print("[bold green][v40.0 BETA] Engaging Decoupled Mission Pipeline...[/bold green]")
         from aura.core.context import MissionContext, FeatureFlags
+        from aura.core.injector import get_container
         from aura.core.pipeline import MissionPipeline
         from aura.phases.recon import ReconPhase
         from aura.phases.deconstruction import DeconstructionPhase
@@ -53,20 +61,41 @@ async def _run_mission(target: str, args: argparse.Namespace = None):
         flags = FeatureFlags(
             fast_mode=getattr(args, 'fast', False) if args else False,
             beginner_mode=getattr(args, 'clinic', True) if args else True,
+            clinic_mode=getattr(args, 'clinic', False) if args else False,
             auto_submit=getattr(args, 'auto_submit', False) if args else False
         )
         context = MissionContext(target_url=target, flags=flags)
         pipeline = MissionPipeline(context)
-        
-        # We instantiate empty mocks for the dependencies for now.
-        # In a real DI container setup, these would be auto-injected.
-        from aura.modules.recon_pipeline import ReconPipeline
-        from aura.modules.secret_hunter import SecretHunter
-        pipeline.add_phase(ReconPhase(recon_pipeline=ReconPipeline(), secret_hunter=SecretHunter(), takeover_hunter=None))
-        pipeline.add_phase(DeconstructionPhase(ssti_engine=None, smuggling_engine=None, ws_oauth_engine=None, logic_fuzzer=None, brain=None))
-        pipeline.add_phase(AuditPhase(power_stack=None, nuclei_engine=None, singularity=None, dast=None, fleet_manager=None, apex=None, bounty_reporter=None))
-        
-        import time
+        container = get_container()
+
+        pipeline.add_phase(
+            ReconPhase(
+                recon_pipeline=container.build_engine("recon_pipeline"),
+                secret_hunter=container.build_engine("secret_hunter"),
+                takeover_hunter=container.build_engine("subdomain_takeover"),
+            )
+        )
+        pipeline.add_phase(
+            DeconstructionPhase(
+                ssti_engine=container.build_engine("ssti_engine"),
+                smuggling_engine=container.build_engine("smuggling_engine"),
+                ws_oauth_engine=container.build_engine("ws_oauth_engine"),
+                logic_fuzzer=container.build_engine("logic_fuzzer"),
+                brain=container.brain,
+            )
+        )
+        pipeline.add_phase(
+            AuditPhase(
+                power_stack=container.build_engine("power_stack"),
+                nuclei_engine=container.build_engine("nuclei_engine"),
+                singularity=container.build_engine("aura_singularity"),
+                dast=container.build_engine("aura_dast"),
+                fleet_manager=container.build_engine("fleet_manager"),
+                apex=container.build_engine("apex_sentinel"),
+                bounty_reporter=container.build_engine("bounty_reporter"),
+            )
+        )
+
         _t0 = time.time()
         result = await pipeline.execute_all()
         elapsed = time.time() - _t0
@@ -83,11 +112,6 @@ async def _run_mission(target: str, args: argparse.Namespace = None):
         await orchestrator.execute_advanced_chain(target)
 
 def _launch_nexus_background():
-    import webbrowser
-    import subprocess
-    import time
-    import socket
-    
     # v45.0: Kill any stale server on port 8000
     try:
         # Windows specific find-and-kill on port 8000
@@ -97,8 +121,8 @@ def _launch_nexus_background():
                 if "LISTENING" in line:
                     pid = line.strip().split()[-1]
                     subprocess.run(['taskkill', '/F', '/PID', pid], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except:
-        pass
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        console.print("[dim yellow][SERVER] Skipping stale-port cleanup; port inspection unavailable.[/dim yellow]")
 
     console.print("[bold green][SERVER] Starting Nexus API Server...[/bold green]")
     api_path = os.path.join(os.getcwd(), "aura", "api", "server.py")
@@ -116,7 +140,7 @@ def _launch_nexus_background():
             with socket.create_connection(("127.0.0.1", 8000), timeout=1):
                 success = True
                 break
-        except:
+        except OSError:
             time.sleep(1)
             
     if success:
@@ -127,10 +151,6 @@ def _launch_nexus_background():
 
 def _launch_zenith_ui():
     """v3.0: Launch the React-based Nexus Zenith Dashboard."""
-    import subprocess
-    import webbrowser
-    import time
-    
     ui_path = os.path.join(os.getcwd(), "nexus_zenith")
     if not os.path.exists(ui_path):
         console.print("[bold red][!] Nexus Zenith UI directory not found![/bold red]")

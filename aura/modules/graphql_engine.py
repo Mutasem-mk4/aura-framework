@@ -16,11 +16,9 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 from urllib.parse import urlparse
 
 import httpx
-from rich.console import Console
 
 from aura.ui.formatter import console
 
@@ -99,7 +97,7 @@ class GraphQLBreaker:
                     console.print(f"[bold cyan][🕸️ GraphQL] Endpoint Found: {url}[/bold cyan]")
                     self.tested_endpoints.add(url)
                     return url
-            except Exception:
+            except httpx.RequestError:
                 continue
         return None
 
@@ -134,7 +132,7 @@ class GraphQLBreaker:
                     "url": endpoint,
                     "confirmed": True,
                 }
-        except Exception:
+        except (httpx.RequestError, ValueError):
             pass
         return None
 
@@ -161,7 +159,7 @@ class GraphQLBreaker:
                     "url": endpoint,
                     "confirmed": True,
                 }
-        except Exception:
+        except (httpx.RequestError, ValueError):
             pass
         return None
 
@@ -194,7 +192,7 @@ class GraphQLBreaker:
                     "url": endpoint,
                     "confirmed": True,
                 }
-        except Exception:
+        except httpx.RequestError:
             pass
         return None
 
@@ -222,7 +220,7 @@ class GraphQLBreaker:
                         "url": endpoint,
                         "confirmed": True,
                     }
-        except Exception:
+        except httpx.RequestError:
             pass
         return None
 

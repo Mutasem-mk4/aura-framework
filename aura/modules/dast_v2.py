@@ -1,14 +1,12 @@
 import asyncio
-import json
 import random
 import time
 from playwright.async_api import async_playwright
-from rich.console import Console
 from aura.core.brain import AuraBrain
-from aura.core.stealth import StealthEngine, AuraSession
+from aura.core.stealth import StealthEngine
 from aura.core import state
 import uuid
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from aura.core.engine_interface import IEngine
 from aura.core.models import Finding, Severity
 
@@ -59,7 +57,7 @@ class AuraSingularity(IEngine):
                 post_data = request.post_data
             except UnicodeDecodeError:
                 post_data = "<binary payload>"
-            except Exception:
+            except AttributeError:
                 pass
                 
             req_data = {

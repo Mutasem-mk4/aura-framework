@@ -17,12 +17,9 @@ import json
 import os
 import re
 import urllib.parse
-from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 
 import httpx
-from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich import box
@@ -98,7 +95,7 @@ class APIEngine:
                         })
                         console.print(f"    [bold red][🔥] INTROSPECTION ENABLED at {ep}[/bold red]")
                     return # Stop after first working endpoint
-            except Exception:
+            except httpx.RequestError:
                 continue
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -143,7 +140,7 @@ class APIEngine:
                     "url": url,
                     "desc": f"Endpoint responded with 200 OK without Authorization. Method: {endpoint['method']}"
                 })
-        except Exception:
+        except httpx.RequestError:
             pass
 
     # ─────────────────────────────────────────────────────────────────────────

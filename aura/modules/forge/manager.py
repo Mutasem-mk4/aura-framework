@@ -1,9 +1,9 @@
 import os
 import importlib.util
 import inspect
-import asyncio
-from typing import List, Type
+from typing import List
 from aura.modules.forge.base import AuraPlugin
+from aura.ui.formatter import console
 
 class ForgeManager:
     """Manages discovery and loading of Aura Forge plugins."""
@@ -38,11 +38,11 @@ class ForgeManager:
         
         try:
             spec.loader.exec_module(module)
-            for name, obj in inspect.getmembers(module):
+            for _, obj in inspect.getmembers(module):
                 if inspect.isclass(obj) and issubclass(obj, AuraPlugin) and obj is not AuraPlugin:
                     return obj()
         except Exception as e:
-            print(f"[!] Error loading plugin {filepath}: {e}")
+            console.print(f"[!] Error loading plugin {filepath}: {e}")
         
         return None
 
@@ -51,8 +51,8 @@ class ForgeManager:
         results = {}
         for plugin in self.plugins:
             try:
-                print(f"[*] Forge: Running {plugin.name} v{plugin.version}...")
+                console.print(f"[*] Forge: Running {plugin.name} v{plugin.version}...")
                 results[plugin.name] = await plugin.run(target, data)
             except Exception as e:
-                print(f"[!] Forge: Plugin {plugin.name} failed: {e}")
+                console.print(f"[!] Forge: Plugin {plugin.name} failed: {e}")
         return results

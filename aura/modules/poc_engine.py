@@ -16,7 +16,6 @@ from typing import List, Dict, Any
 from aura.core.stealth import AuraSession, StealthEngine
 from aura.core.engine_base import AbstractEngine
 from aura.core.context import MissionContext
-from rich.console import Console
 
 from aura.ui.formatter import console
 
@@ -163,7 +162,8 @@ class PoCEngine(AbstractEngine):
                             "poc_evidence": f"Deterministic Time-Based SQLi confirmed. Payload: {payload}",
                             "severity": "CRITICAL"
                         }
-                except: continue
+                except Exception:
+                    continue
         except Exception as e:
             console.print(f"[dim red][!] Time-based verify failure: {e}[/dim red]")
         return None
@@ -295,7 +295,8 @@ class PoCEngine(AbstractEngine):
                         "poc_evidence": f"RCE confirmed via {payload}. Proof: {evidence}",
                         "severity": "CRITICAL"
                     }
-            except: continue
+            except Exception:
+                continue
         return None
 
     async def establish_void_persistence(self, url: str, param: str, original_payload: str):
@@ -311,9 +312,8 @@ class PoCEngine(AbstractEngine):
         
         # 2. Deploy memory-resident heartbeat script (simulated via AI/Ghost-Shell)
         # In a real scenario, this would be a more complex multi-stage payload
-        from rich.console import Console
-        Console().print(f"[dim magenta][+] Persistence Established. Heartbeat ID: {heartbeat_id}[/dim magenta]")
-        Console().print(f"[dim magenta][+] Encrypted Tunnel open via Void-Tunneling (WSS Mode).[/dim magenta]")
+        console.print(f"[dim magenta][+] Persistence Established. Heartbeat ID: {heartbeat_id}[/dim magenta]")
+        console.print(f"[dim magenta][+] Encrypted Tunnel open via Void-Tunneling (WSS Mode).[/dim magenta]")
         
         return heartbeat_id
 

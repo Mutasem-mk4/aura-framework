@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 aura.phases.audit
 
@@ -5,7 +7,7 @@ Controller for Phase 4: Deep Security Audit.
 Manages the concurrent execution of DAST, Nuclei, Singularity, and Apex Sentinel.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 from aura.core.engine_base import AbstractEngine
 from aura.ui.formatter import ZenithUI, console
 import asyncio
@@ -14,7 +16,7 @@ class AuditPhase(AbstractEngine):
     """
     Executes core exploitation payloads, fuzzy testing, and autonomous logic verification.
     """
-    def __init__(self, power_stack: Any, nuclei_engine: Any, singularity: Any, dast: Any, fleet_manager: Any, apex: Any, bounty_reporter: Any):
+    def __init__(self, power_stack: Any, nuclei_engine: Any, singularity: Any, dast: Any, fleet_manager: Any, apex: Any, bounty_reporter: Any) -> None:
         super().__init__()
         self.power_stack = power_stack
         self.nuclei_engine = nuclei_engine
@@ -27,7 +29,7 @@ class AuditPhase(AbstractEngine):
         self.dast_semaphore = asyncio.Semaphore(10)
         self.sing_semaphore = asyncio.Semaphore(5)
 
-    async def run(self, discovered_urls: List[str], swarm_mode: bool = False) -> List[Dict[str, Any]]:
+    async def run(self, discovered_urls: list[str], swarm_mode: bool = False) -> list[dict[str, Any]]:
         domain = self.context.target_url
         ZenithUI.phase_banner("Phase 4: Deep Security Audit", domain, icon="💥")
         self._emit_progress("Initiating Deep Security Audit...", percentage=75)

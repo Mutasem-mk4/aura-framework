@@ -3,7 +3,6 @@ import socket
 import json
 import logging
 from typing import List, Dict, Any, Optional
-from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from aura.core.nexus_bridge import NexusBridge
 
@@ -39,7 +38,10 @@ class NativePortScanner:
         if self.nexus:
             console.print("[yellow][⚡] Nexus Core Active: Accelerating scan with Go engines...[/yellow]")
             # Go timeout is in ms
-            return self.nexus.scan_ports(ip, ports, self.concurrency, int(self.timeout * 1000))
+            nexus_result = self.nexus.scan_ports(ip, ports, self.concurrency, int(self.timeout * 1000))
+            if nexus_result is not None:
+                return nexus_result
+            console.print("[dim yellow][!] Nexus scan returned None — falling back to native scanner.[/dim yellow]")
         
         # Native Fallback
         results = []

@@ -13,9 +13,7 @@ Usage:
     aura www.target.com --lfi --map reports/discovery_map_target.json
 """
 
-import asyncio
 import json
-import os
 import re
 import urllib.parse
 from datetime import datetime
@@ -25,10 +23,6 @@ from typing import Optional
 import httpx
 import urllib3
 urllib3.disable_warnings()
-
-from rich.console import Console
-from rich.panel import Panel
-from rich import box
 
 from aura.ui.formatter import console
 
@@ -205,15 +199,15 @@ class LFIEngine:
                     "original_value": "example.jpg"
                 })
 
-        print(f"\n{'='*65}")
-        print(f"📂 AURA v2 — Path Traversal (LFI) Engine")
-        print(f"🎯 Target: {meta.get('target', self.target)}")
-        print(f"💉 Parameters to Test: {len(params)} (file, path, template, etc.)")
-        print(f"{'='*65}")
+        console.print(f"\n{'='*65}")
+        console.print(f"📂 AURA v2 — Path Traversal (LFI) Engine")
+        console.print(f"🎯 Target: {meta.get('target', self.target)}")
+        console.print(f"💉 Parameters to Test: {len(params)} (file, path, template, etc.)")
+        console.print(f"{'='*65}")
 
         if not params:
-            print("\n⚠️  No LFI-friendly parameters found in discovery map.")
-            print("   Tip: Run --crawl first.")
+            console.print("\n⚠️  No LFI-friendly parameters found in discovery map.")
+            console.print("   Tip: Run --crawl first.")
             return []
 
         for param_info in params:
@@ -224,14 +218,14 @@ class LFIEngine:
                 continue
             self.tested.add(key)
 
-            print(f"\n  🔍 [{param_info['method']}] [{param}] in {url[:70]}")
+            console.print(f"\n  🔍 [{param_info['method']}] [{param}] in {url[:70]}")
 
             res = self._test_lfi(url, param)
             if res:
-                print(f"     🚨 HIGH: LFI Detected! ({res['os_target']}) Payload: {res['payload']}")
+                console.print(f"     🚨 HIGH: LFI Detected! ({res['os_target']}) Payload: {res['payload']}")
                 self.findings.append(self._build_finding(param_info, res))
             else:
-                print(f"     ✅ Safe")
+                console.print(f"     ✅ Safe")
 
         return self._finalize()
 
@@ -240,22 +234,22 @@ class LFIEngine:
         high     = [f for f in self.findings if f.get("severity") == "HIGH"]
         medium   = [f for f in self.findings if f.get("severity") == "MEDIUM"]
 
-        print(f"\n{'='*65}")
-        print(f"✅ LFI SCAN COMPLETE")
-        print(f"{'='*65}")
-        print(f"  🔴 Critical : {len(critical)}")
-        print(f"  🟠 High     : {len(high)}")
-        print(f"  🟡 Medium   : {len(medium)}")
-        print(f"  📊 Total    : {len(self.findings)}")
+        console.print(f"\n{'='*65}")
+        console.print(f"✅ LFI SCAN COMPLETE")
+        console.print(f"{'='*65}")
+        console.print(f"  🔴 Critical : {len(critical)}")
+        console.print(f"  🟠 High     : {len(high)}")
+        console.print(f"  🟡 Medium   : {len(medium)}")
+        console.print(f"  📊 Total    : {len(self.findings)}")
 
         if self.findings:
             target_slug = self.target_domain.replace(".", "_").replace("www_", "")
             out_path = self.output_dir / f"lfi_findings_{target_slug}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
             with open(out_path, "w", encoding="utf-8") as fh:
                 json.dump({"target": self.target, "findings": self.findings}, fh, indent=2)
-            print(f"\n  💾 Findings saved: {out_path}")
+            console.print(f"\n  💾 Findings saved: {out_path}")
         else:
-            print("\n  ✅ No LFI vulnerabilities detected.")
+            console.print("\n  ✅ No LFI vulnerabilities detected.")
 
         return self.findings
 

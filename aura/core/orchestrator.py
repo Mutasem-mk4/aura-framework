@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import asyncio
 import os
@@ -56,7 +58,6 @@ from aura.core.zenith_reporter import ZenithReporter
 from aura.ui.formatter import ZenithUI, console
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 from rich.panel import Panel
-from rich.console import Console
 from rich.table import Table
 from urllib.parse import urlparse, urljoin
 from aura.core.metrics import METRICS
@@ -68,6 +69,35 @@ from aura.core.injector import get_container
 
 import logging
 logger = logging.getLogger("aura.orchestrator")
+
+
+class MockEngine:
+    """Fallback engine used when registry-backed instantiation fails."""
+
+    def __init__(self, engine_id: str) -> None:
+        self.engine_id = engine_id
+        self.engine_name = engine_id
+        self._status = "mocked"
+
+    def __getattr__(self, name: str) -> Callable[..., Any]:
+        if name.startswith("__") and name.endswith("__"):
+            raise AttributeError(f"MockEngine has no attribute {name}")
+
+        async def noop(*args: Any, **kwargs: Any) -> Any:
+            if "scan" in name or "spider" in name or "run" in name:
+                return []
+            return None
+
+        return noop
+
+    async def run(self, *args: Any, **kwargs: Any) -> list[Any]:
+        return []
+
+    async def setup(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+    async def teardown(self, *args: Any, **kwargs: Any) -> None:
+        return None
 
 class MirrorSimulator:
     def __init__(self, brain):
@@ -128,7 +158,7 @@ class NeuralOrchestrator:
         self.broadcast_callback = broadcast_callback or self._default_remote_broadcast
         
         # Infrastructure
-        self.brain = AuraBrain()
+        self.brain = getattr(self.container, "brain", AuraBrain())
         self.stealth = StealthEngine()
         self.session = AuraSession(self.stealth)
         self.scope = ScopeManager(whitelist=whitelist, blacklist=blacklist)
@@ -214,52 +244,27 @@ class NeuralOrchestrator:
 
     def _init_engine(self, engine_id: str, **kwargs) -> Any:
         """Helper to initialize an engine from registry with dependencies."""
-        import os
         debug_mode = os.getenv("AURA_DEBUG", "").lower() == "true"
-        
-        engine_cls = self.registry.get_engine(engine_id)
-        if engine_cls:
-            try:
-                # Inject persistence, telemetry, and brain automatically
-                return engine_cls(persistence=self.persistence, telemetry=self.telemetry, brain=self.brain, **kwargs)
-            except Exception as e:
-                if debug_mode:
-                    self.telemetry.log_error("ORCHESTRATOR", f"Dependency Error in {engine_id}: {e}")
-                    from rich.console import Console
-                    Console().print(f"[dim yellow][Graceful Fallback] {engine_id} missing library/dependency: {e}.[/dim yellow]")
-        else:
+        try:
+            engine = self.container.build_engine(engine_id, **kwargs)
+            if engine is not None:
+                return engine
+        except Exception as e:
             if debug_mode:
-                self.telemetry.log_error("ORCHESTRATOR", f"Failed to initialize engine: {engine_id} (Not found in registry)")
-                from rich.console import Console
-                Console().print(f"[dim yellow][Graceful Fallback] Engine '{engine_id}' not found in registry. Using Mock.[/dim yellow]")
+                self.telemetry.log_error("ORCHESTRATOR", f"Dependency error in {engine_id}: {e}")
+                console.print(
+                    f"[dim yellow][Graceful Fallback] {engine_id} missing dependency or init failed: {e}.[/dim yellow]"
+                )
 
-        # Return a MockEngine to prevent cascade failure
-        class MockEngine:
-            def __init__(self, eid): 
-                self.engine_id = eid
-                self.engine_name = eid
-                self._status = "mocked"
-            
-            def __getattr__(self, name):
-                """Return an async function that returns appropriate empty value."""
-                if name.startswith("__") and name.endswith("__"):
-                    raise AttributeError(f"MockEngine has no attribute {name}")
-                async def noop(*args, **kwargs):
-                    # Return empty list for scan/spider/run methods, None otherwise
-                    if 'scan' in name or 'spider' in name or 'run' in name:
-                        return []
-                    return None
-                return noop
-            
-            async def run(self, *args, **kwargs): return []
-            async def setup(self, *args, **kwargs): pass
-            async def teardown(self, *args, **kwargs): pass
-            
-            # Additional common methods as async
-            async def stop_veritas(self): pass
-            async def scan(self, *args, **kwargs): return []
-            async def spider(self, *args, **kwargs): return []
-            async def probe(self, *args, **kwargs): return []
+        if debug_mode:
+            self.telemetry.log_error(
+                "ORCHESTRATOR",
+                f"Failed to initialize engine: {engine_id} (not found in registry or construction failed)",
+            )
+            console.print(
+                f"[dim yellow][Graceful Fallback] Engine '{engine_id}' unavailable from injector. Using Mock.[/dim yellow]"
+            )
+
         return MockEngine(engine_id)
 
     def _track_task(self, coro, name: str = "engine_task") -> asyncio.Task:
@@ -295,8 +300,10 @@ class NeuralOrchestrator:
         try:
             async with httpx.AsyncClient() as client:
                 await client.post("http://127.0.0.1:8000/api/broadcast", json=message, timeout=1.0)
-        except Exception:
-            pass
+        except asyncio.CancelledError:
+            raise
+        except httpx.HTTPError as exc:
+            logger.debug(f"Remote broadcast failed: {exc}")
 
     async def _process_exploit_chain(self, domain: str, finding_type: str, content_obj: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         campaign_id = getattr(self, 'current_campaign', None)

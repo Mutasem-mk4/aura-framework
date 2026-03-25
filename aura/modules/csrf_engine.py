@@ -29,11 +29,12 @@ import urllib.parse
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-import html.parser
 
 import requests
 import urllib3
 urllib3.disable_warnings()
+
+from aura.ui.formatter import console
 
 
 # ─── CSRF Test Payload Configuration ──────────────────────────────────────────
@@ -264,7 +265,7 @@ class CSRFEngine:
                     )
                     post_body = json.dumps({k: v for k, v in inputs if "csrf" not in k.lower()})
 
-                    print(f"  [+] Discovered form: POST {action}")
+                    console.print(f"  [+] Discovered form: POST {action}")
                     discovered.append({
                         "url": action,
                         "method": "POST",
@@ -286,16 +287,16 @@ class CSRFEngine:
         method = endpoint.get("method", "POST")
         body = endpoint.get("post_data") or '{"test": 1}'
 
-        print(f"\n  🔍 [{method}] {url[:80]}")
+        console.print(f"\n  🔍 [{method}] {url[:80]}")
 
         # Baseline: normal request (should work)
         baseline = self._request(method, url, body=body)
         if not baseline or baseline.status_code not in (200, 201, 204, 400, 422):
-            print(f"     ⏭️  Skipping — baseline returned {baseline.status_code if baseline else 'no response'}")
+            console.print(f"     ⏭️  Skipping — baseline returned {baseline.status_code if baseline else 'no response'}")
             return None
 
         baseline_status = baseline.status_code
-        print(f"     📊 Baseline: HTTP {baseline_status}")
+        console.print(f"     📊 Baseline: HTTP {baseline_status}")
 
         # Test 1: Remove Origin + Referer (Cross-origin simulation)
         no_origin = self._request(
@@ -316,15 +317,15 @@ class CSRFEngine:
         if no_origin and no_origin.status_code == baseline_status:
             csrf_confirmed = True
             csrf_method = "No Origin/Referer check — cross-origin requests accepted"
-            print(f"     🚨 No Origin check! Same response without Origin header (HTTP {no_origin.status_code})")
+            console.print(f"     🚨 No Origin check! Same response without Origin header (HTTP {no_origin.status_code})")
 
         if evil_origin and evil_origin.status_code == baseline_status and not csrf_confirmed:
             csrf_confirmed = True
             csrf_method = "Origin not validated — evil.com accepted as valid origin"
-            print(f"     🚨 Evil origin accepted! HTTP {evil_origin.status_code} from evil.com")
+            console.print(f"     🚨 Evil origin accepted! HTTP {evil_origin.status_code} from evil.com")
 
         if not csrf_confirmed:
-            print(f"     ✅ Origin/Referer validation appears active")
+            console.print(f"     ✅ Origin/Referer validation appears active")
             return None
 
         # Check SameSite
@@ -355,9 +356,9 @@ class CSRFEngine:
         poc_path = self._generate_poc(finding)
         finding["poc_file"] = str(poc_path)
 
-        print(f"     💥 CSRF CONFIRMED! [{csrf_method}]")
+        console.print(f"     💥 CSRF CONFIRMED! [{csrf_method}]")
         if poc_path:
-            print(f"     📄 PoC saved: {poc_path}")
+            console.print(f"     📄 PoC saved: {poc_path}")
 
         self.findings.append(finding)
         return finding
@@ -426,21 +427,21 @@ class CSRFEngine:
             mutating = discovery_map.get("mutating_endpoints", [])
             meta = discovery_map.get("meta", {"target": self.target})
 
-        print(f"\n{'='*65}")
-        print(f"🔴 AURA v2 — CSRF Detection Engine")
-        print(f"🎯 Target: {meta.get('target', self.target)}")
-        print(f"⚡ Mutating Endpoints from Map: {len(mutating)}")
-        print(f"{'='*65}")
+        console.print(f"\n{'='*65}")
+        console.print(f"🔴 AURA v2 — CSRF Detection Engine")
+        console.print(f"🎯 Target: {meta.get('target', self.target)}")
+        console.print(f"⚡ Mutating Endpoints from Map: {len(mutating)}")
+        console.print(f"{'='*65}")
 
         if not mutating:
-            print("\n⚠️  No mutating endpoints in discovery map.")
-            print("   🔍 Switching to Active Form Discovery mode...")
+            console.print("\n⚠️  No mutating endpoints in discovery map.")
+            console.print("   🔍 Switching to Active Form Discovery mode...")
             mutating = self._discover_forms_from_html()
             if not mutating:
-                print("   ⚠️  No POST forms found on common pages either.")
-                print("   💡 Tip: This site may require a more specific crawl path.")
+                console.print("   ⚠️  No POST forms found on common pages either.")
+                console.print("   💡 Tip: This site may require a more specific crawl path.")
                 return []
-            print(f"   ✅ Found {len(mutating)} form(s) to test.")
+            console.print(f"   ✅ Found {len(mutating)} form(s) to test.")
 
         for ep in mutating:
             time.sleep(0.5)
@@ -450,28 +451,28 @@ class CSRFEngine:
 
     def _finalize(self, meta: dict) -> list[dict]:
         """Prints summary and saves findings."""
-        print(f"\n{'='*65}")
-        print(f"✅ CSRF SCAN COMPLETE")
-        print(f"{'='*65}")
-        print(f"  🚨 CSRF Confirmed : {len(self.findings)}")
+        console.print(f"\n{'='*65}")
+        console.print(f"✅ CSRF SCAN COMPLETE")
+        console.print(f"{'='*65}")
+        console.print(f"  🚨 CSRF Confirmed : {len(self.findings)}")
 
         if self.findings:
-            print(f"\n{'🔴'*30}")
+            console.print(f"\n{'🔴'*30}")
             for i, f in enumerate(self.findings, 1):
-                print(f"\n  [{i}] [{f['method']}] {f['url'][:75]}")
-                print(f"       {f['csrf_method']}")
-                print(f"       Severity: {f['severity']} | CVSS: {f['cvss_score']}")
-                print(f"       PoC: {f.get('poc_file', '')}")
-            print(f"\n{'🔴'*30}")
+                console.print(f"\n  [{i}] [{f['method']}] {f['url'][:75]}")
+                console.print(f"       {f['csrf_method']}")
+                console.print(f"       Severity: {f['severity']} | CVSS: {f['cvss_score']}")
+                console.print(f"       PoC: {f.get('poc_file', '')}")
+            console.print(f"\n{'🔴'*30}")
 
             # Save JSON findings
             target_slug = self.target_domain.replace(".", "_").replace("www_", "")
             out_path = self.output_dir / f"csrf_findings_{target_slug}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
             with open(out_path, "w", encoding="utf-8") as f:
                 json.dump({"target": self.target, "findings": self.findings}, f, indent=2)
-            print(f"\n  💾 Findings saved: {out_path}")
+            console.print(f"\n  💾 Findings saved: {out_path}")
         else:
-            print("\n  ✅ No CSRF vulnerabilities detected on tested endpoints.")
+            console.print("\n  ✅ No CSRF vulnerabilities detected on tested endpoints.")
 
         return self.findings
 
@@ -483,7 +484,7 @@ def run_csrf_scan(target: str, discovery_map_path: Optional[str] = None) -> list
 
     cookies_str = os.getenv("AUTH_TOKEN_ATTACKER", "")
     if not cookies_str:
-        print("⚠️  AUTH_TOKEN_ATTACKER not set — running unauthenticated CSRF scan.")
+        console.print("⚠️  AUTH_TOKEN_ATTACKER not set — running unauthenticated CSRF scan.")
 
     # Auto-detect discovery map (optional — will fallback to form discovery)
     if not discovery_map_path:

@@ -2,9 +2,8 @@ import asyncio
 import json
 import random
 import yaml
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from urllib.parse import urlparse, urljoin
-from rich.console import Console
 
 from aura.ui.formatter import console
 
@@ -77,19 +76,23 @@ class APIBreaker:
             if "json" in content_type or text.strip().startswith("{"):
                 try:
                     return url, json.loads(text)
-                except: pass
+                except json.JSONDecodeError:
+                    pass
                 
             if "yaml" in content_type or "openapi:" in text[:200] or "swagger:" in text[:200]:
                 try:
                     return url, yaml.safe_load(text)
-                except: pass
+                except yaml.YAMLError:
+                    pass
                 
             # If Content-Type is missing but it looks like Swagger JSON
             if '"swagger":"' in text.replace(" ", "") or '"openapi":"' in text.replace(" ", ""):
-                 try: return url, json.loads(text)
-                 except: pass
+                 try:
+                     return url, json.loads(text)
+                 except json.JSONDecodeError:
+                     pass
 
-        except Exception as e:
+        except (AttributeError, TypeError):
             pass
         return url, None
 

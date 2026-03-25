@@ -17,6 +17,8 @@ from pathlib import Path
 from typing import Optional
 from datetime import datetime
 
+from aura.ui.formatter import console
+
 try:
     from playwright.async_api import async_playwright, BrowserContext, Page
     PLAYWRIGHT_AVAILABLE = True
@@ -166,7 +168,7 @@ class AuthenticatedCrawler:
                     self.api_calls.append(call)
                     priority = "🔥 MUTATING" if method in MUTATING_METHODS else "📡 API"
                     id_info = f" [IDs: {len(ids)}]" if ids else ""
-                    print(f"  {priority} [{method}] {url[:100]}{id_info}")
+                    console.print(f"  {priority} [{method}] {url[:100]}{id_info}")
             
             await route.continue_()
         
@@ -182,7 +184,7 @@ class AuthenticatedCrawler:
         page = await context.new_page()
         try:
             await self._intercept_requests(page, url)
-            print(f"\n📄 Visiting: {url}")
+            console.print(f"\n📄 Visiting: {url}")
             await page.goto(url, timeout=self.timeout_ms, wait_until="networkidle")
             
             # Scroll to trigger lazy-loaded content
@@ -198,7 +200,7 @@ class AuthenticatedCrawler:
             """)
             return links
         except Exception as e:
-            print(f"  ⚠️ Failed to load {url}: {type(e).__name__}: {str(e)[:80]}")
+            console.print(f"  ⚠️ Failed to load {url}: {type(e).__name__}: {str(e)[:80]}")
             return []
         finally:
             await page.close()
@@ -214,11 +216,11 @@ class AuthenticatedCrawler:
         if pages_to_visit is None:
             pages_to_visit = ["/", "/cart", "/account", "/wishlist", "/myAccount"]
         
-        print(f"\n{'='*60}")
-        print(f"🕷️  AURA v2 — Authenticated Crawler")
-        print(f"🎯 Target: {self.target_url}")
-        print(f"📋 Pages to scan: {len(pages_to_visit)}")
-        print(f"{'='*60}")
+        console.print(f"\n{'='*60}")
+        console.print(f"🕷️  AURA v2 — Authenticated Crawler")
+        console.print(f"🎯 Target: {self.target_url}")
+        console.print(f"📋 Pages to scan: {len(pages_to_visit)}")
+        console.print(f"{'='*60}")
         
         async with async_playwright() as playwright:
             context, browser = await self._setup_context(playwright)
@@ -300,27 +302,27 @@ class AuthenticatedCrawler:
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(discovery_map, f, indent=2)
         
-        print(f"\n💾 Discovery map saved: {output_path}")
+        console.print(f"\n💾 Discovery map saved: {output_path}")
 
     def _print_summary(self, discovery_map: dict):
         """Prints a human-readable summary of the crawl results."""
         meta = discovery_map["meta"]
-        print(f"\n{'='*60}")
-        print(f"✅ CRAWL COMPLETE")
-        print(f"{'='*60}")
-        print(f"  📊 Total API Calls Intercepted : {meta['total_api_calls']}")
-        print(f"  🔥 Mutating Endpoints (POST/PATCH/DELETE) : {meta['mutating_endpoints']}")
-        print(f"  🎯 IDOR Candidates (with IDs in URL) : {meta['idor_candidates']}")
-        print(f"  📄 Pages Visited : {meta['pages_visited']}")
+        console.print(f"\n{'='*60}")
+        console.print(f"✅ CRAWL COMPLETE")
+        console.print(f"{'='*60}")
+        console.print(f"  📊 Total API Calls Intercepted : {meta['total_api_calls']}")
+        console.print(f"  🔥 Mutating Endpoints (POST/PATCH/DELETE) : {meta['mutating_endpoints']}")
+        console.print(f"  🎯 IDOR Candidates (with IDs in URL) : {meta['idor_candidates']}")
+        console.print(f"  📄 Pages Visited : {meta['pages_visited']}")
         
         if discovery_map["idor_candidates"]:
-            print(f"\n🚨 TOP IDOR CANDIDATES:")
+            console.print(f"\n🚨 TOP IDOR CANDIDATES:")
             for ep in discovery_map["idor_candidates"][:5]:
                 ids_str = ", ".join([f"{i['type']}:{i['value'][:8]}..." 
                                     for i in ep["ids"]])
-                print(f"  [{ep['method']}] {ep['url'][:80]}")
-                print(f"       IDs: {ids_str}")
-        print(f"{'='*60}\n")
+                console.print(f"  [{ep['method']}] {ep['url'][:80]}")
+                console.print(f"       IDs: {ids_str}")
+        console.print(f"{'='*60}\n")
 
 
 async def run_crawler(target: str, cookies: str, output_dir: str = "./reports",
@@ -350,7 +352,7 @@ if __name__ == "__main__":
     COOKIES = os.getenv("AUTH_TOKEN_ATTACKER", "")
     
     if not COOKIES:
-        print("❌ ERROR: AUTH_TOKEN_ATTACKER not found in .env")
+        console.print("❌ ERROR: AUTH_TOKEN_ATTACKER not found in .env")
         sys.exit(1)
     
     asyncio.run(run_crawler(TARGET, COOKIES))

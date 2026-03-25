@@ -5,7 +5,6 @@ import uuid
 import urllib.parse
 from urllib.parse import urljoin
 from playwright.async_api import async_playwright
-from rich.console import Console
 from aura.core.stealth import StealthEngine, AuraSession
 from aura.core import state
 from aura.core.patterns import AuraPatternEngine
@@ -14,8 +13,7 @@ from aura.modules.vision import VisualEye
 from aura.core.brain import AuraBrain
 from aura.modules.logic_analyzer import LogicAnalyzer
 from aura.modules.business_logic import BusinessLogicAuditor
-from aura.modules.oast import OastCatcher
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from aura.core.engine_interface import IEngine
 from aura.core.models import Finding, Severity
 
@@ -228,12 +226,10 @@ class AuraDAST(IEngine):
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
                     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36"
                 ]
-                headers = {'User-Agent': random.choice(user_agents)}
                 res = await self.session.get(test_url, timeout=state.NETWORK_TIMEOUT)
                 if res is None: continue # Skip if request failed or blocked entirely
                 
                 body = res.text
-                status_code = res.status_code
                 
                 # Log operation manually to storage via singleton or global DB if we had it,
                 # but we will just pass this info so orchestrator or storage logs it.
@@ -494,8 +490,6 @@ class AuraDAST(IEngine):
         
         # v14.0 [FINAL SIEGE]: Boost aggression for sensitive paths and legacy .asp
         is_sensitive = any(x in url.lower() for x in ["admin", "manager", "login", "auth", ".asp", ".aspx", "cgi-bin"])
-        agg_factor = 3 if is_sensitive else 1
-        
         # v19.5 Performance: Increased Concurrency Semaphore for payloads
         param_semaphore = asyncio.Semaphore(30) 
         
@@ -519,7 +513,6 @@ class AuraDAST(IEngine):
                 
                 # Phase 6: Universal Open Redirect Fuzzer
                 async def check_open_redirect():
-                    or_findings = []
                     # Only aggressively fuzz likely redirect parameters
                     if any(x in param.lower() for x in ["url", "redirect", "next", "return", "uri", "path", "dest", "target", "goto"]):
                         payloads = ["https://evil-aura-hunter.com", "//evil-aura-hunter.com"]

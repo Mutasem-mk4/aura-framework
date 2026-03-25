@@ -24,9 +24,10 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import httpx
+
+from aura.ui.formatter import console
 
 
 # ─── Report Templates ────────────────────────────────────────────────────────
@@ -319,7 +320,7 @@ class ProfessionalReportGenerator:
         try:
             resp = httpx.get(f"{self.ollama_host}/api/tags", timeout=3)
             return resp.status_code == 200
-        except Exception:
+        except httpx.RequestError:
             return False
 
     def _ask_ai(self, prompt: str, system: str = "", timeout: int = 90) -> str:
@@ -335,7 +336,7 @@ class ProfessionalReportGenerator:
         try:
             resp = httpx.post(f"{self.ollama_host}/api/generate", json=payload, timeout=timeout)
             return resp.json().get("response", "").strip()
-        except Exception:
+        except (httpx.RequestError, ValueError):
             return ""
 
     def _detect_vuln_type(self, finding: dict) -> str:
@@ -392,8 +393,6 @@ class ProfessionalReportGenerator:
     def _build_impact(self, finding: dict, vuln_type: str) -> str:
         """Builds the impact section using AI or pre-built templates."""
         url = finding.get("url", "")
-        victim_body = finding.get("victim_body_snippet", "") or finding.get("value", "")
-
         # Try AI first
         if self.ai_available:
             prompt = f"""Write a 4-5 sentence impact statement for a bug bounty report.
@@ -621,7 +620,7 @@ Requirements:
             parsed = urlparse(url)
             host = parsed.netloc
             path = parsed.path or "/"
-        except Exception:
+        except ValueError:
             host = "target.com"
             path = "/"
 
@@ -722,7 +721,7 @@ Requirements:
         """Reads any Aura findings JSON and generates professional reports."""
         findings_path = Path(findings_path)
         if not findings_path.exists():
-            print(f"❌ File not found: {findings_path}")
+            console.print(f"❌ File not found: {findings_path}")
             return []
 
         with open(findings_path, "r", encoding="utf-8") as f:
@@ -735,18 +734,18 @@ Requirements:
             findings = data.get("findings", data.get("secrets", [data]))
 
         if not findings:
-            print("⚠️  No findings found in the file.")
+            console.print("⚠️  No findings found in the file.")
             return []
 
-        print(f"\n{'='*65}")
-        print(f"🏆 AURA v2 — Professional Report Generator")
-        print(f"📋 Processing {len(findings)} finding(s) from: {findings_path.name}")
-        print(f"🤖 AI Engine: {'Ollama (' + self.model + ')' if self.ai_available else 'OFFLINE — using templates'}")
-        print(f"{'='*65}\n")
+        console.print(f"\n{'='*65}")
+        console.print(f"🏆 AURA v2 — Professional Report Generator")
+        console.print(f"📋 Processing {len(findings)} finding(s) from: {findings_path.name}")
+        console.print(f"🤖 AI Engine: {'Ollama (' + self.model + ')' if self.ai_available else 'OFFLINE — using templates'}")
+        console.print(f"{'='*65}\n")
 
         reports = []
         for i, finding in enumerate(findings):
-            print(f"  📝 Generating report {i+1}/{len(findings)}: [{finding.get('type', 'Unknown')}]")
+            console.print(f"  📝 Generating report {i+1}/{len(findings)}: [{finding.get('type', 'Unknown')}]")
             report_md, title, severity = self.generate_report(finding, platform=platform)
 
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -755,17 +754,17 @@ Requirements:
             with open(out_path, "w", encoding="utf-8") as f:
                 f.write(report_md)
 
-            print(f"  ✅ Saved: {out_path}")
-            print(f"  🎯 Title: {title}")
-            print(f"  ⚠️  Severity: {severity}")
-            print()
+            console.print(f"  ✅ Saved: {out_path}")
+            console.print(f"  🎯 Title: {title}")
+            console.print(f"  ⚠️  Severity: {severity}")
+            console.print()
 
             reports.append({"title": title, "severity": severity, "path": str(out_path)})
 
-        print(f"{'='*65}")
-        print(f"✅ {len(reports)} report(s) generated — see ./reports/report_*.md")
-        print(f"📋 Follow the Submission Coach section in each report!")
-        print(f"{'='*65}\n")
+        console.print(f"{'='*65}")
+        console.print(f"✅ {len(reports)} report(s) generated — see ./reports/report_*.md")
+        console.print(f"📋 Follow the Submission Coach section in each report!")
+        console.print(f"{'='*65}\n")
 
         return reports
 
@@ -785,7 +784,7 @@ class SecurityAnalyst(ProfessionalReportGenerator):
 if __name__ == "__main__":
     import sys
     if len(sys.argv) < 2:
-        print("Usage: python -m aura.modules.ai_analyst <findings.json> [platform]")
+        console.print("Usage: python -m aura.modules.ai_analyst <findings.json> [platform]")
         sys.exit(1)
     plat = sys.argv[2] if len(sys.argv) > 2 else "intigriti"
     run_report(sys.argv[1], platform=plat)

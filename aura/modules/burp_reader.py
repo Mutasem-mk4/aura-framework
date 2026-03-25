@@ -17,11 +17,12 @@ and Aura tests 500 endpoints automatically overnight.
 import base64
 import json
 import re
-import urllib.parse
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+from aura.ui.formatter import console
 
 
 # ─── Constants ─────────────────────────────────────────────────────────────────
@@ -117,25 +118,25 @@ class BurpXMLReader:
         """
         xml_path = Path(xml_path)
         if not xml_path.exists():
-            print(f"❌ Burp XML file not found: {xml_path}")
+            console.print(f"❌ Burp XML file not found: {xml_path}")
             return {}
 
-        print(f"\n{'='*65}")
-        print(f"📊 AURA v2 — Burp Suite XML Importer")
-        print(f"📁 File: {xml_path}")
+        console.print(f"\n{'='*65}")
+        console.print(f"📊 AURA v2 — Burp Suite XML Importer")
+        console.print(f"📁 File: {xml_path}")
         if self.target_filter:
-            print(f"🎯 Filtering to: *.{self.target_filter}.*")
-        print(f"{'='*65}")
+            console.print(f"🎯 Filtering to: *.{self.target_filter}.*")
+        console.print(f"{'='*65}")
 
         try:
             tree = ET.parse(xml_path)
             root = tree.getroot()
         except ET.ParseError as e:
-            print(f"❌ Failed to parse XML: {e}")
+            console.print(f"❌ Failed to parse XML: {e}")
             return {}
 
         items = root.findall("item")
-        print(f"📋 Total items in export: {len(items)}")
+        console.print(f"📋 Total items in export: {len(items)}")
 
         for item in items:
             try:
@@ -255,30 +256,30 @@ class BurpXMLReader:
         output_path = self.output_dir / f"discovery_map_{target_slug}.json"
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(discovery_map, f, indent=2)
-        print(f"\n💾 Discovery map saved: {output_path}")
+        console.print(f"\n💾 Discovery map saved: {output_path}")
 
     def _print_summary(self, discovery_map: dict):
         """Prints a human-readable summary."""
         meta = discovery_map["meta"]
-        print(f"\n{'='*65}")
-        print(f"✅ BURP IMPORT COMPLETE")
-        print(f"{'='*65}")
-        print(f"  📊 Total Relevant API Calls : {meta['total_api_calls']}")
-        print(f"  🔥 Mutating (POST/PATCH/DELETE) : {meta['mutating_endpoints']}")
-        print(f"  🎯 IDOR Candidates (IDs in URL) : {meta['idor_candidates']}")
+        console.print(f"\n{'='*65}")
+        console.print(f"✅ BURP IMPORT COMPLETE")
+        console.print(f"{'='*65}")
+        console.print(f"  📊 Total Relevant API Calls : {meta['total_api_calls']}")
+        console.print(f"  🔥 Mutating (POST/PATCH/DELETE) : {meta['mutating_endpoints']}")
+        console.print(f"  🎯 IDOR Candidates (IDs in URL) : {meta['idor_candidates']}")
 
         if discovery_map["idor_candidates"]:
-            print(f"\n🚨 TOP IDOR CANDIDATES FROM BURP:")
+            console.print(f"\n🚨 TOP IDOR CANDIDATES FROM BURP:")
             for ep in discovery_map["idor_candidates"][:8]:
                 ids_str = ", ".join([
                     f"{i['type']}:{i['value'][:10]}..."
                     for i in ep["ids"]
                 ])
-                print(f"  [{ep['method']}] {ep['url'][:80]}")
-                print(f"       IDs: {ids_str}")
+                console.print(f"  [{ep['method']}] {ep['url'][:80]}")
+                console.print(f"       IDs: {ids_str}")
         
-        print(f"\n💡 Next step: aura <target> --hunt")
-        print(f"{'='*65}\n")
+        console.print(f"\n💡 Next step: aura <target> --hunt")
+        console.print(f"{'='*65}\n")
 
 
 def run_burp_import(
@@ -297,7 +298,7 @@ def run_burp_import(
 if __name__ == "__main__":
     import sys
     if len(sys.argv) < 2:
-        print("Usage: python -m aura.modules.burp_reader <burp_export.xml> [target_domain]")
+        console.print("Usage: python -m aura.modules.burp_reader <burp_export.xml> [target_domain]")
         sys.exit(1)
 
     xml_file = sys.argv[1]

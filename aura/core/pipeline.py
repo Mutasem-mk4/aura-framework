@@ -73,6 +73,7 @@ class MissionPipeline:
                         self.state["target_ip"] = result.get("target_ip")
                         self.state["intel_data"] = result.get("intel_data", {})
                         self.state["urls"] = [r.get("url") for r in result.get("urls", [])]
+                        self.state["recon_data"] = result
                     elif phase.name == "DeconstructionPhase":
                         result = await phase.run(self.state.get("recon_data", {}))
                         self.state["findings"].extend(result)

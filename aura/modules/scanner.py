@@ -3,24 +3,21 @@ import re
 import dns.resolver
 import asyncio
 import aiohttp
-import yaml
 import os
 import json
 import random
 import uuid
-import requests
 import urllib3
 from urllib.parse import urlparse, urljoin
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
-from rich.console import Console
 from aura.modules.threat_intel import ThreatIntel
 from aura.core.stealth import StealthEngine, AuraSession
 from aura.core.brain import AuraBrain
 from aura.core import state
 from aura.modules.scope_checker import ScopeChecker
 from aura.core.engine_interface import IEngine
-from aura.core.models import Finding, Severity
+from aura.core.models import Finding
 
 from aura.ui.formatter import console
 
@@ -77,8 +74,8 @@ class AuraScanner(IEngine):
         console.print(f"[blue][*] Starting subdomain discovery for: {domain}[/blue]")
         
         intel_module = ThreatIntel(stealth=self.stealth)
-        vt_data = await intel_module.query_virustotal(domain)
-        otx_data = await intel_module.query_otx(domain)
+        await intel_module.query_virustotal(domain)
+        await intel_module.query_otx(domain)
         
         found = []
         scope_guard = ScopeChecker(getattr(state, 'IN_SCOPE_RULES', []), getattr(state, 'OUT_OF_SCOPE_RULES', []))
@@ -831,13 +828,11 @@ class AuraScanner(IEngine):
 
         # v19.6 Siege Fix: Fast-Fail for dead hosts
         siege_baseline_200 = False
-        host_is_dead = False
         try:
             _r1 = await self.stealth_session.get(f"{base_url}/rnd_{uuid.uuid4().hex[:8]}", allow_redirects=False, timeout=10, max_attempts=1)
             _r2 = await self.stealth_session.get(f"{base_url}/rnd_{uuid.uuid4().hex[:8]}", allow_redirects=False, timeout=10, max_attempts=1)
             
             if _r1 is None and _r2 is None:
-                host_is_dead = True
                 console.print(f"[bold red][X] FAST-FAIL: Target {base_url} is completely unresponsive/dead. Aborting Siege to save time.[/bold red]")
                 return [] # Fast abort
 
@@ -845,7 +840,6 @@ class AuraScanner(IEngine):
                 siege_baseline_200 = True
                 console.print(f"[dim yellow][!] Siege Catch-All: SPA detected. Only 301/302/403 accepted as Siege Hits.[/dim yellow]")
         except Exception as e:
-            host_is_dead = True
             console.print(f"[bold red][X] FAST-FAIL: Connection to {base_url} failed ({e}). Aborting Siege.[/bold red]")
             return []
 
@@ -915,8 +909,13 @@ class AuraScanner(IEngine):
         try:
             # Prepare execution environment
             local_namespace = {}
+            if not code.strip().startswith("def detect_vulnerability"):
+                raise ValueError("AI output is not a valid detection function")
             # We wrap the exec in a controlled scope
-            exec(code, globals(), local_namespace)
+            try:
+                exec(code, {"__builtins__": {}}, local_namespace)
+            except Exception as exc:
+                raise RuntimeError(f"Synthesized plugin execution failed: {exc}") from exc
             
             if 'detect_vulnerability' in local_namespace:
                 # v24.0: Synthesized plugins are executed with current stealth session
@@ -967,7 +966,6 @@ class AuraScanner(IEngine):
             console.print(f"[dim][🕷️] Spidering (depth {depth}): Processing {len(current_level_urls)} URLs concurrently...[/dim]")
             # Cap per-depth to prevent explosion on large sites
             current_level_urls = current_level_urls[:100]
-            next_level_urls = []
             scope_guard = ScopeChecker(getattr(state, 'IN_SCOPE_RULES', []), getattr(state, 'OUT_OF_SCOPE_RULES', []))
             
             async def crawl_single(curl):

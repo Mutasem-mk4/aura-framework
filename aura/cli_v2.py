@@ -8,11 +8,11 @@ import asyncio
 import sys
 import argparse
 import os
-from aura.ui.formatter import ZenithUI, console, ui, Table, Panel, box
+from aura.ui.formatter import Panel, Table, ZenithUI, console
 
 
 async def _run_mission(target: str, swarm: bool = False):
-    from aura.ui.formatter import ZenithUI, dashboard
+    from aura.ui.formatter import dashboard
     from aura.core.orchestrator import NeuralOrchestrator
     try:
         dashboard.start(target)
@@ -43,9 +43,8 @@ async def _run_crawl(target: str, victim: bool = False):
 
 
 def main():
-    import sys
     try:
-        if sys.stdout.encoding.lower() != 'utf-8':
+        if (sys.stdout.encoding or "").lower() != "utf-8":
             sys.stdout.reconfigure(encoding='utf-8')
     except AttributeError:
         pass
@@ -109,7 +108,6 @@ Examples:
 
     args = parser.parse_args()
 
-    from aura.ui.formatter import ZenithUI, console, ui, Table, Panel, box
     ZenithUI.show_startup_banner()
 
     if args.setup:
@@ -134,7 +132,6 @@ Examples:
 
     if args.status:
         from aura.core.storage import AuraStorage
-        from rich.panel import Panel
         storage = AuraStorage()
         stats = storage.get_stats()
         console.print(Panel(
@@ -159,7 +156,8 @@ Examples:
                 # Basic extraction of the first number in the range, e.g., "$500 - $1000" -> 500
                 payout = int(payout_str.split('$')[1].split('-')[0].strip().replace(',', ''))
                 total_payout += payout
-            except: continue
+            except (IndexError, ValueError):
+                continue
         console.print(f"[bold green]💰 Total Cumulative Projected Earnings: ${total_payout:,}[/bold green]")
         return
 

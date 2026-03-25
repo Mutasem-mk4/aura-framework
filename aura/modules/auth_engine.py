@@ -31,7 +31,6 @@ import httpx
 import urllib3
 urllib3.disable_warnings()
 
-from rich.console import Console
 from rich.panel import Panel
 from rich import box
 
@@ -145,7 +144,7 @@ class AuthLogicEngine:
                 follow_redirects=True,
                 verify=False,
             )
-        except Exception:
+        except httpx.RequestError:
             return None
 
     def _post(self, path: str, data=None, json_data=None, headers: Optional[dict] = None) -> Optional[httpx.Response]:
@@ -162,7 +161,7 @@ class AuthLogicEngine:
                 follow_redirects=True,
                 verify=False,
             )
-        except Exception:
+        except httpx.RequestError:
             return None
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -230,7 +229,7 @@ class AuthLogicEngine:
                         discovered["reset_endpoints"].append(apath)
                         seen.add(apath)
 
-            except Exception:
+            except httpx.RequestError:
                 continue
 
         return discovered
@@ -245,7 +244,7 @@ class AuthLogicEngine:
             padded = part + "=" * (4 - len(part) % 4)
             decoded = base64.urlsafe_b64decode(padded)
             return json.loads(decoded)
-        except Exception:
+        except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
             return None
 
     def _forge_jwt_none_alg(self, token: str) -> str:
@@ -463,7 +462,7 @@ class AuthLogicEngine:
 
             try:
                 user_data = resp.json()
-            except Exception:
+            except ValueError:
                 continue
 
             current_email = (
@@ -494,7 +493,7 @@ class AuthLogicEngine:
                         timeout=self.timeout,
                         verify=False,
                     )
-                except Exception:
+                except httpx.RequestError:
                     continue
 
                 if patch_resp and patch_resp.status_code in (200, 201, 204):
@@ -534,9 +533,9 @@ class AuthLogicEngine:
                                         verify=False,
                                     )
                                     console.print(f"     [dim]Reverted email back to {current_email}[/dim]")
-                                except Exception:
+                                except httpx.RequestError:
                                     pass
-                        except Exception:
+                        except ValueError:
                             pass
                     break
 

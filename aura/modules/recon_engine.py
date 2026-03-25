@@ -19,11 +19,10 @@ import socket
 import urllib.parse
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Set, List
+from typing import Optional, Set
 
 from aura.core.async_requester import AsyncRequester
 
-from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -248,7 +247,7 @@ class ReconEngine:
                 if resp:
                     self.subdomains.add(domain)
                     console.print(f"  [bold green]✓ Mobile Entry Point Verified: {domain}[/bold green]")
-            except:
+            except OSError:
                 pass
 
     async def _fetch_js_files(self, requester: AsyncRequester):
@@ -329,7 +328,7 @@ class ReconEngine:
             if canonical and canonical != domain:
                 return canonical.rstrip(".")
             return None
-        except Exception:
+        except OSError:
             return None
 
     async def _check_all_takeovers(self, requester: AsyncRequester):
@@ -403,7 +402,7 @@ class ReconEngine:
             try:
                 socket.create_connection((self.target_domain, port), timeout=2)
                 self.open_ports.append(port)
-            except Exception:
+            except OSError:
                 pass
 
         tasks = [loop.run_in_executor(None, lambda p=p: check_port(p)) for p in COMMON_PORTS]
@@ -462,7 +461,7 @@ class ReconEngine:
                 TextColumn("[cyan]Running Nuclei Templates (CVEs, Misconfigs) on discovered subdomains...[/cyan]"),
                 console=console
             ) as progress:
-                task = progress.add_task("nuclei", total=None)
+                progress.add_task("nuclei", total=None)
                 
                 # Execute Nuclei silently, outputting JSON to a file
                 process = await asyncio.create_subprocess_exec(

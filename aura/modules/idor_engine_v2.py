@@ -18,7 +18,6 @@ Usage:
     aura www.iciparisxl.nl --hunt
 """
 
-import asyncio
 import json
 import os
 import re
@@ -34,6 +33,8 @@ from requests.exceptions import ConnectionError, Timeout
 # Suppress SSL warnings (we're using Burp proxy sometimes)
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+from aura.ui.formatter import console
 
 
 # ─── Constants ─────────────────────────────────────────────────────────────────
@@ -126,16 +127,16 @@ class BolaTester:
                             val = data.get(key)
                             if val and str(val) not in context[role]["ids"]:
                                 context[role]["ids"].append(str(val))
-                                print(f"  [Matrix] Extracted {role} ID: {val}")
+                                console.print(f"  [Matrix] Extracted {role} ID: {val}")
                         # Extract Emails
                         for key in ["email", "emailAddress", "username"]:
                             val = data.get(key)
                             if val and str(val) not in context[role]["emails"]:
                                 context[role]["emails"].append(str(val))
-                    except Exception:
+                    except json.JSONDecodeError:
                         pass
 
-        print("\n[🎯] Initializing Auth Matrix Context...")
+        console.print("\n[🎯] Initializing Auth Matrix Context...")
         _fetch_profile(self.attacker_cookies, "attacker")
         if not self.single_account_mode:
             _fetch_profile(self.victim_cookies, "victim")
@@ -243,7 +244,7 @@ class BolaTester:
                         "timestamp": datetime.utcnow().isoformat(),
                         "needs_manual_verify": True,
                     })
-                    print(f"     ⚠️  Neighboring ID {test_id} returned 200 with PII: {', '.join(pii_kw)}")
+                    console.print(f"     ⚠️  Neighboring ID {test_id} returned 200 with PII: {', '.join(pii_kw)}")
         return findings
 
     def _compare_responses(self, attacker_resp: dict, victim_resp: dict) -> tuple[bool, str]:
@@ -301,14 +302,14 @@ class BolaTester:
         method = endpoint.get("method", "GET")
         post_data = endpoint.get("post_data")
 
-        print(f"\n  🎯 Testing [{method}] {url[:90]}")
+        console.print(f"\n  🎯 Testing [{method}] {url[:90]}")
 
         # Step 1: Attacker request (baseline — should succeed with their own data)
         attacker_resp = self._request(method, url, self.attacker_cookies, body=post_data)
-        print(f"     👤 Attacker: HTTP {attacker_resp['status']} ({attacker_resp['length']} bytes)")
+        console.print(f"     👤 Attacker: HTTP {attacker_resp['status']} ({attacker_resp['length']} bytes)")
 
         if attacker_resp["status"] not in (200, 201, 204):
-            print(f"     ⚠️  Skipping — Attacker didn't get 2xx (got {attacker_resp['status']})")
+            console.print(f"     ⚠️  Skipping — Attacker didn't get 2xx (got {attacker_resp['status']})")
             return None
 
         # [Auth Matrix] Prepare malicious request (Swapping logic)
@@ -330,7 +331,7 @@ class BolaTester:
                     context["victim"]["ids"]
                 )
                 if malicious_body != post_data:
-                    print(f"     [Matrix] Injected Victim ID/Data into payload.")
+                    console.print(f"     [Matrix] Injected Victim ID/Data into payload.")
 
         # Step 2: Victim request (Attempting to touch Attacker's resource or Attacker touching Victim's)
         # Note: The classic IDOR is Attacker reaching Victim's data. 
@@ -341,14 +342,14 @@ class BolaTester:
         # Send using ATTACKER cookies, but aiming at VICTIM'S ID
         # (This is horizontal privilege escalation / BOLA)
         victim_data_resp = self._request(method, malicious_url, self.attacker_cookies, body=malicious_body)
-        print(f"     🦹 Attacker (targeting Victim ID): HTTP {victim_data_resp['status']} ({victim_data_resp['length']} bytes)")
+        console.print(f"     🦹 Attacker (targeting Victim ID): HTTP {victim_data_resp['status']} ({victim_data_resp['length']} bytes)")
 
         # Step 3: Compare Attacker's success vs Attacker attempting to hit Victim's scope
         # If the attacker successfully modified or retrieved the victim's data, we have a critical finding.
         is_bola, reason = self._compare_responses(attacker_resp, victim_data_resp)
 
         if is_bola:
-            print(f"     🚨 {reason}")
+            console.print(f"     🚨 {reason}")
             finding = {
                 "url": malicious_url,
                 "method": method,
@@ -369,7 +370,7 @@ class BolaTester:
             self.confirmed_idors.append(finding)
             return finding
         else:
-            print(f"     ✅ Secure (Denied or Not Applicable)")
+            console.print(f"     ✅ Secure (Denied or Not Applicable)")
             return None
 
     def run_from_discovery_map(self, map_path: str) -> list[dict]:
@@ -379,8 +380,8 @@ class BolaTester:
         """
         map_file = Path(map_path)
         if not map_file.exists():
-            print(f"❌ Discovery map not found: {map_path}")
-            print("   Run: aura <target> --crawl  first!")
+            console.print(f"❌ Discovery map not found: {map_path}")
+            console.print("   Run: aura <target> --crawl  first!")
             return []
 
         with open(map_file, "r", encoding="utf-8-sig") as f:
@@ -390,12 +391,12 @@ class BolaTester:
         idor_candidates = discovery_map.get("idor_candidates", [])
         mutating_eps = discovery_map.get("mutating_endpoints", [])
 
-        print(f"\n{'='*65}")
-        print(f"🔥 AURA v2 — BOLA/IDOR Cross-Tenant Engine")
-        print(f"🎯 Target: {meta.get('target', 'unknown')}")
-        print(f"📋 IDOR Candidates: {len(idor_candidates)}")
-        print(f"⚡ Mutating Endpoints: {len(mutating_eps)}")
-        print(f"{'='*65}")
+        console.print(f"\n{'='*65}")
+        console.print(f"🔥 AURA v2 — BOLA/IDOR Cross-Tenant Engine")
+        console.print(f"🎯 Target: {meta.get('target', 'unknown')}")
+        console.print(f"📋 IDOR Candidates: {len(idor_candidates)}")
+        console.print(f"⚡ Mutating Endpoints: {len(mutating_eps)}")
+        console.print(f"{'='*65}")
 
         # Test IDOR candidates (GET requests on ID-bearing URLs)
         all_endpoints = []
@@ -420,18 +421,18 @@ class BolaTester:
         if not all_endpoints:
             if self.single_account_mode:
                 # No discovery map and no victim — try blind probe on common paths
-                print("\n🔍 No IDOR candidates in map. Switching to Single-Account Blind Probe mode...")
-                print("   (For full cross-tenant BOLA testing, add AUTH_TOKEN_VICTIM to .env)")
+                console.print("\n🔍 No IDOR candidates in map. Switching to Single-Account Blind Probe mode...")
+                console.print("   (For full cross-tenant BOLA testing, add AUTH_TOKEN_VICTIM to .env)")
                 return self._run_blind_probe()
             else:
-                print("\n⚠️  No endpoints to test!")
-                print("   The discovery map is empty. Did the crawl authenticate successfully?")
-                print("   Check that AUTH_TOKEN_ATTACKER in .env has a fresh session cookie.")
+                console.print("\n⚠️  No endpoints to test!")
+                console.print("   The discovery map is empty. Did the crawl authenticate successfully?")
+                console.print("   Check that AUTH_TOKEN_ATTACKER in .env has a fresh session cookie.")
                 return []
 
-        print(f"\n🚀 Starting {len(all_endpoints)} BOLA tests...") 
+        console.print(f"\n🚀 Starting {len(all_endpoints)} BOLA tests...") 
         if self.single_account_mode:
-            print("   ⚠️  Single-account mode (no victim token) — results need manual verification")
+            console.print("   ⚠️  Single-account mode (no victim token) — results need manual verification")
             
         context = self._extract_context()
 
@@ -461,9 +462,9 @@ class BolaTester:
                               data.get("customerId"))
                     if own_id:
                         own_id = int(str(own_id))
-                        print(f"  ✅ Found own user ID: {own_id}")
+                        console.print(f"  ✅ Found own user ID: {own_id}")
                         break
-                except Exception:
+                except (ValueError, TypeError, json.JSONDecodeError):
                     continue
 
         probe_findings = []
@@ -491,33 +492,33 @@ class BolaTester:
                         }
                         probe_findings.append(f)
                         self.confirmed_idors.append(f)
-                        print(f"  ⚠️  Potential IDOR: {url} (PII: {', '.join(pii_kw)})")
+                        console.print(f"  ⚠️  Potential IDOR: {url} (PII: {', '.join(pii_kw)})")
 
         self._finalize_report({})
         return probe_findings
 
     def _finalize_report(self, meta: dict) -> list[dict]:
         """Prints the final summary and saves findings."""
-        print(f"\n{'='*65}")
-        print(f"✅ HUNT COMPLETE")
-        print(f"{'='*65}")
-        print(f"  🔍 Endpoints Tested : {self.tested_count}")
-        print(f"  🚨 BOLA Confirmed   : {len(self.confirmed_idors)}")
+        console.print(f"\n{'='*65}")
+        console.print(f"✅ HUNT COMPLETE")
+        console.print(f"{'='*65}")
+        console.print(f"  🔍 Endpoints Tested : {self.tested_count}")
+        console.print(f"  🚨 BOLA Confirmed   : {len(self.confirmed_idors)}")
         
         if self.confirmed_idors:
-            print(f"\n{'🔴'*30}")
-            print(f"  💰 CONFIRMED BOLA/IDOR FINDINGS:")
+            console.print(f"\n{'🔴'*30}")
+            console.print(f"  💰 CONFIRMED BOLA/IDOR FINDINGS:")
             for i, finding in enumerate(self.confirmed_idors, 1):
-                print(f"\n  [{i}] [{finding['method']}] {finding['url'][:80]}")
-                print(f"      Severity: {finding['severity']} | CVSS: {finding['cvss_score']}")
-                print(f"      {finding['reason']}")
-            print(f"{'🔴'*30}\n")
+                console.print(f"\n  [{i}] [{finding['method']}] {finding['url'][:80]}")
+                console.print(f"      Severity: {finding['severity']} | CVSS: {finding['cvss_score']}")
+                console.print(f"      {finding['reason']}")
+            console.print(f"{'🔴'*30}\n")
             
             # Save findings report
             self._save_report()
         else:
-            print(f"\n  ✅ No unauthorized access detected on tested endpoints.")
-            print(f"  💡 Tip: Update your session cookies and re-run --crawl for fresh endpoints.\n")
+            console.print(f"\n  ✅ No unauthorized access detected on tested endpoints.")
+            console.print(f"  💡 Tip: Update your session cookies and re-run --crawl for fresh endpoints.\n")
 
         return self.confirmed_idors
 
@@ -537,7 +538,7 @@ class BolaTester:
                 "findings": self.confirmed_idors
             }, f, indent=2)
         
-        print(f"  💾 Findings saved: {output_path}")
+        console.print(f"  💾 Findings saved: {output_path}")
 
 
 def run_hunt(target: str, discovery_map_path: Optional[str] = None):
@@ -552,13 +553,13 @@ def run_hunt(target: str, discovery_map_path: Optional[str] = None):
     victim_cookies = os.getenv("AUTH_TOKEN_VICTIM", "")
 
     if not attacker_cookies:
-        print("❌ AUTH_TOKEN_ATTACKER not found in .env!")
+        console.print("❌ AUTH_TOKEN_ATTACKER not found in .env!")
         return []
 
     if not victim_cookies:
-        print("⚠️  AUTH_TOKEN_VICTIM not set — running in Single-Account Probe mode.")
-        print("   For full cross-tenant BOLA testing, add AUTH_TOKEN_VICTIM to .env")
-        print("   (Create a second account on the target and paste its cookie)")
+        console.print("⚠️  AUTH_TOKEN_VICTIM not set — running in Single-Account Probe mode.")
+        console.print("   For full cross-tenant BOLA testing, add AUTH_TOKEN_VICTIM to .env")
+        console.print("   (Create a second account on the target and paste its cookie)")
 
     # Auto-find discovery map if not specified
     if not discovery_map_path:
@@ -567,7 +568,7 @@ def run_hunt(target: str, discovery_map_path: Optional[str] = None):
         if candidate.exists():
             discovery_map_path = str(candidate)
         elif not victim_cookies:
-            print(f"\n  No discovery map either — running Blind Probe on {target}...")
+            console.print(f"\n  No discovery map either — running Blind Probe on {target}...")
 
     tester = BolaTester(
         target=target,

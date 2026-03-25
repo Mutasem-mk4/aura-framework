@@ -22,7 +22,6 @@ from pathlib import Path
 
 import httpx
 import jwt
-from rich.console import Console
 
 from aura.ui.formatter import console
 
@@ -124,23 +123,23 @@ class TokenBreaker:
 
     async def _run_attacks(self, client: httpx.AsyncClient, url: str, method: str):
         """Generates and tests all JWT forgery payloads."""
-        header, payload, sig = self._decode_jwt(self.original_token)
+        header, payload, _sig = self._decode_jwt(self.original_token)
         if not header or not payload:
             console.print(f"  [yellow]⚠️ Skipping JWT attacks — token format is invalid.[/yellow]")
             return
 
-        print(f"\n  🎯 Testing TokenBreaker on [{method}] {url[:70]}")
+        console.print(f"\n  🎯 Testing TokenBreaker on [{method}] {url[:70]}")
         
         # 0. Get baseline with the ORIGINAL valid token (so we know what success looks like)
         try:
             baseline_resp = await client.request(method, url, headers={"Authorization": f"Bearer {self.original_token}"})
             baseline_status = baseline_resp.status_code
             baseline_len = len(baseline_resp.text)
-            print(f"     ✅ Baseline (Valid Token): HTTP {baseline_status} ({baseline_len} bytes)")
+            console.print(f"     ✅ Baseline (Valid Token): HTTP {baseline_status} ({baseline_len} bytes)")
         except Exception:
             baseline_status = 0
             baseline_len = 0
-            print(f"     ⚠️ Baseline request failed. Proceeding blindly.")
+            console.print(f"     ⚠️ Baseline request failed. Proceeding blindly.")
 
         # 0.5 Generate a Tampered Payload (Privilege Escalation)
         tampered_payload = payload.copy()
@@ -193,7 +192,7 @@ class TokenBreaker:
         
         for res in results:
             if res:
-                print(f"     🚨 CRITICAL: {res['attack_name']} Successful! HTTP {res['response_status']}")
+                console.print(f"     🚨 CRITICAL: {res['attack_name']} Successful! HTTP {res['response_status']}")
                 self.findings.append(res)
                 # If we broke it once, no need to spam the output, but we keep testing.
 
@@ -223,11 +222,11 @@ class TokenBreaker:
         return self.findings
 
     def _finalize_report(self):
-        print(f"\n{'='*65}")
-        print(f"✅ TOKEN BREAKER COMPLETE")
-        print(f"{'='*65}")
-        print(f"  🔍 Forgeries Tested : {self.tested_count}")
-        print(f"  🚨 ATO Confirmed    : {len(self.findings)}")
+        console.print(f"\n{'='*65}")
+        console.print(f"✅ TOKEN BREAKER COMPLETE")
+        console.print(f"{'='*65}")
+        console.print(f"  🔍 Forgeries Tested : {self.tested_count}")
+        console.print(f"  🚨 ATO Confirmed    : {len(self.findings)}")
         
         if self.findings:
             reports_dir = Path("./reports")
@@ -241,9 +240,9 @@ class TokenBreaker:
                     "scan_time": datetime.utcnow().isoformat(),
                     "findings": self.findings
                 }, f, indent=2)
-            print(f"\n  💾 Findings saved: {out_path}")
+            console.print(f"\n  💾 Findings saved: {out_path}")
         else:
-            print(f"\n  ✅ JWT implementation appears secure against classic forgery vectors.")
+            console.print(f"\n  ✅ JWT implementation appears secure against classic forgery vectors.")
 
 def run_jwt_scan(target: str, discovery_map_path: Optional[str] = None):
     """CLI runner for `aura <target> --jwt`."""

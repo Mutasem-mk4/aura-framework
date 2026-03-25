@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 aura.phases.recon
 
@@ -5,24 +7,28 @@ Controller for Phase 2: Active Reconnaissance.
 Implements the BaseEngine Protocol and is decoupled from the main Orchestrator.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 from aura.core.engine_base import AbstractEngine
 from aura.ui.formatter import ZenithUI, console
 from aura.modules.recon_pipeline import ReconPipeline
-from aura.modules.safety import ScopeManager
 from aura.modules.secret_hunter import SecretHunter
 
 class ReconPhase(AbstractEngine):
     """
     Executes deep infrastructure mapping, subdomain discovery, and secret hunting.
     """
-    def __init__(self, recon_pipeline: ReconPipeline, secret_hunter: SecretHunter, takeover_hunter: Any):
+    def __init__(self, recon_pipeline: ReconPipeline, secret_hunter: SecretHunter, takeover_hunter: Any) -> None:
         super().__init__()
         self.recon_pipeline = recon_pipeline
         self.secret_hunter = secret_hunter
         self.takeover_hunter = takeover_hunter
 
-    async def run(self, target_ip: Optional[str] = None, intel_data: Optional[Dict] = None, campaign_id: Optional[str] = None) -> Dict[str, Any]:
+    async def run(
+        self,
+        target_ip: str | None = None,
+        intel_data: dict[str, Any] | None = None,
+        campaign_id: str | None = None,
+    ) -> dict[str, Any]:
         """
         Executes the recon phase using the provided MissionContext.
         """

@@ -24,14 +24,11 @@ import json
 import re
 import time
 import uuid
-import hashlib
 from typing import Dict, List, Set, Optional, Any, Tuple, Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from urllib.parse import urljoin, urlparse, parse_qs
+from urllib.parse import urljoin
 from collections import defaultdict
-import sys
-import io
 import os
 
 # Set UTF-8 encoding for Windows
@@ -39,11 +36,6 @@ if os.name == 'nt':
     os.environ['PYTHONIOENCODING'] = 'utf-8'
 
 import httpx
-from rich.console import Console
-from rich.table import Table
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
-from rich.panel import Panel
-from rich.tree import Tree
 from aura.core.brain import AuraBrain
 from aura.modules.idor_hunter_v2 import IDORHunterV2
 from aura.modules.sentinel_ssrf import SentinelSSRF
@@ -233,7 +225,7 @@ class StrategicMind:
                 if isinstance(decision, list) and len(decision) > 0:
                     return decision[0]
                 return decision if isinstance(decision, dict) else {"move": "PERSIST"}
-            except:
+            except (TypeError, ValueError, json.JSONDecodeError):
                 return {"move": "PERSIST"}
         return {"move": "PERSIST"}
 
@@ -847,7 +839,7 @@ class StatefulLogicFuzzer:
                 for key in keys:
                     value = value.get(key, {})
                 extracted["json"] = value
-            except Exception:
+            except (ValueError, AttributeError):
                 pass
         
         return extracted

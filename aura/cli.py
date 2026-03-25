@@ -1,10 +1,11 @@
 import click
-import sys
-import os
 import asyncio
-import json
+import io
+import os
+import re
+import sys
 # UI and Formatter imports
-from aura.ui.formatter import ui, console, ZenithUI
+from aura.ui.formatter import Panel, Table, console, ui
 from dotenv import load_dotenv
 
 # Load environment variables from .env if it exists
@@ -15,10 +16,8 @@ from aura.core.ingestor import Ingestor
 from aura.core.analyzer import CorrelationEngine
 from aura.core.brain import AuraBrain
 from aura.core.storage import AuraStorage
-from aura.core.reporter import AuraReporter
 from aura.core.neural_arsenal import NeuralArsenal
 from aura.core import state
-import re
 
 def check_safety(target_input):
     if not target_input: return
@@ -37,7 +36,6 @@ def check_safety(target_input):
 # Module imports
 from aura.modules.scanner import AuraScanner
 from aura.modules.exploiter import AuraExploiter
-from aura.modules.arsenal import AuraArsenal
 from aura.modules.bounty import BountyHunter
 from aura.modules.cloud import CloudHunter
 from aura.modules.takeover import TakeoverFinder
@@ -49,32 +47,23 @@ from aura.core.orchestrator import NeuralOrchestrator
 # v21.0 Round 1 imports
 from aura.modules.earnings import EarningsTracker   # D6: Financial Dashboard
 from aura.modules.submitter import BountySubmitter  # D4: One-Click Submit
-from aura.modules.idor_hunter import IDORHunter     # D2: IDOR/BOLA Hunter
-from aura.modules.oauth_hunter import OAuthHunter   # D2: OAuth Flaw Detector
 
 # v22.0 Tier 0-2 imports
 from aura.core.hunt_loop import HuntLoop            # Tier 0: Autonomous Loop
 from aura.modules.program_ranker import ProgramRanker  # Tier 1: Intelligence
-from aura.modules.ssrf_hunter import SSRFHunter     # Tier 2: SSRF
 
 # v22.0 UX Supercharge imports
-from aura.core.config import cfg as aura_cfg        # Config singleton
-from aura.core.notifier import notify               # Telegram notifier
 from aura.core.status import show_status            # Status dashboard
 from aura.core.target_profiles import TargetProfiles  # Hunt profiles
 
 # UI imports
 # UI imports (Migrated to ZenithFormatter)
-
-
-import sys
-import io
 # Windows: ensure Rich can write unicode without crashing on cp1252 encoding
 if sys.platform == "win32" and hasattr(sys.stdout, "buffer") and "pytest" not in sys.modules and not os.getenv("PYTEST_CURRENT_TEST"):
     try:
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
-    except Exception:
+    except (AttributeError, OSError):
         pass
 
 # from aura.ui.formatter import console # Now using global console from aura.ui.formatter
@@ -83,7 +72,7 @@ db = AuraStorage()
 class AuraHelpGroup(click.Group):
     def format_help(self, ctx, formatter):
         ui.show_banner()
-        ui.console.print(ui.Panel(
+        console.print(Panel(
             "[bold red]AURA v25.0 (THE OMEGA PROTOTYPE)[/bold red]\n"
             "Sentient Singularity: Autonomous Strategic Warfare & Absolute Omniscience.",
             title="[bold red]SENTIENT CONTROL CENTER[/bold red]",
@@ -101,7 +90,7 @@ class AuraHelpGroup(click.Group):
         }
 
         for cat_name, cmd_list in categories.items():
-            table = ui.Table(title=f"\n[bold cyan]{cat_name}[/bold cyan]", show_header=True, header_style="bold magenta", box=None)
+            table = Table(title=f"\n[bold cyan]{cat_name}[/bold cyan]", show_header=True, header_style="bold magenta", box=None)
             table.add_column("Command", style="bold green", width=15)
             table.add_column("Description", style="white")
             
@@ -110,12 +99,12 @@ class AuraHelpGroup(click.Group):
                 if cmd:
                     desc = cmd.help.split('\n')[0].strip() if cmd.help else ""
                     table.add_row(cmd_name, desc)
-            ui.console.print(table)
+            console.print(table)
 
-        ui.console.print("\n[bold yellow]PRO USAGE EXAMPLES[/bold yellow]")
-        ui.console.print("  $ aura scan target.com")
-        ui.console.print("  $ aura zenith target.com")
-        ui.console.print("  $ aura brain 1 --ai\n")
+        console.print("\n[bold yellow]PRO USAGE EXAMPLES[/bold yellow]")
+        console.print("  $ aura scan target.com")
+        console.print("  $ aura zenith target.com")
+        console.print("  $ aura brain 1 --ai\n")
 
 def resolve_target(target_input):
     """Helper to resolve target from ID (int) or Value (string/domain)."""
@@ -166,12 +155,13 @@ def analyze(file):
         status.update("Generating battle plan...")
         time.sleep(0.5)
     
-    ui.console.print(ui.render_results_table(results))
+    console.print(ui.render_results_table(results))
     
     engine = CorrelationEngine()
     paths = engine.correlate(results)
     if paths:
-        ui.console.print("\n"); ui.console.print(ui.render_battle_plan(paths))
+        console.print("\n")
+        console.print(ui.render_battle_plan(paths))
         for path in paths: db.save_target(path)
 
 @cli.command()
@@ -184,10 +174,10 @@ def scan(domain, header, cookie):
     
     for h in header:
         try: k, v = h.split(":", 1); state.CUSTOM_HEADERS[k.strip()] = v.strip()
-        except: ui.console.print(f"[yellow][!] Invalid header format: {h}[/yellow]")
+        except ValueError: console.print(f"[yellow][!] Invalid header format: {h}[/yellow]")
     for c in cookie:
         try: k, v = c.split("=", 1); state.CUSTOM_COOKIES[k.strip()] = v.strip()
-        except: ui.console.print(f"[yellow][!] Invalid cookie format: {c}[/yellow]")
+        except ValueError: console.print(f"[yellow][!] Invalid cookie format: {c}[/yellow]")
 
     ui.show_banner()
     scanner = AuraScanner()
@@ -197,7 +187,8 @@ def scan(domain, header, cookie):
     if results:
         #    # ui.simulate_analysis_flow(results) # Replaced with logic in analyze
         if paths:
-            ui.console.print("\n"); ui.console.print(ui.render_battle_plan(paths))
+            console.print("\n")
+            console.print(ui.render_battle_plan(paths))
             for path in paths: db.save_target(path)
 
 @cli.command()
@@ -209,11 +200,11 @@ def brain(target_input, ai):
     if not target: return
     target_data = {"value": target["value"], "type": target["type"], "risk_score": target["risk_score"]}
     if ai:
-        ui.console.print("[bold cyan][*] Activating Neural Arsenal AI...[/bold cyan]")
+        console.print("[bold cyan][*] Activating Neural Arsenal AI...[/bold cyan]")
         advice = NeuralArsenal().generate_strategy(target_data)
     else:
         advice = AuraBrain().reason({"target": target["value"]})
-    ui.console.print(ui.Panel(advice, title=f"AURA BRAIN: {target['value']}", border_style="magenta"))
+    console.print(Panel(advice, title=f"AURA BRAIN: {target['value']}", border_style="magenta"))
 
 def _open_report_file(path):
     """v14.2: Cross-platform auto-open helper."""
@@ -226,7 +217,7 @@ def _open_report_file(path):
         else:
             subprocess.run(["xdg-open", path])
     except Exception as e:
-        ui.console.print(f"[dim yellow]Could not auto-open {path}: {e}[/dim yellow]")
+        console.print(f"[dim yellow]Could not auto-open {path}: {e}[/dim yellow]")
 
 @cli.command()
 @click.argument('target_input')

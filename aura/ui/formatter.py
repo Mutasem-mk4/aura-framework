@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Aura ZenithFormatter
 =====================
@@ -16,19 +18,25 @@ Theme Colors:
 import sys
 import os
 
-# Windows compatibility
+# Windows UTF-8 compatibility — must happen BEFORE any rich imports
 if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding='utf-8')
         sys.stderr.reconfigure(encoding='utf-8')
-    except AttributeError:
+    except (AttributeError, OSError):
         pass
-    
-    # Patch Windows console before rich imports
+
+    try:
+        import colorama
+        colorama.just_fix_windows_console()
+    except ImportError:
+        pass
+
+    # Disable legacy Windows renderer that garbles output
     try:
         import rich._windows_renderer
         rich._windows_renderer.LegacyWindowsTerm = None
-    except ImportError:
+    except (ImportError, AttributeError):
         pass
 
 os.environ['RICH_DISABLE_JUPYTER'] = '1'
@@ -47,7 +55,7 @@ from rich.columns import Columns
 from rich.console import Group
 from rich import box
 from rich.style import Style
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -101,12 +109,26 @@ class ZenithTheme:
 # ============================================================
 
 # Global Shared Console to act as the rendering anchor for the Dashboard
-shared_console = Console(
-    theme=ZenithTheme.get_theme(),
-    file=sys.stdout,
-    force_terminal=True,
-    width=120
-)
+# On Windows, detect if UTF-8 is actually supported before forcing terminal mode
+def _make_console() -> "Console":
+    _utf8_ok = True
+    if sys.platform == "win32":
+        try:
+            sys.stdout.write("")
+            encoding = getattr(sys.stdout, "encoding", "cp1252") or "cp1252"
+            _utf8_ok = encoding.lower().replace("-", "") in ("utf8", "utf-8")
+        except (AttributeError, OSError):
+            _utf8_ok = False
+    return Console(
+        theme=ZenithTheme.get_theme(),
+        file=sys.stdout,
+        force_terminal=_utf8_ok,   # Only force terminal if encoding is clean
+        force_jupyter=False,
+        width=120,
+        highlight=False,           # Disable auto-highlight to reduce garbling risk
+    )
+
+shared_console = _make_console()
 
 # ============================================================
 # CENTRAL LOGGER
@@ -679,3 +701,15 @@ class DashboardManager:
         self.console.print(msg)
 
 dashboard = DashboardManager(shared_console)
+
+__all__ = [
+    "ZenithFormatter",
+    "ZenithLogger",
+    "ZenithTheme",
+    "ZenithUI",
+    "console",
+    "dashboard",
+    "logger",
+    "shared_console",
+    "ui",
+]

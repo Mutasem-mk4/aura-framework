@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 aura.phases.deconstruction
 
@@ -5,7 +7,7 @@ Controller for Phase 3.5: API & Frontend Deconstruction.
 Abstracts the massive nested try/except blocks of API/GQL Reapers.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 from aura.core.engine_base import AbstractEngine
 from aura.ui.formatter import ZenithUI, console
 import asyncio
@@ -14,7 +16,7 @@ class DeconstructionPhase(AbstractEngine):
     """
     Dissects Webpack frontends, REST APIs, and GraphQL endpoints dynamically.
     """
-    def __init__(self, ssti_engine: Any, smuggling_engine: Any, ws_oauth_engine: Any, logic_fuzzer: Any, brain: Any):
+    def __init__(self, ssti_engine: Any, smuggling_engine: Any, ws_oauth_engine: Any, logic_fuzzer: Any, brain: Any) -> None:
         super().__init__()
         self.ssti_engine = ssti_engine
         self.smuggling_engine = smuggling_engine
@@ -22,7 +24,7 @@ class DeconstructionPhase(AbstractEngine):
         self.logic_fuzzer = logic_fuzzer
         self.brain = brain
 
-    async def run(self, recon_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def run(self, recon_data: dict[str, Any]) -> list[dict[str, Any]]:
         domain = self.context.target_url
         ZenithUI.phase_banner("Phase 3.5: Deconstruction Doctrine", domain, icon="🏗️")
         self._emit_progress("Dissecting frontend and APIs...", percentage=60)

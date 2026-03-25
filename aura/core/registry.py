@@ -54,42 +54,64 @@ class EngineRegistry:
     def _register_core_engines(self):
         """Register core engines that live in aura.core."""
         try:
+            from aura.core.apex_sentinel import ApexSentinel
+            from aura.core.bounty_reporter import BountyReporter
+            from aura.core.exploit_chain import ChainOfThoughtExploiter
+            from aura.core.fleet_manager import FleetManager
+            from aura.core.mission_hunter import MissionHunter
             from aura.core.nexus_bridge import NexusBridge
-            self._engines["nexus_bridge"] = NexusBridge
-            logger.debug("Registered core engine: nexus_bridge")
-            
+            from aura.core.omega_crawler import OMEGACrawler
+            from aura.core.sentinel_watch import SentinelWatch
+            from aura.core.shadow_state import ShadowStateModeler
+            from aura.core.vuln_intel import CVEProvider
+            from aura.modules.api_reaper import APIReaper
+            from aura.modules.frontend_deconstructor import FrontendDeconstructor
+            from aura.modules.ghost_ops import GhostOps
+            from aura.modules.graphql_reaper import GraphQLReaper
+            from aura.modules.leaks import LeakProber
+            from aura.modules.lateral_engine import LateralEngine
+            from aura.modules.pivoting import AuraLink
+            from aura.modules.secret_hunter import SecretHunter
+            from aura.modules.stateful_logic_fuzzer import StatefulLogicFuzzer
+
+            self._engines.update(
+                {
+                    "apex_sentinel": ApexSentinel,
+                    "api_reaper": APIReaper,
+                    "aura_link": AuraLink,
+                    "bounty_reporter": BountyReporter,
+                    "cve_provider": CVEProvider,
+                    "exploit_chain": ChainOfThoughtExploiter,
+                    "fleet_manager": FleetManager,
+                    "frontend_deconstructor": FrontendDeconstructor,
+                    "ghost_ops": GhostOps,
+                    "graphql_reaper": GraphQLReaper,
+                    "lateral_engine": LateralEngine,
+                    "leak_prober": LeakProber,
+                    "logic_fuzzer": StatefulLogicFuzzer,
+                    "mission_hunter": MissionHunter,
+                    "nexus_bridge": NexusBridge,
+                    "omega_crawler": OMEGACrawler,
+                    "secret_hunter": SecretHunter,
+                    "sentinel_watch": SentinelWatch,
+                    "shadow_state_modeler": ShadowStateModeler,
+                }
+            )
+
             # Register known modules that may not be in aura.modules
-            self._try_register("aura.modules.leaks", "leak_prober")
-            self._try_register("aura.modules.secret_hunter", "secret_hunter")
-            self._try_register("aura.modules.cve_provider", "cve_provider")
-            self._try_register("aura.modules.pivoting", "aura_link")
-            self._try_register("aura.modules.lateral_engine", "lateral_engine")
             self._try_register("aura.modules.takeover", "subdomain_takeover")
             self._try_register("aura.modules.nuclei_engine", "nuclei_engine")
             self._try_register("aura.modules.submitter", "bounty_submitter")
             self._try_register("aura.modules.profit_engine", "profit_engine")
             self._try_register("aura.modules.ssti_engine", "ssti_engine")
             self._try_register("aura.modules.smuggling_engine", "smuggling_engine")
-            self._try_register("aura.modules.oauth_engine", "ws_oauth_engine")
-            self._try_register("aura.modules.fleet_manager", "fleet_manager")
-            self._try_register("aura.modules.mission_hunter", "mission_hunter")
-            self._try_register("aura.modules.sentinel_watch", "sentinel_watch")
-            self._try_register("aura.modules.omega_crawler", "omega_crawler")
-            self._try_register("aura.modules.apex_sentinel", "apex_sentinel")
-            self._try_register("aura.modules.shadow_state", "shadow_state_modeler")
-            self._try_register("aura.modules.bounty_reporter", "bounty_reporter")
+            self._try_register("aura.modules.ws_oauth_engine", "ws_oauth_engine")
             self._try_register("aura.modules.bola_butcher", "bola_butcher")
             self._try_register("aura.modules.race_assassin", "race_assassin")
             self._try_register("aura.modules.ai_mutator", "ai_mutator")
-            self._try_register("aura.modules.exploit_chain", "exploit_chain")
-            self._try_register("aura.modules.stateful_logic_fuzzer", "logic_fuzzer")
             self._try_register("aura.modules.dorks_intel", "dorks_intel")
             self._try_register("aura.modules.heavy_weapons", "heavy_weapons")
             self._try_register("aura.modules.cloud_recon", "aura_cloud_recon")
-            self._try_register("aura.modules.ghost_ops", "ghost_ops")
-            self._try_register("aura.modules.api_reaper", "api_reaper")
-            self._try_register("aura.modules.frontend_deconstructor", "frontend_deconstructor")
-            self._try_register("aura.modules.graphql_reaper", "graphql_reaper")
             
         except ImportError as e:
             logger.warning(f"Failed to register core engines: {e}")

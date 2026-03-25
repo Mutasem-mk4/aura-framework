@@ -28,13 +28,14 @@ from pathlib import Path
 from typing import Optional
 
 import httpx
+from aura.ui.formatter import console
 
 try:
     from playwright.async_api import async_playwright, Page, Dialog
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
-    print("[XSS] Playwright not installed — using httpx reflection mode only")
+    console.print("[XSS] Playwright not installed — using httpx reflection mode only")
 
 
 # ─── XSS Payload Arsenal ──────────────────────────────────────────────────────
@@ -414,27 +415,27 @@ class XSSEngine:
 
         # Step 2: If no injection points from map, try sitemap/homepage discovery
         if not injectable_urls:
-            print("\n🔰 No discovery map provided — running Sitemap/Homepage URL Discovery...")
+            console.print("\n🔰 No discovery map provided — running Sitemap/Homepage URL Discovery...")
             injectable_urls = self._discover_urls_from_sitemap()
             if injectable_urls:
-                print(f"   ✅ Discovered {len(injectable_urls)} injectable URL(s) from sitemap/homepage")
+                console.print(f"   ✅ Discovered {len(injectable_urls)} injectable URL(s) from sitemap/homepage")
             else:
                 # Last resort: use common test params on target
-                print("   ⚠️  No injectable URLs found from sitemap either.")
-                print("   🔰 Falling back to common parameter probes...")
+                console.print("   ⚠️  No injectable URLs found from sitemap either.")
+                console.print("   🔰 Falling back to common parameter probes...")
                 injectable_urls = self._extract_injectable_urls({})
 
         meta = discovery_map.get("meta", {}) if discovery_map else {}
 
-        print(f"\n{'='*65}")
-        print(f"🟡 AURA v2 — XSS Detection Engine")
-        print(f"🎯 Target: {meta.get('target', self.target)}")
-        print(f"💩 Injectable Parameters Found: {len(injectable_urls)}")
-        print(f"🔫 Payloads per Parameter: {len(MARKED_PAYLOADS)}")
-        print(f"{'='*65}")
+        console.print(f"\n{'='*65}")
+        console.print(f"🟡 AURA v2 — XSS Detection Engine")
+        console.print(f"🎯 Target: {meta.get('target', self.target)}")
+        console.print(f"💩 Injectable Parameters Found: {len(injectable_urls)}")
+        console.print(f"🔫 Payloads per Parameter: {len(MARKED_PAYLOADS)}")
+        console.print(f"{'='*65}")
 
         # Phase 1: Fast httpx reflection check (no browser needed)
-        print(f"\n⚡ Phase 1: HTTP Reflection Check ({ len(injectable_urls)} params)...")
+        console.print(f"\n⚡ Phase 1: HTTP Reflection Check ({ len(injectable_urls)} params)...")
         reflection_hits = []
         for target_info in injectable_urls:
             result = self._httpx_reflection_check(
@@ -442,18 +443,18 @@ class XSSEngine:
             )
             if result:
                 if result["severity"] in ("HIGH", "MEDIUM"):
-                    print(f"  🚨 REFLECTION: [{target_info['param']}] in {target_info['url'][:70]}")
-                    print(f"     Note: {result['note']}")
+                    console.print(f"  🚨 REFLECTION: [{target_info['param']}] in {target_info['url'][:70]}")
+                    console.print(f"     Note: {result['note']}")
                     self.findings.append(result)
                     reflection_hits.append(target_info)
                 else:
-                    print(f"  ⚠️  Encoded reflection: [{target_info['param']}] (HTML-encoded, lower risk)")
+                    console.print(f"  ⚠️  Encoded reflection: [{target_info['param']}] (HTML-encoded, lower risk)")
 
         # Phase 2: Playwright confirmation on reflection hits (if available)
         if not PLAYWRIGHT_AVAILABLE:
-            print(f"\n⚠️  Playwright not installed — skipping browser-based XSS confirmation.")
-            print("   Install: pip install playwright && playwright install chromium")
-            print(f"   📊 {len(reflection_hits)} URL(s) need manual browser confirmation.")
+            console.print(f"\n⚠️  Playwright not installed — skipping browser-based XSS confirmation.")
+            console.print("   Install: pip install playwright && playwright install chromium")
+            console.print(f"   📊 {len(reflection_hits)} URL(s) need manual browser confirmation.")
             return self._finalize()
 
         async with async_playwright() as pw:
@@ -469,34 +470,34 @@ class XSSEngine:
                 await context.add_cookies(cookies)
 
             # Scan DOM sinks on key pages
-            print("\n🔍 Phase 2: DOM Sink Analysis...")
+            console.print("\n🔍 Phase 2: DOM Sink Analysis...")
             dom_page = await context.new_page()
             key_pages = [self.target, f"{self.target}/search", f"{self.target}/products"]
             for kp in key_pages:
                 dom_findings = await self._scan_dom_sinks(dom_page, kp)
                 for df in dom_findings:
-                    print(f"  ⚠️  DOM Sink [{df['sink']}] ← [{df['source']}] on {kp}")
+                    console.print(f"  ⚠️  DOM Sink [{df['sink']}] ← [{df['source']}] on {kp}")
                     self.findings.append(df)
             await dom_page.close()
 
             # Phase 3: Playwright confirmation on reflection hits first, then all injectable
             all_to_test = reflection_hits or injectable_urls
-            print(f"\n💩 Phase 3: Browser XSS Confirmation ({len(all_to_test)} targets)...")
+            console.print(f"\n💩 Phase 3: Browser XSS Confirmation ({len(all_to_test)} targets)...")
             page = await context.new_page()
 
             for target_info in all_to_test:
-                print(f"\n  🎯 [{target_info['param']}] in {target_info['url'][:70]}")
+                console.print(f"\n  🎯 [{target_info['param']}] in {target_info['url'][:70]}")
                 confirmed = False
                 for payload in MARKED_PAYLOADS:
                     if confirmed:
                         break
                     finding = await self._test_injection(page, target_info, payload)
                     if finding:
-                        print(f"     🚨 XSS CONFIRMED! Payload: {payload[:50]}")
+                        console.print(f"     🚨 XSS CONFIRMED! Payload: {payload[:50]}")
                         self.findings.append(finding)
                         confirmed = True
                 if not confirmed:
-                    print(f"     ✅ No XSS confirmed on this parameter")
+                    console.print(f"     ✅ No XSS confirmed on this parameter")
 
             await page.close()
             await browser.close()
@@ -508,26 +509,26 @@ class XSSEngine:
         xss_confirmed = [f for f in self.findings if f.get("type") == "Reflected XSS"]
         dom_sinks = [f for f in self.findings if f.get("type") == "DOM XSS Sink"]
 
-        print(f"\n{'='*65}")
-        print(f"✅ XSS SCAN COMPLETE")
-        print(f"{'='*65}")
-        print(f"  🚨 Reflected XSS Confirmed : {len(xss_confirmed)}")
-        print(f"  ⚠️  DOM XSS Sinks Found    : {len(dom_sinks)}")
+        console.print(f"\n{'='*65}")
+        console.print(f"✅ XSS SCAN COMPLETE")
+        console.print(f"{'='*65}")
+        console.print(f"  🚨 Reflected XSS Confirmed : {len(xss_confirmed)}")
+        console.print(f"  ⚠️  DOM XSS Sinks Found    : {len(dom_sinks)}")
 
         if self.findings:
             for i, f in enumerate(xss_confirmed, 1):
-                print(f"\n  [{i}] {f['type']} — param: {f['param']}")
-                print(f"       URL: {f['injected_url'][:80]}")
-                print(f"       Payload: {f['payload'][:60]}")
-                print(f"       Severity: {f['severity']} | CVSS: {f['cvss_score']}")
+                console.print(f"\n  [{i}] {f['type']} — param: {f['param']}")
+                console.print(f"       URL: {f['injected_url'][:80]}")
+                console.print(f"       Payload: {f['payload'][:60]}")
+                console.print(f"       Severity: {f['severity']} | CVSS: {f['cvss_score']}")
 
             target_slug = self.target_domain.replace(".", "_").replace("www_", "")
             out_path = self.output_dir / f"xss_findings_{target_slug}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
             with open(out_path, "w", encoding="utf-8") as f:
                 json.dump({"target": self.target, "findings": self.findings}, f, indent=2)
-            print(f"\n  💾 Findings saved: {out_path}")
+            console.print(f"\n  💾 Findings saved: {out_path}")
         else:
-            print("\n  ✅ No XSS vulnerabilities confirmed.")
+            console.print("\n  ✅ No XSS vulnerabilities confirmed.")
 
         return self.findings
 
@@ -543,7 +544,7 @@ def run_xss_scan(
 
     cookies_str = os.getenv("AUTH_TOKEN_ATTACKER", "")
     if not cookies_str:
-        print("⚠️  AUTH_TOKEN_ATTACKER not set — running unauthenticated XSS scan.")
+        console.print("⚠️  AUTH_TOKEN_ATTACKER not set — running unauthenticated XSS scan.")
 
     # Auto-detect discovery map (optional — engine will self-discover URLs)
     discovery_map = None

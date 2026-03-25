@@ -89,6 +89,8 @@ class NativeProber:
             console.print(f"[yellow][⚡] Nexus Core Active: Batch probing {len(urls)} targets at Go-native speeds...[/yellow]")
             try:
                 go_results = self.nexus.probe_urls(urls, self.concurrency, self.timeout * 1000)
+                if go_results is None:
+                    raise Exception("Nexus results are None")
                 results = []
                 for r in go_results:
                     results.append({

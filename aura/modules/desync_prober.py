@@ -5,8 +5,7 @@ Automated HTTP Request Smuggling detection engine.
 Uses Nexus Go core for high-precision desync discovery.
 """
 import asyncio
-from typing import List, Dict, Any
-from rich.console import Console
+from typing import List
 from rich.panel import Panel
 from aura.core.nexus_bridge import NexusBridge
 from aura.core.storage import AuraStorage
@@ -64,6 +63,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         # Mock storage for CLI test
         class MockStorage:
-            def add_finding(self, **kwargs): print(f"Finding logged: {kwargs}")
+            def add_finding(self, **kwargs):
+                console.print(f"Finding logged: {kwargs}")
         
         asyncio.run(DesyncProber(MockStorage()).audit_endpoints(sys.argv[1:]))

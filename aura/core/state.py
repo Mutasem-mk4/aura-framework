@@ -206,7 +206,7 @@ AUTH_TOKEN_ATTACKER = None
 AUTH_TOKEN_VICTIM = None
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5-coder:7b")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:latest")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 ZENITH_FREE_STACK = ["google/gemini-2.0-flash-exp:free", "meta-llama/llama-3.3-70b-instruct:free", "mistralai/mistral-7b-instruct:free", "openrouter/auto"]

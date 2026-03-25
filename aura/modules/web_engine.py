@@ -14,17 +14,13 @@ Modules:
 import asyncio
 import json
 import os
-import re
-import time
 import urllib.parse
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional
 
 from aura.core.async_requester import AsyncRequester
 
-from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
 from rich import box
 
@@ -302,23 +298,23 @@ class WebSecurityEngine:
 
         # Use 100 concurrent connections for massive speed boost!
         async with AsyncRequester(concurrency_limit=100, timeout=10, proxy_file=self.proxy_file) as requester:
-            cors_findings = await self.scan_cors(requester)
-            redirect_findings = await self.scan_open_redirect(requester)
-            rate_limit_findings = await self.scan_rate_limiting(requester)
-            header_findings = await self.scan_security_headers(requester)
+            await self.scan_cors(requester)
+            await self.scan_open_redirect(requester)
+            await self.scan_rate_limiting(requester)
+            await self.scan_security_headers(requester)
 
         all_findings = self.findings
         critical = [f for f in all_findings if f.get("severity") == "CRITICAL"]
         high     = [f for f in all_findings if f.get("severity") == "HIGH"]
         medium   = [f for f in all_findings if f.get("severity") == "MEDIUM"]
 
-        print(f"\n{'='*65}")
-        print(f"⚡ WEB ASYNC SCAN COMPLETE")
-        print(f"{'='*65}")
-        print(f"  🔴 Critical : {len(critical)}")
-        print(f"  🟠 High     : {len(high)}")
-        print(f"  🟡 Medium   : {len(medium)}")
-        print(f"  📊 Total    : {len(all_findings)}")
+        console.print(f"\n{'='*65}")
+        console.print(f"⚡ WEB ASYNC SCAN COMPLETE")
+        console.print(f"{'='*65}")
+        console.print(f"  🔴 Critical : {len(critical)}")
+        console.print(f"  🟠 High     : {len(high)}")
+        console.print(f"  🟡 Medium   : {len(medium)}")
+        console.print(f"  📊 Total    : {len(all_findings)}")
 
         if all_findings:
             target_slug = self.target_domain.replace(".", "_").replace("www_", "")
@@ -340,6 +336,7 @@ def run_web_scan(target: str, discovery_map_path: Optional[str] = None, proxy_fi
     """CLI runner for `aura <target> --web`."""
     from dotenv import load_dotenv
     load_dotenv()
+    _ = discovery_map_path
     cookies_str = os.getenv("AUTH_TOKEN_ATTACKER", "")
     engine = WebSecurityEngine(target=target, cookies_str=cookies_str, proxy_file=proxy_file)
     return engine.run()

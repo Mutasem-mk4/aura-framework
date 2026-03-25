@@ -1,13 +1,11 @@
 import os
 import sys
-import json
 from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional, Set, Dict
-import asyncio
+from typing import List, Optional, Set
 from datetime import datetime
 
 # Fix: Add current working directory to path to resolve 'aura' module
@@ -52,23 +50,23 @@ def get_reporter():
 
 # WebSocket Manager for live streaming
 class ConnectionManager:
-    def __init__(self):
+    def __init__(self) -> None:
         self.active_connections: Set[WebSocket] = set()
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket) -> None:
         await websocket.accept()
         self.active_connections.add(websocket)
 
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+    def disconnect(self, websocket: WebSocket) -> None:
+        self.active_connections.discard(websocket)
 
-    async def broadcast(self, message: dict):
+    async def broadcast(self, message: dict) -> None:
         """Broadcasts a structured JSON message to all connected clients."""
         for connection in self.active_connections:
             try:
                 await connection.send_json(message)
-            except:
-                pass
+            except (RuntimeError, WebSocketDisconnect):
+                self.active_connections.discard(connection)
 
 manager = ConnectionManager()
 
