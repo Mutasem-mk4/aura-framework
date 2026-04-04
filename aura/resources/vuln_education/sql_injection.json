@@ -1,0 +1,27 @@
+{
+  "name": "SQL Injection",
+  "category": "Injection",
+  "what_is_it": "SQL Injection allows attackers to execute arbitrary SQL queries on the database.",
+  "why_matters": "Attackers can read, modify, or delete sensitive data including passwords, personal information, and business data. Can lead to complete database compromise.",
+  "severity_levels": {
+    "standard": {"cvss_range": "9.0-10.0", "impact": "Critical - full database compromise possible"},
+    "blind": {"cvss_range": "6.0-8.0", "impact": "High - requires careful timing or boolean-based exploitation"}
+  },
+  "how_to_verify": [
+    "1. Find input fields or URL parameters that interact with a database",
+    "2. Try injecting: ' OR '1'='1 to see if you get unexpected data",
+    "3. Try: ' UNION SELECT null,table_name FROM information_schema.tables--",
+    "4. Use tools like sqlmap for automated exploitation"
+  ],
+  "remediation_steps": [
+    "1. Use parameterized queries (prepared statements) for all database interactions",
+    "2. Never concatenate user input directly into SQL queries",
+    "3. Use ORM frameworks that handle escaping automatically",
+    "4. Apply least privilege to database accounts"
+  ],
+  "resources": {
+    "owasp": "https://owasp.org/www-community/attacks/SQL_Injection",
+    "portswigger": "https://portswigger.net/web-security/sql-injection",
+    "academy": "https://portswigger.net/web-security/all-labs#sql-injection"
+  }
+}

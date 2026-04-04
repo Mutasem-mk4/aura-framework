@@ -1,0 +1,28 @@
+{
+  "name": "Cross-Site Scripting (XSS)",
+  "category": "Web Security",
+  "what_is_it": "XSS allows attackers to inject malicious scripts into web pages viewed by other users.",
+  "why_matters": "Attackers can steal session cookies, deface websites, redirect users to phishing sites, or perform actions on behalf of users.",
+  "severity_levels": {
+    "reflected": {"cvss_range": "4.0-6.0", "impact": "Medium - requires user interaction"},
+    "stored": {"cvss_range": "6.0-8.0", "impact": "High - affects all users visiting the page"},
+    "dom": {"cvss_range": "4.0-7.0", "impact": "Medium - client-side only, no server involvement"}
+  },
+  "how_to_verify": [
+    "1. Find input fields, URL parameters, or headers that are reflected in the response",
+    "2. Inject a simple payload like <script>alert('XSS')</script>",
+    "3. If an alert box appears when the page loads, XSS is confirmed",
+    "4. Try different XSS bypass techniques if filters are in place"
+  ],
+  "remediation_steps": [
+    "1. Sanitize all user input - remove HTML tags and script tags",
+    "2. Use output encoding when displaying user data (HTML entities)",
+    "3. Implement Content Security Policy (CSP) headers to restrict script execution",
+    "4. Use secure frameworks that auto-escape by default (React, Angular)"
+  ],
+  "resources": {
+    "owasp": "https://owasp.org/www-community/attacks/xss/",
+    "portswigger": "https://portswigger.net/web-security/cross-site-scripting",
+    "academy": "https://portswigger.net/web-security/all-labs#cross-site-scripting"
+  }
+}

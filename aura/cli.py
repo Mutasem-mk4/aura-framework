@@ -95,6 +95,7 @@ class AuraHelpGroup(click.Group):
 
         categories = {
             "QUICK START": ["setup", "status", "hunt", "programs"],
+            "BEGINNER MODE": ["practice", "learn", "clinic"],
             "RECON AND ANALYSIS": ["scan", "analyze", "report"],
             "STRATEGIC INTEL": ["brain", "forge", "scope", "triage"],
             "WEAPONIZATION": ["exploit", "bounty", "cloud", "scan_vuln"],
@@ -1292,3 +1293,261 @@ def profit(target_filter):
 
 if __name__ == "__main__":
     cli()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BEGINNER MODE COMMANDS (v22.X)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@cli.command()
+@click.option('--target', '-t', help="Practice target name (e.g., juice_shop, badstore)")
+@click.option('--list', '-l', 'list_targets', is_flag=True, help="List available practice targets")
+def practice(target, list_targets):
+    """[BEGINNER] 🏠 Practice hunting on safe, vulnerable targets.
+
+    This command helps you practice bug hunting on legal, vulnerable targets
+    without risking your account or facing legal issues.
+
+    Examples:
+        aura practice --list              Show all available practice targets
+        aura practice --target juice_shop Start practicing on Juice Shop
+    """
+    from aura.core.practice_config import PracticeConfig
+
+    # List targets
+    if list_targets:
+        console.print(Panel(
+            "[bold cyan]🏠 Available Practice Targets[/bold cyan]\n"
+            "These are SAFE, LEGAL vulnerable applications for practice.\n"
+            "Use --target <name> to start practicing.",
+            title="[bold yellow]Practice Mode[/bold yellow]",
+            border_style="cyan"
+        ))
+
+        targets = PracticeConfig.list_targets()
+
+        # Group by difficulty
+        from rich.table import Table
+        beginner = [t for t in targets if "Beginner" in t.get("difficulty", "")]
+        intermediate = [t for t in targets if "Intermediate" in t.get("difficulty", "")]
+
+        if beginner:
+            console.print("\n[bold green]Beginner Level:[/bold green]")
+            for t in beginner:
+                console.print(f"  [cyan]{t['id']}[/cyan] — {t['name']}")
+                console.print(f"    URL: {t['url']}")
+                console.print(f"    Vulns: {', '.join(t.get('vulnerabilities', [])[:4])}")
+                console.print()
+
+        if intermediate:
+            console.print("[bold yellow]Intermediate Level:[/bold yellow]")
+            for t in intermediate:
+                console.print(f"  [cyan]{t['id']}[/cyan] — {t['name']}")
+                console.print(f"    URL: {t['url']}")
+                console.print(f"    Vulns: {', '.join(t.get('vulnerabilities', [])[:4])}")
+                console.print()
+
+        console.print("[dim]Run 'aura practice --target <name>' to start.[/dim]")
+        return
+
+    # Load target
+    if target:
+        pt = PracticeConfig.get_target(target)
+        if not pt:
+            console.print(f"[red]Unknown target: {target}[/red]")
+            console.print("Run 'aura practice --list' to see available targets.")
+            return
+
+        # Set practice mode
+        state.PRACTICE_MODE = True
+        state.BEGINNER_MODE = True
+        state.FEATURE_FLAGS['practice_mode'] = True
+        state.FEATURE_FLAGS['beginner_mode'] = True
+
+        console.print(Panel(
+            f"[bold green]✅ Practice Mode Enabled[/bold green]\n\n"
+            f"Target: [cyan]{pt['name']}[/cyan]\n"
+            f"URL: [cyan]{pt['url']}[/cyan]\n"
+            f"Difficulty: {pt['difficulty']}\n"
+            f"Vulnerabilities: {', '.join(pt.get('vulnerabilities', []))}\n\n"
+            f"[yellow]All findings will be saved separately from production.[/yellow]\n\n"
+            f"Next steps:\n"
+            f"  [cyan]aura scan {pt['url']}[/cyan] — Start reconnaissance\n"
+            f"  [cyan]aura hunt {pt['url']}[/cyan] — Full guided hunt",
+            title=f"[bold]🎯 {pt['name']}[/bold]",
+            border_style="green"
+        ))
+    else:
+        console.print("[yellow]Usage: aura practice [--list | --target <name>][/yellow]")
+        console.print("Run 'aura practice --list' to see available targets.")
+
+
+@cli.command()
+@click.argument('vuln_type', required=False)
+@click.option('--list', '-l', 'list_types', is_flag=True, help="List all vulnerability types")
+@click.option('--severity', '-s', is_flag=True, help="Show severity explanations")
+def learn(vuln_type, list_types, severity):
+    """[BEGINNER] 📚 Learn about vulnerabilities in plain English.
+
+    This command provides beginner-friendly explanations for any vulnerability type.
+
+    Examples:
+        aura learn xss                 Learn about Cross-Site Scripting
+        aura learn sql injection       Learn about SQL Injection
+        aura learn --list             List all available vulnerability types
+        aura learn --severity         Show severity level explanations
+
+    Run 'aura learn --list' to see all topics.
+    """
+    from aura.modules.clinic import VulnClinic
+    from aura.core.learning_reporter import LearningReporter
+
+    # List all types
+    if list_types:
+        console.print(Panel(
+            "[bold cyan]📚 Available Vulnerability Topics[/bold cyan]\n"
+            "Run 'aura learn <topic>' to learn about any topic.",
+            title="[bold]Learn Center[/bold]",
+            border_style="cyan"
+        ))
+
+        from rich.table import Table
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Topic", style="cyan")
+        table.add_column("Category", style="yellow")
+        table.add_column("Description", style="white")
+
+        vuln_types = VulnClinic.list_vulnerability_types()
+        for vtype in sorted(vuln_types):
+            tip = VulnClinic.get_tip(vtype)
+            table.add_row(
+                vtype.replace("_", " ").title(),
+                tip.get("category", "Other"),
+                tip.get("description", "")[:50] + "..."
+            )
+
+        console.print(table)
+        console.print("\n[dim]Run 'aura learn <topic>' for details.[/dim]")
+        return
+
+    # Show severity explanations
+    if severity:
+        LearningReporter.print_severity_legend()
+        return
+
+    # Learn about specific vulnerability
+    if not vuln_type:
+        console.print("[yellow]Usage: aura learn <vuln_type>[/yellow]")
+        console.print("Run 'aura learn --list' to see available topics.")
+        return
+
+    # Show learning panel
+    panel = VulnClinic.render_tip_panel(vuln_type)
+    console.print(panel)
+
+    # Show remediation steps
+    steps = LearningReporter._get_remediation_steps(vuln_type)
+    console.print(f"\n[bold green]How to Fix It (For Developers):[/bold green]")
+    for step in steps:
+        console.print(f"  {step}")
+
+    console.print(f"\n[cyan]💡 Run 'aura learn --severity' to understand severity levels.[/cyan]")
+
+
+@cli.command()
+@click.argument('target')
+@click.option('--practice', is_flag=True, help="Run in practice mode (safe targets only)")
+def hunt(target, practice):
+    """[BEGINNER] 🎯 Guided Hunt: Recon -> Learn -> Exploit flow.
+
+    This command guides beginners through the complete hunting process:
+    1. Reconnaissance - Discover attack surface
+    2. Learn - Understand vulnerabilities found
+    3. Exploit - Validate and escalate findings
+
+    Examples:
+        aura hunt target.com              Start guided hunt on production target
+        aura hunt target.com --practice   Start guided hunt on practice target
+
+    Note: Use --practice flag to hunt safely on practice targets.
+    """
+    # Safety check
+    check_safety(target)
+
+    # Practice mode
+    if practice:
+        from aura.core.practice_config import PracticeConfig
+        pt = PracticeConfig.get_target(target)
+
+        if not pt:
+            # Try to use target as-is if it looks like a practice target
+            console.print(f"[yellow]Warning: '{target}' not found in practice targets.[/yellow]")
+            console.print("Run 'aura practice --list' to see available targets.")
+            return
+
+        console.print(Panel(
+            f"[bold green]🎯 Starting Practice Hunt[/bold green]\n\n"
+            f"Target: [cyan]{pt['name']}[/cyan]\n"
+            f"URL: [cyan]{pt['url']}[/cyan]\n"
+            f"Difficulty: {pt['difficulty']}",
+            border_style="green"
+        ))
+
+        target = pt['url']
+
+    # Check if this is a known safe practice target
+    safe_targets = ["juice-shop.herokuapp.com", "badstore.net", "dvwa.local", "webgoat.local"]
+    if any(safe in target.lower() for safe in safe_targets) and not practice:
+        console.print(Panel(
+            "[bold yellow]⚠️ This appears to be a practice target.[/bold yellow]\n"
+            "Did you mean to use --practice flag?\n\n"
+            "Example: aura hunt juice-shop.herokuapp.com --practice",
+            border_style="yellow"
+        ))
+
+    # Run hunt flow
+    from aura.core.hunt_flow import HuntFlow
+    asyncio.run(HuntFlow.start_hunt(target, practice_mode=practice))
+
+
+@cli.command()
+def clinic():
+    """[BEGINNER] 🏥 Show educational tips for recent findings.
+
+    This command displays clinic tips for vulnerabilities found in recent scans.
+    It helps beginners understand what each vulnerability means and how to fix it.
+    """
+    from aura.modules.clinic import VulnClinic
+
+    # Get recent findings from database
+    try:
+        findings = db.get_all_findings()
+        if not findings:
+            console.print(Panel(
+                "[yellow]No findings in database.[/yellow]\n\n"
+                "Run a scan first to generate findings:\n"
+                "  [cyan]aura scan target.com[/cyan]",
+                title="[bold]Clinic Tips[/bold]",
+                border_style="yellow"
+            ))
+            return
+
+        # Show tips for unique finding types
+        unique_types = {}
+        for f in findings:
+            vt = f.get("finding_type", "Unknown")
+            if vt not in unique_types:
+                unique_types[vt] = f
+
+        console.print(Panel(
+            "[bold cyan]🏥 Clinic Tips - Recent Findings[/bold cyan]\n"
+            f"Showing tips for {len(unique_types)} unique vulnerability types.",
+            title="[bold]Clinic[/bold]",
+            border_style="cyan"
+        ))
+
+        VulnClinic.show_phase_tips(list(unique_types.values()))
+
+    except Exception as e:
+        console.print(f"[red]Error loading findings: {e}[/red]")
+        console.print("[dim]Run 'aura scan target.com' first to generate findings.[/dim]")

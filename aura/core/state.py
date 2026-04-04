@@ -61,6 +61,17 @@ TOR_PORT = 9050 # Dynamic: verified by stealth engine
 CLOUD_SWARM_MODE = False
 FAST_MODE = False # v14.2: Optimized rapid-fire mode (skips deep audits)
 
+# v22.X Beginner Mode Feature Flags
+BEGINNER_MODE = False
+PRACTICE_MODE = False
+FEATURE_FLAGS = {
+    "beginner_mode": False,
+    "practice_mode": False,
+    "show_clinic_tips": True,
+    "plain_english_reports": True,
+    "auto_learn_flow": False,
+}
+
 # Network Stability & Performance Scaling (Hyper-Acceleration Phase 19)
 GLOBAL_CONCURRENCY_LIMIT = 10  # Increased for Protocol Warp parallelization
 REQUEST_JITTER_MODE = True      # Forces subtle random delays to avoid triggering system-wide blocks

@@ -53,6 +53,9 @@ class AuraConfig:
     # ── Watchlist ──────────────────────────────────────────────────────
     watchlist_programs:    list  = field(default_factory=list)
 
+    # ── Beginner Mode (v22.X) ─────────────────────────────────────────
+    beginner_mode:         bool  = False  # Enable tutorial tips and learning features
+
     # ── Internal ───────────────────────────────────────────────────────
     _loaded_from:          str   = field(default="defaults", repr=False, compare=False)
 
