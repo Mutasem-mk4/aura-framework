@@ -6,14 +6,111 @@ import re
 import asyncio
 from typing import Dict, Any, Optional
 
-from google import genai
 from aura.core import state
 
 logger = logging.getLogger("aura")
 
+
+class OllamaClient:
+    """
+    Local Ollama AI client - works without API keys.
+    Uses OpenAI-compatible API to communicate with local Ollama models.
+    """
+
+    def __init__(self, base_url: str = "http://localhost:11434/v1", model: str = "llama3.2"):
+        self.base_url = base_url
+        self.model = model
+        self.enabled = False
+
+        # Try to connect and verify
+        try:
+            import aiohttp
+            import urllib.request
+            # Quick connectivity check
+            req = urllib.request.Request(
+                f"{base_url}/models",
+                method="GET"
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                if resp.status == 200:
+                    self.enabled = True
+                    logger.info(f"OllamaClient: Connected to {base_url} with model {model}")
+        except Exception as e:
+            logger.warning(f"OllamaClient: Ollama not available at {base_url}: {e}")
+            self.enabled = False
+
+    def generate(self, prompt: str, system_instruction: str = None) -> Optional[str]:
+        """Generate response using Ollama."""
+        if not self.enabled:
+            return None
+
+        try:
+            import urllib.request
+            import urllib.error
+
+            payload = {
+                "model": self.model,
+                "messages": [
+                    {"role": "system", "content": system_instruction or "You are a helpful AI assistant."},
+                    {"role": "user", "content": prompt}
+                ],
+                "stream": False
+            }
+
+            data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(
+                f"{self.base_url}/chat/completions",
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                if resp.status == 200:
+                    result = json.loads(resp.read().decode("utf-8"))
+                    return result.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+        except Exception as e:
+            logger.error(f"OllamaClient generate error: {e}")
+
+        return None
+
+    async def generate_async(self, prompt: str, system_instruction: str = None) -> Optional[str]:
+        """Async version of generate."""
+        if not self.enabled:
+            return None
+
+        try:
+            import aiohttp
+
+            payload = {
+                "model": self.model,
+                "messages": [
+                    {"role": "system", "content": system_instruction or "You are a helpful AI assistant."},
+                    {"role": "user", "content": prompt}
+                ],
+                "stream": False
+            }
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.base_url}/chat/completions",
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=120)
+                ) as resp:
+                    if resp.status == 200:
+                        result = await resp.json()
+                        return result.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+        except Exception as e:
+            logger.error(f"OllamaClient generate_async error: {e}")
+
+        return None
+
+
 class AuraBrain:
-    """The 'Sentient' intelligence layer powered by Gemini for strategic offensive reasoning."""
-    
+    """The 'Sentient' intelligence layer powered by Gemini or Ollama for strategic offensive reasoning."""
+
     SYSTEM_PROMPT = (
         "You are AURA-Zenith Singularity, the ultimate autonomous offensive AI agent. "
         "Your mission is to perform deep, chain-of-thought (CoT) security analysis. "
@@ -35,13 +132,36 @@ class AuraBrain:
 
     def __init__(self):
         self.enabled = False
-        self.tactical_memory = [] # Phase 18: Tactical Memory
+        self.tactical_memory = []  # Phase 18: Tactical Memory
         self.payload_cache = {}  # Initialize payload cache for Level 1 & 2
-        self.ai_cache = {} # v19.2: General AI query cache
-        if state.GEMINI_API_KEY:
+        self.ai_cache = {}  # v19.2: General AI query cache
+        self.using_ollama = False
+
+        # Check for Ollama first (local, no API key needed)
+        ollama_host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+        ollama_model = os.environ.get("OLLAMA_MODEL", "llama3.2")
+
+        if ollama_host:
             try:
+                self.ollama = OllamaClient(
+                    base_url=f"{ollama_host}/v1" if not ollama_host.endswith("/v1") else ollama_host,
+                    model=ollama_model
+                )
+                if self.ollama.enabled:
+                    self.enabled = True
+                    self.using_ollama = True
+                    logger.info(f"AuraBrain Singularity: Ollama online ({ollama_model} at {ollama_host})")
+            except Exception as e:
+                logger.warning(f"AuraBrain: Ollama not available: {e}")
+                self.ollama = None
+
+        # Fall back to Gemini if Ollama not available
+        if not self.enabled and state.GEMINI_API_KEY:
+            try:
+                from google import genai
                 self.client = genai.Client(api_key=state.GEMINI_API_KEY)
                 self.enabled = True
+                self.using_ollama = False
                 logger.info("AuraBrain Singularity: Gemini Engine online (SDK v1).")
             except Exception as e:
                 logger.error(f"AuraBrain: Failed to initialize Gemini: {e}")
@@ -51,7 +171,27 @@ class AuraBrain:
         if use_cache and prompt in self.ai_cache:
             return self.ai_cache[prompt]
 
-        max_retries = 5 # Increased for higher resilience
+        # Use Ollama if available
+        if self.using_ollama and self.ollama and self.ollama.enabled:
+            for attempt in range(3):
+                try:
+                    response = self.ollama.generate(prompt, system_instruction or self.SYSTEM_PROMPT)
+                    if response:
+                        if use_cache:
+                            self.ai_cache[prompt] = response
+                        return response
+                except Exception as e:
+                    if attempt == 2:
+                        logger.error(f"Ollama call failed: {e}")
+                    import time
+                    time.sleep(1)
+            return None
+
+        # Fall back to Gemini
+        if not hasattr(self, 'client') or not self.enabled:
+            return None
+
+        max_retries = 5  # Increased for higher resilience
         for attempt in range(max_retries):
             try:
                 response = self.client.models.generate_content(
@@ -69,11 +209,11 @@ class AuraBrain:
                 if "quota" in err_str or "safety" in err_str:
                     logger.error(f"Sentinel-G Blocked: {e}")
                     break
-                
+
                 if attempt == max_retries - 1:
                     logger.error(f"Sentinel-G Final Failure: {e}")
                     break
-                
+
                 wait_time = (2 ** attempt) + random.uniform(0.1, 1.0)
                 logger.warning(f"Sentinel-G Retry ({attempt+1}/{max_retries}) in {wait_time:.1f}s: {e}")
                 import time
@@ -103,23 +243,37 @@ class AuraBrain:
     def reason(self, target_context: dict) -> str:
         """Analyzes a target and provides strategic advice using AI or fallback rules."""
         target_value = target_context.get("target", "").lower()
-        
+
         if self.enabled:
             try:
-                prompt = (
-                    f"Analyze this target context and generate a strategic offensive 'Battle Plan'.\n"
-                    f"Context: {target_context}\n"
-                    "Focus on specific attack vectors based on the tech stack and risk score.\n"
-                    "Provide concise actionable recommendations."
-                )
-                response = self.client.models.generate_content(
-                    model=state.GEMINI_MODEL,
-                    contents=prompt,
-                    config={'system_instruction': self.SYSTEM_PROMPT}
-                )
-                return response.text
+                # Use Ollama if available
+                if self.using_ollama and self.ollama and self.ollama.enabled:
+                    prompt = (
+                        f"Analyze this target context and generate a strategic offensive 'Battle Plan'.\n"
+                        f"Context: {target_context}\n"
+                        "Focus on specific attack vectors based on the tech stack and risk score.\n"
+                        "Provide concise actionable recommendations."
+                    )
+                    response = self.ollama.generate(prompt, self.SYSTEM_PROMPT)
+                    if response:
+                        return response
+
+                # Fall back to Gemini
+                if hasattr(self, 'client'):
+                    prompt = (
+                        f"Analyze this target context and generate a strategic offensive 'Battle Plan'.\n"
+                        f"Context: {target_context}\n"
+                        "Focus on specific attack vectors based on the tech stack and risk score.\n"
+                        "Provide concise actionable recommendations."
+                    )
+                    response = self.client.models.generate_content(
+                        model=state.GEMINI_MODEL,
+                        contents=prompt,
+                        config={'system_instruction': self.SYSTEM_PROMPT}
+                    )
+                    return response.text
             except Exception as e:
-                logger.warning(f"AuraBrain: Gemini query failed, falling back to rules. Error: {e}")
+                logger.warning(f"AuraBrain: AI query failed, falling back to rules. Error: {e}")
 
         insights = []
         for pattern, explanation in self.REASONING_PATTERNS.items():
@@ -132,8 +286,32 @@ class AuraBrain:
         return "\n\n".join(insights)
 
     def reason_json(self, prompt: str, system_instruction: str = None) -> str:
-        """v5.1 / v19.4: Synchronized JSON reasoning using google-genai SDK (matches _call_ai)."""
+        """v5.1 / v19.4: Synchronized JSON reasoning using Ollama or Gemini."""
         if not self.enabled: return "[]"
+
+        # Try Ollama first
+        if self.using_ollama and self.ollama and self.ollama.enabled:
+            try:
+                response = self.ollama.generate(prompt, system_instruction or self.SYSTEM_PROMPT)
+                if not response:
+                    return "[]"
+                raw = response.strip().replace("```json", "").replace("```", "").strip()
+                if not (raw.startswith("[") or raw.startswith("{")):
+                    return "[]"
+                import re
+                raw = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', raw)
+                try:
+                    json.loads(raw)
+                except Exception:
+                    return "[]"
+                return raw
+            except Exception as e:
+                logger.error(f"AuraBrain JSON Reason (Ollama): {e}")
+                return "[]"
+
+        # Fall back to Gemini
+        if not hasattr(self, 'client'):
+            return "[]"
 
         try:
             response = self.client.models.generate_content(
@@ -200,7 +378,7 @@ class AuraBrain:
     def analyze_parameter_semantics(self, parameters: dict) -> list:
         """Phase 27: Analyzes parameter keys and values to suggest business logic attacks."""
         if not self.enabled or not parameters: return []
-        
+
         prompt = (
             f"As AURA Singularity, analyze these HTTP parameters for business logic flaws (IDOR, BOLA, Privilege Escalation, Price Manipulation).\n"
             f"Parameters: {parameters}\n\n"
@@ -208,6 +386,23 @@ class AuraBrain:
             "Suggest 1-3 specific manipulations to bypass logic or escalate privileges. "
             "Respond ONLY in JSON array: [{'parameter': 'name', 'payload': 'value', 'type': 'Logic Injection', 'reason': 'string'}]"
         )
+
+        # Use Ollama if available
+        if self.using_ollama and self.ollama and self.ollama.enabled:
+            try:
+                response = self.ollama.generate(prompt, self.SYSTEM_PROMPT)
+                if not response:
+                    return []
+                import re
+                parsed = self._clean_json(response)
+                return parsed if isinstance(parsed, list) else []
+            except Exception:
+                return []
+
+        # Fall back to Gemini
+        if not hasattr(self, 'client'):
+            return []
+
         try:
             response = self.client.models.generate_content(
                 model=state.GEMINI_MODEL,
@@ -215,8 +410,6 @@ class AuraBrain:
                 config={'system_instruction': self.SYSTEM_PROMPT}
             )
             raw = response.text.strip()
-            import re
-            
             parsed = self._clean_json(raw)
             return parsed if isinstance(parsed, list) else []
         except Exception:
@@ -225,7 +418,7 @@ class AuraBrain:
     def analyze_business_logic(self, request_data: dict, response_data: dict) -> list:
         """v15.0: Deep analysis of HTTP transactions for complex business logic flaws (BOLA, Price Manip, etc)."""
         if not self.enabled: return []
-        
+
         prompt = (
             f"As AURA-Zenith, perform a Deep Logic Audit on this transaction:\n"
             f"Request: {request_data}\n"
@@ -237,12 +430,29 @@ class AuraBrain:
             "4. Race Condition potential (state changes without unique nonces/tokens)\n\n"
             "Respond ONLY with a JSON array: [{'type': 'Logic Flaw', 'severity': 'HIGH/CRITICAL', 'reason': 'str', 'remediation': 'str'}]"
         )
+
+        # Use Ollama if available
+        if self.using_ollama and self.ollama and self.ollama.enabled:
+            try:
+                response = self.ollama.generate(prompt, self.SYSTEM_PROMPT)
+                if not response:
+                    return []
+                return self._clean_json(response)
+            except Exception as e:
+                logger.error(f"AuraBrain Logic Audit (Ollama): {e}")
+                return []
+
+        # Fall back to Gemini
+        if not hasattr(self, 'client'):
+            return []
+
         try:
             response = self.client.models.generate_content(
                 model=state.GEMINI_MODEL,
                 contents=prompt,
                 config={'system_instruction': self.SYSTEM_PROMPT}
             )
+            raw = response.text.strip()
             return self._clean_json(raw)
         except Exception as e:
             logger.error(f"AuraBrain Logic Audit: {e}")
@@ -324,6 +534,23 @@ class AuraBrain:
             "The script must be professional, include clear documentation, and attempt to verify the exploit non-destructively.\n"
             "Return ONLY the raw Python code without markdown code blocks."
         )
+
+        # Use Ollama if available
+        if self.using_ollama and self.ollama and self.ollama.enabled:
+            try:
+                code = self.reason_json(prompt)
+                if "```python" in code:
+                    code = code.split("```python")[-1].split("```")[0]
+                elif "```" in code:
+                    code = code.split("```")[-1].split("```")[0]
+                return code.strip()
+            except Exception as e:
+                return f"# [!] Failed to generate shadow-script: {e}"
+
+        # Fall back to Gemini
+        if not hasattr(self, 'client'):
+            return "# AI not available"
+
         try:
             # Ghost v5: AI-assisted weaponization
             code = self.reason_json(prompt)
@@ -339,7 +566,7 @@ class AuraBrain:
     def generate_graphql_attack(self, schema: str) -> str:
         """Phase 30: AI-driven GraphQL mutation fuzzing based on schema analysis."""
         if not self.enabled: return 'mutation { login(user: "admin", pass: "' + "' OR 1=1--" + '") { token } }'
-        
+
         prompt = (
             f"As AURA Singularity, analyze this GraphQL schema and generate a malicious mutation or query.\n"
             f"Schema Fragment: {schema[:2000]}\n\n"
@@ -347,6 +574,20 @@ class AuraBrain:
             "Generate a 'lethal' GraphQL payload to exploit potential logic flaws or injection.\n"
             "Return ONLY the raw GraphQL string."
         )
+
+        # Use Ollama if available
+        if self.using_ollama and self.ollama and self.ollama.enabled:
+            try:
+                response = self.ollama.generate(prompt, self.SYSTEM_PROMPT)
+                if response:
+                    return response.strip().replace("```graphql", "").replace("```", "")
+            except Exception as e:
+                logger.error(f"AuraBrain GraphQL (Ollama): {e}")
+
+        # Fall back to Gemini
+        if not hasattr(self, 'client'):
+            return 'mutation { login(user: "admin") { token } }'
+
         try:
             response = self.client.models.generate_content(
                 model=state.GEMINI_MODEL,
@@ -376,52 +617,65 @@ class AuraBrain:
         """Phase 31: Analyzes a finding to determine professional severity."""
         content_low = content.lower()
         type_low = finding_type.lower()
-        
+
         # 1. AI-Driven deep reasoning (if available)
         if self.enabled:
-            # We use a summarized prompt for speed
             prompt = (
                 f"As AURA Singularity, analyze this security finding and assign a professional severity: CRITICAL, HIGH, MEDIUM, or LOW.\n"
                 f"Finding Type: {finding_type}\n"
                 f"Finding Content: {content}\n\n"
                 "Return ONLY the severity name."
             )
-            try:
-                response = self.client.models.generate_content(
-                    model=state.GEMINI_MODEL,
-                    contents=prompt,
-                    config={'count': 1}
-                )
-                res = response.text.strip().upper()
-                if res in ["CRITICAL", "HIGH", "MEDIUM", "LOW"]:
-                    return res
-            except: pass
+
+            # Use Ollama if available
+            if self.using_ollama and self.ollama and self.ollama.enabled:
+                try:
+                    response = self.ollama.generate(prompt, self.SYSTEM_PROMPT)
+                    if response:
+                        res = response.strip().upper()
+                        if res in ["CRITICAL", "HIGH", "MEDIUM", "LOW"]:
+                            return res
+                except:
+                    pass
+            elif hasattr(self, 'client'):
+                # Fall back to Gemini
+                try:
+                    response = self.client.models.generate_content(
+                        model=state.GEMINI_MODEL,
+                        contents=prompt,
+                        config={'count': 1}
+                    )
+                    res = response.text.strip().upper()
+                    if res in ["CRITICAL", "HIGH", "MEDIUM", "LOW"]:
+                        return res
+                except:
+                    pass
 
         # 2. Heuristic Fallback (Logical/Deterministic rules)
         high_impact_paths = [
-            "/backup", "/db", "/phpmyadmin", "/config", "/setup", "/.env", "/settings", 
+            "/backup", "/db", "/phpmyadmin", "/config", "/setup", "/.env", "/settings",
             "/admin", "/login", "/mysql", "/sql", "/backup.zip", "/config.php", "/web.config",
             "/.git", "/.svn", "/.ds_store", "/dvwa", "/vuln", "/test", "/dev"
         ]
-        
+
         # If any high-impact keyword is in the content/path and it's info disclosure or discovered path
         if "path" in type_low or "disclosure" in type_low or "discovered" in type_low:
             if any(path in content_low for path in high_impact_paths):
                 return "CRITICAL"
-        
+
         # Injection and high-impact vulns
         if any(x in type_low for x in ["injection", "rce", "ssrf", "idor", "lfi"]):
             return "CRITICAL"
-            
+
         if any(x in type_low for x in ["xss", "secret", "token", "key", "access", "auth"]):
             return "HIGH"
-            
+
         return "MEDIUM"
 
     def generate_payload(self, vuln_type: str, tech_stack: str, level: int = 2, oast_url: str = None) -> str:
         """v15.1: Semantic Stack-Mapping - Generates tech-specific payloads for maximum impact."""
         if not self.enabled: return "fallback_payload"
-        
+
         prompt = (
             f"As AURA-Zenith, generate a high-impact Level {level} payload for: {vuln_type}.\n"
             f"Target Stack: {tech_stack}\n"
@@ -431,17 +685,32 @@ class AuraBrain:
             "- Target specific weaknesses in the identified stack (e.g., if Tomcat, use path traversal variants).\n"
             "Respond ONLY with the payload string."
         )
-        try:
-            return self._call_ai(prompt)
-        except:
-            return "fallback_payload_simple"
+
+        # Use Ollama if available
+        if self.using_ollama and self.ollama and self.ollama.enabled:
+            try:
+                response = self.ollama.generate(prompt, self.SYSTEM_PROMPT)
+                if response:
+                    return response.strip()
+            except:
+                pass
+
+        # Fall back to Gemini
+        if hasattr(self, 'client'):
+            try:
+                return self._call_ai(prompt) or "fallback_payload_simple"
+            except:
+                return "fallback_payload_simple"
+
+        return "fallback_payload"
+
     def predict_implied_vulns(self, context: dict, existing_findings: list) -> list:
         """
         v22.0: Oracle Synthesis - Predictive Vulnerability Engine.
         Analyzes existing findings and architectural patterns to predict 'Implied' vulnerabilities.
         """
         if not self.enabled: return []
-        
+
         prompt = (
             f"As AURA-Zenith Oracle, analyze these confirmed findings and environmental context:\n"
             f"Context: {context}\n"
@@ -452,21 +721,40 @@ class AuraBrain:
             "If SSRF is confirmed, is an internal metadata leak implied?\n"
             "Respond ONLY in JSON array: [{'predicted_type': 'str', 'implied_url': 'str', 'confidence': 'str', 'reasoning': 'str'}]"
         )
+
+        # Use Ollama if available
+        if self.using_ollama and self.ollama and self.ollama.enabled:
+            try:
+                raw = self.ollama.generate(prompt, self.SYSTEM_PROMPT)
+                if not raw:
+                    return []
+                parsed = self._clean_json(raw)
+                return parsed if isinstance(parsed, list) else []
+            except Exception as e:
+                logger.error(f"AuraBrain IDOR Logic JSON Reason (Ollama): {e}")
+                return []
+
+        # Fall back to Gemini
+        if not hasattr(self, 'client'):
+            return []
+
         try:
             raw = self._call_ai(prompt, use_cache=True)
-            if not raw: return []
+            if not raw:
+                return []
             parsed = self._clean_json(raw)
             return parsed if isinstance(parsed, list) else []
         except Exception as e:
             logger.error(f"AuraBrain IDOR Logic JSON Reason: {e}")
             return []
+
     def synthesize_detection_plugin(self, tech_info: str, target_desc: str) -> str:
         """
         v24.0 Sovereign Hegemony: Autonomous Plugin Synthesis.
         Generates custom Python detection logic for unknown technologies or specific CVEs.
         """
         if not self.enabled: return ""
-        
+
         prompt = (
             f"As AURA-Zenith AI, synthesize a HIGH-STAKES Python 3 function to detect a vulnerability in this specific target:\n"
             f"Tech Stack/Context: {tech_info}\n"
@@ -479,10 +767,27 @@ class AuraBrain:
             "5. Respond ONLY with the Python code block, no markdown formatting if possible, "
             "but if you use backticks I will strip them. Code must be ready to execute via exec()."
         )
+
+        # Use Ollama if available
+        if self.using_ollama and self.ollama and self.ollama.enabled:
+            try:
+                raw = self.ollama.generate(prompt, self.SYSTEM_PROMPT)
+                if not raw:
+                    return ""
+                clean_code = raw.replace("```python", "").replace("```", "").strip()
+                return clean_code
+            except Exception as e:
+                logger.error(f"Plugin Synthesis Error (Ollama): {e}")
+                return ""
+
+        # Fall back to Gemini
+        if not hasattr(self, 'client'):
+            return ""
+
         try:
             raw = self._call_ai(prompt, use_cache=False)
-            if not raw: return ""
-            # Clean backticks if present
+            if not raw:
+                return ""
             clean_code = raw.replace("```python", "").replace("```", "").strip()
             return clean_code
         except Exception as e:
