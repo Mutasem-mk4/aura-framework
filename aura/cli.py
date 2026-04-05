@@ -1551,3 +1551,163 @@ def clinic():
     except Exception as e:
         console.print(f"[red]Error loading findings: {e}[/red]")
         console.print("[dim]Run 'aura scan target.com' first to generate findings.[/dim]")
+
+@cli.command()
+@click.option('--target', '-t', help="Filter by target domain")
+@click.option('--platform', '-p', default='generic', type=click.Choice(['hackerone', 'bugcrowd', 'intigriti', 'generic']), help="Bug bounty platform")
+@click.option('--format', '-f', default='md', type=click.Choice(['md', 'html', 'both']), help="Report format")
+@click.option('--output', '-o', help="Output file path (optional)")
+def report(target, platform, format, output):
+    """📄 Generate a professional bug bounty report.
+
+    Creates submission-ready reports for HackerOne, Bugcrowd, Intigriti, and more.
+
+    Examples:
+        aura report                           Generate report for all findings
+        aura report -t target.com             Generate report for specific target
+        aura report -p hackerone             HackerOne-formatted report
+        aura report -f html                   Generate HTML report
+        aura report -f both -o report.md     Markdown + HTML to specific file
+
+    Features:
+        - Executive summary with key statistics
+        - CVSS v3.1 scoring for all findings
+        - MITRE ATT&CK and OWASP Top 10 mappings
+        - Professional impact analysis
+        - Detailed remediation steps
+        - Proof-of-concept code blocks
+        - References to security resources
+    """
+    from aura.core.professional_reporter import ProfessionalReporter
+
+    try:
+        reporter = ProfessionalReporter()
+
+        console.print(Panel(
+            f"[bold cyan]📄 Professional Report Generator[/bold cyan]\n\n"
+            f"Platform: [yellow]{platform.upper()}[/yellow]\n"
+            f"Format: [yellow]{format.upper()}[/yellow]\n"
+            f"Target Filter: [yellow]{target or 'All targets'}[/yellow]",
+            border_style="cyan"
+        ))
+
+        # Generate Markdown report
+        if format in ['md', 'both']:
+            md_path = output or None
+            console.print("\n[cyan]Generating Markdown report...[/cyan]")
+            md_result = reporter.generate_markdown_report(
+                output_path=md_path,
+                target_filter=target,
+                platform=platform
+            )
+            if md_result:
+                console.print(f"[bold green]✅ Markdown report: {md_result}[/bold green]")
+            else:
+                console.print("[yellow]No findings to report (Markdown).[/yellow]")
+
+        # Generate HTML report
+        if format in ['html', 'both']:
+            html_path = output.replace('.md', '.html') if output and output.endswith('.md') else None
+            console.print("\n[cyan]Generating HTML report...[/cyan]")
+            html_result = reporter.generate_html_report(
+                output_path=html_path,
+                target_filter=target,
+                platform=platform
+            )
+            if html_result:
+                console.print(f"[bold green]✅ HTML report: {html_result}[/bold green]")
+            else:
+                console.print("[yellow]No findings to report (HTML).[/yellow]")
+
+        console.print(Panel(
+            "[bold green]✅ Report generation complete![/bold green]\n\n"
+            "Next steps:\n"
+            "1. Review the report and verify findings\n"
+            "2. Add screenshots and evidence\n"
+            "3. Submit to the bug bounty program\n"
+            "4. Use 'aura report --help' for more options",
+            title="[bold]Success[/bold]",
+            border_style="green"
+        ))
+
+    except Exception as e:
+        console.print(f"[red]Error generating report: {e}[/red]")
+        console.print("[dim]Make sure you have scanned at least one target first.[/dim]")
+
+
+@cli.command()
+def triage():
+    """🔍 Triage and prioritize findings.
+
+    Analyzes all findings and prioritizes them by severity and impact.
+    Helps you focus on the most critical issues first.
+    """
+    from aura.core.professional_reporter import ProfessionalReporter
+
+    try:
+        findings = db.get_all_findings()
+        if not findings:
+            console.print(Panel(
+                "[yellow]No findings to triage.[/yellow]\n\n"
+                "Run a scan first:\n"
+                "  [cyan]aura scan target.com[/cyan]",
+                title="[bold]Triage[/bold]",
+                border_style="yellow"
+            ))
+            return
+
+        # Get unique findings
+        seen = set()
+        unique = []
+        for f in findings:
+            key = f.get('finding_type', 'Unknown')
+            if key not in seen:
+                seen.add(key)
+                unique.append(f)
+
+        # Sort by severity
+        sev_rank = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1, "INFO": 0}
+        unique.sort(key=lambda x: sev_rank.get(x.get('severity', 'INFO'), 0), reverse=True)
+
+        # Show triage table
+        table = Table(
+            title="[bold]🔍 Finding Triage - Priority Queue[/bold]",
+            show_header=True,
+            header_style="bold magenta"
+        )
+        table.add_column("Priority", style="bold", width=4)
+        table.add_column("Severity", style="bold", width=10)
+        table.add_column("Type", style="cyan")
+        table.add_column("CVSS", style="magenta", justify="center")
+        table.add_column("Action", style="yellow")
+
+        action_map = {
+            "CRITICAL": "Submit ASAP",
+            "HIGH": "Investigate Today",
+            "MEDIUM": "Plan This Week",
+            "LOW": "Schedule Fix",
+            "INFO": "Optional"
+        }
+
+        for i, f in enumerate(unique, 1):
+            sev = f.get('severity', 'INFO')
+            cvss = f.get('cvss_score', 0.0)
+            vuln_type = f.get('finding_type', 'Unknown')
+
+            table.add_row(
+                str(i),
+                f"[bold]{sev}[/bold]" if sev == "CRITICAL" else sev,
+                vuln_type,
+                f"{cvss:.1f}",
+                action_map.get(sev, "Review")
+            )
+
+        console.print(table)
+        console.print("\n[dim]Run 'aura report' to generate a full report.[/dim]")
+
+    except Exception as e:
+        console.print(f"[red]Error during triage: {e}[/red]")
+
+
+if __name__ == "__main__":
+    cli()
