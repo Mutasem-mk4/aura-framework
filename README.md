@@ -110,3 +110,11 @@ export GEMINI_API_KEY="your_google_ai_key"
 Aura is an extremely potent offensive security tool. It is intended strictly for authorized security auditing, bug bounty hunting, and defensive research. Any illicit usage or deployment against unauthorized targets is strictly prohibited. The developers accept no liability for the misuse of this tool.
 
 ## 🌌 The Future is Sovereign. The Future is Aura.
+
+---
+
+## About the Author
+
+**Developed by [Mutasem Kharma](https://github.com/Mutasem-mk4)**, a Security Engineer and Open-Source Toolsmith specializing in eBPF, AI-powered security frameworks, and autonomous vulnerability hunting. 
+
+Explore more projects and technical deep-dives at **[mutasem-portfolio.vercel.app](https://mutasem-portfolio.vercel.app/)**.
