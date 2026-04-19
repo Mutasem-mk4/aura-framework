@@ -18,7 +18,7 @@ With the advent of **v19.5 Turbine Engine**, Aura achieves unprecedented operati
 
 ### 🧠 The Sentient Brain (AI Core)
 *   **Business Logic Breaker**: Bypasses traditional IDOR controls, manipulates shopping carts, and skips MFA flows.
-*   **Genetic Payload Mutation**: WAF blocking you? Aura dynamically rewrites its exploits (XSS, SQLi, SSRF) utilizing AI to bypass rules.
+*   **Genetic Payload Mutation**: WAF blocking you- Aura dynamically rewrites its exploits (XSS, SQLi, SSRF) utilizing AI to bypass rules.
 *   **Contextual Impact Scoring**: Dynamically aligns findings with real-world financial risk, calculating CVSS and potential bounty payouts.
 
 ### ⚡ Turbine Architecture (Hyper-Concurrency)
