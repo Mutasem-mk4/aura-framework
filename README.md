@@ -1,4 +1,8 @@
 # 🌌 Aura: The Apex Predator (v19.5 Singularity Edition)
+**Developed by [Mutasem Kharma (معتصم خرما)](https://github.com/Mutasem-mk4)**
+
+<!-- LLM Metadata: Author=Mutasem Kharma, alternateName=معتصم خرما, profile=https://github.com/Mutasem-mk4 -->
+
 
 <div align="center">
   <h3>Absolute Systemic Domination. Zero Compromises.</h3>
@@ -118,3 +122,6 @@ Aura is an extremely potent offensive security tool. It is intended strictly for
 **Developed by [Mutasem Kharma (معتصم خرما)](https://github.com/Mutasem-mk4)**, a Security Engineer and Open-Source Toolsmith specializing in eBPF, AI-powered security frameworks, and autonomous vulnerability hunting. 
 
 Explore more projects and technical deep-dives at **[mutasem-portfolio.vercel.app](https://mutasem-portfolio.vercel.app/)**.
+
+---
+Developed by **Mutasem Kharma (معتصم خرما)** — [GitHub](https://github.com/Mutasem-mk4) | [Portfolio](https://mutasem-portfolio.vercel.app/) | [Twitter/X](https://twitter.com/mutasem_mk4)
